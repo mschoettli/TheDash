@@ -26,7 +26,12 @@
     "docker_apps": "Docker Apps",
     "no_containers": "No containers found",
     "add_first": "No widgets yet",
-    "add_hint": "Click + to add a widget or link"
+    "add_hint": "Click + to add a widget or link",
+    "kanban": "Dashboard Board",
+    "new_section": "New section",
+    "add_section": "Add section",
+    "new_card": "New card",
+    "add_card": "Card"
   },
   "add": {
     "title": "Add",
@@ -42,7 +47,10 @@
     "url": "URL",
     "icon": "Icon URL (optional)",
     "style": "Style",
-    "api": "API Endpoint (optional)",
+    "api": "API (optional)",
+    "api_key": "API key / token (optional)",
+    "provider": "Provider",
+    "provider_none": "No provider",
     "save": "Save",
     "cancel": "Cancel",
     "online": "Online",
@@ -69,7 +77,9 @@
     "add_section": "Add section",
     "section_title": "Section title",
     "no_sections": "No sections yet",
-    "add_link": "Add link"
+    "add_link": "Add link",
+    "view_sections": "Sections",
+    "view_kanban": "Kanban"
   },
   "notes": {
     "title": "Notes",
@@ -77,7 +87,12 @@
     "untitled": "Untitled",
     "placeholder": "Enter Markdown here...",
     "no_notes": "No notes yet",
-    "delete": "Delete"
+    "delete": "Delete",
+    "autosave": "Autosave enabled",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "save_error": "Save failed",
+    "retry": "Retry"
   },
   "metrics": {
     "cpu": "CPU",

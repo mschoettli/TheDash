@@ -9,10 +9,18 @@ export interface Note {
 
 const KEY = ["notes"];
 
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export function useNotes() {
   return useQuery<Note[]>({
     queryKey: KEY,
-    queryFn: () => fetch("/api/notes").then((r) => r.json()),
+    queryFn: () => fetchJson<Note[]>("/api/notes"),
   });
 }
 
@@ -20,11 +28,11 @@ export function useCreateNote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data?: { title?: string; content?: string }) =>
-      fetch("/api/notes", {
+      fetchJson<Note>("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data ?? {}),
-      }).then((r) => r.json()),
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }
@@ -33,11 +41,11 @@ export function useUpdateNote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...data }: Partial<Note> & { id: number }) =>
-      fetch(`/api/notes/${id}`, {
+      fetchJson<Note>(`/api/notes/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-      }).then((r) => r.json()),
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }
@@ -46,7 +54,7 @@ export function useDeleteNote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) =>
-      fetch(`/api/notes/${id}`, { method: "DELETE" }).then((r) => r.json()),
+      fetchJson<{ ok: true }>(`/api/notes/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }

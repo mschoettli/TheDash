@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNotes } from "../hooks/useNotes";
 import NoteList from "../components/notes/NoteList";
@@ -8,6 +8,16 @@ export default function NotesPage() {
   const { t } = useTranslation();
   const { data: notes } = useNotes();
   const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!notes?.length) {
+      setSelectedId(null);
+      return;
+    }
+    if (!notes.some((note) => note.id === selectedId)) {
+      setSelectedId(notes[0].id);
+    }
+  }, [notes, selectedId]);
 
   const selectedNote = notes?.find((n) => n.id === selectedId);
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import Modal from "../ui/Modal";
-import { useCreateTile, useUpdateTile, useDeleteTile, Tile } from "../../hooks/useTiles";
+import { useCreateTile, useUpdateTile, useDeleteTile, Tile, TileProvider } from "../../hooks/useTiles";
 
 interface Props {
   open: boolean;
@@ -17,7 +17,9 @@ export default function TileEditModal({ open, onClose, tile }: Props) {
   const [url, setUrl] = useState(tile?.url ?? "");
   const [iconUrl, setIconUrl] = useState(tile?.icon_url ?? "");
   const [style, setStyle] = useState<Tile["style"]>(tile?.style ?? "card");
-  const [apiEndpoint, setApiEndpoint] = useState(tile?.api_endpoint ?? "");
+  const [apiUrl, setApiUrl] = useState(tile?.api_url ?? "");
+  const [apiKey, setApiKey] = useState(tile?.api_key ?? "");
+  const [provider, setProvider] = useState<TileProvider>(tile?.provider ?? "none");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -26,7 +28,9 @@ export default function TileEditModal({ open, onClose, tile }: Props) {
       setUrl(tile?.url ?? "");
       setIconUrl(tile?.icon_url ?? "");
       setStyle(tile?.style ?? "card");
-      setApiEndpoint(tile?.api_endpoint ?? "");
+      setApiUrl(tile?.api_url ?? "");
+      setApiKey(tile?.api_key ?? "");
+      setProvider(tile?.provider ?? "none");
       setConfirmDelete(false);
     }
   }, [open, tile]);
@@ -41,9 +45,12 @@ export default function TileEditModal({ open, onClose, tile }: Props) {
       url,
       icon_url: iconUrl || null,
       style,
-      api_endpoint: apiEndpoint || null,
+      api_url: apiUrl || null,
+      api_key: apiKey || null,
+      provider,
       sort_order: tile?.sort_order ?? 0,
     };
+
     if (isEdit && tile) {
       update.mutate({ id: tile.id, ...data }, { onSuccess: onClose });
     } else {
@@ -53,7 +60,10 @@ export default function TileEditModal({ open, onClose, tile }: Props) {
 
   const handleDelete = () => {
     if (!tile) return;
-    if (!confirmDelete) { setConfirmDelete(true); return; }
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
     del.mutate(tile.id, { onSuccess: onClose });
   };
 
@@ -61,6 +71,13 @@ export default function TileEditModal({ open, onClose, tile }: Props) {
     { value: "card", label: t("settings.style_card") },
     { value: "compact", label: t("settings.style_compact") },
     { value: "minimal", label: t("settings.style_minimal") },
+  ];
+
+  const providerOptions: Array<{ value: TileProvider; label: string }> = [
+    { value: "none", label: t("tile.provider_none") },
+    { value: "jellyfin", label: "Jellyfin" },
+    { value: "plex", label: "Plex" },
+    { value: "emby", label: "Emby" },
   ];
 
   return (
@@ -78,9 +95,10 @@ export default function TileEditModal({ open, onClose, tile }: Props) {
             className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Meine App"
+            placeholder="My Service"
           />
         </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
             {t("tile.url")} *
@@ -92,6 +110,7 @@ export default function TileEditModal({ open, onClose, tile }: Props) {
             placeholder="http://server:8080"
           />
         </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
             {t("tile.icon")}
@@ -103,6 +122,7 @@ export default function TileEditModal({ open, onClose, tile }: Props) {
             placeholder="https://..."
           />
         </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
             {t("tile.style")}
@@ -123,15 +143,45 @@ export default function TileEditModal({ open, onClose, tile }: Props) {
             ))}
           </div>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+            {t("tile.provider")}
+          </label>
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as TileProvider)}
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          >
+            {providerOptions.map((entry) => (
+              <option key={entry.value} value={entry.value}>
+                {entry.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
             {t("tile.api")}
           </label>
           <input
             className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            value={apiEndpoint}
-            onChange={(e) => setApiEndpoint(e.target.value)}
-            placeholder="http://server:8080/api/status"
+            value={apiUrl}
+            onChange={(e) => setApiUrl(e.target.value)}
+            placeholder="http://media-server:8096"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+            {t("tile.api_key")}
+          </label>
+          <input
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="Optional token"
           />
         </div>
 

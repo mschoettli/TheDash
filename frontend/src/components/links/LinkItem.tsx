@@ -19,7 +19,12 @@ export default function LinkItem({ link }: Props) {
         rel="noopener noreferrer"
         className="flex items-center gap-3 flex-1 min-w-0"
       >
-        <FaviconImg url={link.url} name={link.name} size={20} />
+        <FaviconImg
+          url={link.url}
+          name={link.name}
+          size={20}
+          explicitIconUrl={link.icon_url}
+        />
         <span className="text-sm text-slate-700 dark:text-slate-200 truncate">
           {link.name}
         </span>

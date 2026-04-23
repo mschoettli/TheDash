@@ -26,7 +26,12 @@
     "docker_apps": "Docker Apps",
     "no_containers": "Keine Container gefunden",
     "add_first": "Noch keine Widgets vorhanden",
-    "add_hint": "Klicke auf + um ein Widget oder Link hinzuzufügen"
+    "add_hint": "Klicke auf + um ein Widget oder Link hinzuzufügen",
+    "kanban": "Dashboard Board",
+    "new_section": "Neue Sektion",
+    "add_section": "Sektion hinzufügen",
+    "new_card": "Neue Karte",
+    "add_card": "Karte"
   },
   "add": {
     "title": "Hinzufügen",
@@ -42,7 +47,10 @@
     "url": "URL",
     "icon": "Icon URL (optional)",
     "style": "Stil",
-    "api": "API Endpunkt (optional)",
+    "api": "API (optional)",
+    "api_key": "API Key / Token (optional)",
+    "provider": "Provider",
+    "provider_none": "Kein Provider",
     "save": "Speichern",
     "cancel": "Abbrechen",
     "online": "Online",
@@ -69,7 +77,9 @@
     "add_section": "Sektion hinzufügen",
     "section_title": "Sektions-Titel",
     "no_sections": "Noch keine Sektionen vorhanden",
-    "add_link": "Link hinzufügen"
+    "add_link": "Link hinzufügen",
+    "view_sections": "Sektionen",
+    "view_kanban": "Kanban"
   },
   "notes": {
     "title": "Notizen",
@@ -77,7 +87,12 @@
     "untitled": "Ohne Titel",
     "placeholder": "Markdown hier eingeben...",
     "no_notes": "Noch keine Notizen vorhanden",
-    "delete": "Löschen"
+    "delete": "Löschen",
+    "autosave": "Autosave aktiv",
+    "saving": "Speichert...",
+    "saved": "Gespeichert",
+    "save_error": "Speichern fehlgeschlagen",
+    "retry": "Erneut versuchen"
   },
   "metrics": {
     "cpu": "CPU",

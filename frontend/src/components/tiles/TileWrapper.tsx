@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Pencil } from "lucide-react";
-import { Tile } from "../../hooks/useTiles";
+import { Tile, TileMetrics, fetchTileMetrics } from "../../hooks/useTiles";
 import { useSettingsStore } from "../../store/useSettingsStore";
 import TileCard from "./TileCard";
 import TileCompact from "./TileCompact";
@@ -16,7 +16,7 @@ export default function TileWrapper({ tile }: Props) {
   const effectiveStyle = tile.style !== "card" ? tile.style : globalStyle;
 
   const [online, setOnline] = useState<boolean | null>(null);
-  const [apiData, setApiData] = useState<unknown>(null);
+  const [apiData, setApiData] = useState<TileMetrics | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -35,29 +35,42 @@ export default function TileWrapper({ tile }: Props) {
       }
     }
 
-    async function fetchApi() {
-      if (!tile.api_endpoint) return;
+    async function fetchMetrics() {
+      if (tile.provider === "none" || !tile.api_url) {
+        setApiData(null);
+        return;
+      }
+
       try {
-        const res = await fetch(tile.api_endpoint);
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled) setApiData(data);
-        }
+        const data = await fetchTileMetrics(tile.id);
+        if (!cancelled) setApiData(data);
       } catch {
-        // ignore
+        if (!cancelled) {
+          setApiData({
+            status: "error",
+            provider: tile.provider,
+            seriesCount: null,
+            movieCount: null,
+            activeStreams: null,
+            lastUpdated: new Date().toISOString(),
+          });
+        }
       }
     }
 
-    check();
-    fetchApi();
-    const id = setInterval(() => { check(); fetchApi(); }, 60_000);
+    void check();
+    void fetchMetrics();
+    const id = setInterval(() => {
+      void check();
+      void fetchMetrics();
+    }, 60_000);
 
     return () => {
       cancelled = true;
       abortRef.current?.abort();
       clearInterval(id);
     };
-  }, [tile.url, tile.api_endpoint]);
+  }, [tile.id, tile.url, tile.api_url, tile.provider]);
 
   const tileProps = { tile, online, apiData };
 
@@ -73,7 +86,10 @@ export default function TileWrapper({ tile }: Props) {
         )}
       </a>
       <button
-        onClick={(e) => { e.preventDefault(); setEditOpen(true); }}
+        onClick={(e) => {
+          e.preventDefault();
+          setEditOpen(true);
+        }}
         className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-white/80 dark:bg-slate-700/80 shadow text-slate-500 dark:text-slate-400 hover:text-indigo-500 transition-all"
         title="Bearbeiten"
       >

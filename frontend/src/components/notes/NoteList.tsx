@@ -25,6 +25,7 @@ export default function NoteList({ notes, selectedId, onSelect }: Props) {
               onSuccess: (note) => onSelect(note.id),
             })
           }
+          disabled={createNote.isPending}
           className="p-1 rounded text-slate-400 hover:text-indigo-500 transition-colors"
         >
           <Plus size={16} />
@@ -56,6 +57,7 @@ export default function NoteList({ notes, selectedId, onSelect }: Props) {
                   },
                 });
               }}
+              disabled={deleteNote.isPending}
               className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-slate-400 hover:text-rose-500 transition-all"
             >
               <Trash2 size={13} />
