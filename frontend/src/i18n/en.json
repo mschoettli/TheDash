@@ -1,0 +1,92 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "bookmarks": "Bookmarks",
+    "notes": "Notes"
+  },
+  "header": {
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "theme": "Theme",
+    "theme_light": "Light",
+    "theme_dark": "Dark",
+    "language": "Language",
+    "widget_style": "Widget Style",
+    "style_card": "Card",
+    "style_compact": "Compact",
+    "style_minimal": "Minimal",
+    "export": "Export settings",
+    "import": "Import settings",
+    "import_success": "Import successful",
+    "import_error": "Import failed"
+  },
+  "dashboard": {
+    "docker_apps": "Docker Apps",
+    "no_containers": "No containers found",
+    "add_first": "No widgets yet",
+    "add_hint": "Click + to add a widget or link"
+  },
+  "add": {
+    "title": "Add",
+    "widget": "Widget",
+    "widget_desc": "App tile with status and optional API",
+    "link": "Link",
+    "link_desc": "Simple link to a URL"
+  },
+  "tile": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "name": "Name",
+    "url": "URL",
+    "icon": "Icon URL (optional)",
+    "style": "Style",
+    "api": "API Endpoint (optional)",
+    "save": "Save",
+    "cancel": "Cancel",
+    "online": "Online",
+    "offline": "Offline",
+    "add_title": "Add Widget",
+    "edit_title": "Edit Widget"
+  },
+  "link": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "name": "Name",
+    "url": "URL",
+    "icon": "Icon URL (optional)",
+    "section": "Section",
+    "new_section": "New Section",
+    "section_name": "Section Title",
+    "save": "Save",
+    "cancel": "Cancel",
+    "add_title": "Add Link",
+    "edit_title": "Edit Link"
+  },
+  "bookmarks": {
+    "title": "Bookmarks",
+    "add_section": "Add section",
+    "section_title": "Section title",
+    "no_sections": "No sections yet",
+    "add_link": "Add link"
+  },
+  "notes": {
+    "title": "Notes",
+    "new_note": "New Note",
+    "untitled": "Untitled",
+    "placeholder": "Enter Markdown here...",
+    "no_notes": "No notes yet",
+    "delete": "Delete"
+  },
+  "metrics": {
+    "cpu": "CPU",
+    "ram": "RAM",
+    "disk": "Disk"
+  },
+  "common": {
+    "confirm_delete": "Really delete?",
+    "yes": "Yes",
+    "no": "No"
+  }
+}

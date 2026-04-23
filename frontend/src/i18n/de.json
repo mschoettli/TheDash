@@ -1,0 +1,92 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "bookmarks": "Lesezeichen",
+    "notes": "Notizen"
+  },
+  "header": {
+    "settings": "Einstellungen"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "theme": "Design",
+    "theme_light": "Hell",
+    "theme_dark": "Dunkel",
+    "language": "Sprache",
+    "widget_style": "Widget-Stil",
+    "style_card": "Karte",
+    "style_compact": "Kompakt",
+    "style_minimal": "Minimal",
+    "export": "Einstellungen exportieren",
+    "import": "Einstellungen importieren",
+    "import_success": "Import erfolgreich",
+    "import_error": "Import fehlgeschlagen"
+  },
+  "dashboard": {
+    "docker_apps": "Docker Apps",
+    "no_containers": "Keine Container gefunden",
+    "add_first": "Noch keine Widgets vorhanden",
+    "add_hint": "Klicke auf + um ein Widget oder Link hinzuzufügen"
+  },
+  "add": {
+    "title": "Hinzufügen",
+    "widget": "Widget",
+    "widget_desc": "App-Kachel mit Status und optionaler API",
+    "link": "Link",
+    "link_desc": "Einfacher Link zu einer URL"
+  },
+  "tile": {
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "name": "Name",
+    "url": "URL",
+    "icon": "Icon URL (optional)",
+    "style": "Stil",
+    "api": "API Endpunkt (optional)",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "online": "Online",
+    "offline": "Offline",
+    "add_title": "Widget hinzufügen",
+    "edit_title": "Widget bearbeiten"
+  },
+  "link": {
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "name": "Name",
+    "url": "URL",
+    "icon": "Icon URL (optional)",
+    "section": "Sektion",
+    "new_section": "Neue Sektion",
+    "section_name": "Sektions-Titel",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "add_title": "Link hinzufügen",
+    "edit_title": "Link bearbeiten"
+  },
+  "bookmarks": {
+    "title": "Lesezeichen",
+    "add_section": "Sektion hinzufügen",
+    "section_title": "Sektions-Titel",
+    "no_sections": "Noch keine Sektionen vorhanden",
+    "add_link": "Link hinzufügen"
+  },
+  "notes": {
+    "title": "Notizen",
+    "new_note": "Neue Notiz",
+    "untitled": "Ohne Titel",
+    "placeholder": "Markdown hier eingeben...",
+    "no_notes": "Noch keine Notizen vorhanden",
+    "delete": "Löschen"
+  },
+  "metrics": {
+    "cpu": "CPU",
+    "ram": "RAM",
+    "disk": "Speicher"
+  },
+  "common": {
+    "confirm_delete": "Wirklich löschen?",
+    "yes": "Ja",
+    "no": "Nein"
+  }
+}
