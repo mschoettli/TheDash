@@ -1,0 +1,62 @@
+services:
+  backend:
+    image: ghcr.io/${GHCR_OWNER:-mschoettli}/thedash-backend:${THEDASH_IMAGE_TAG:-main}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_PATH: /data/thedash.db
+      DOCKER_HOST_URL: ${DOCKER_HOST_URL:-}
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3001/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - thedash
+
+  frontend:
+    image: ghcr.io/${GHCR_OWNER:-mschoettli}/thedash-frontend:${THEDASH_IMAGE_TAG:-main}
+    restart: unless-stopped
+    ports:
+      - "${THEDASH_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - thedash
+
+  dockerproxy:
+    image: tecnativa/docker-socket-proxy:0.1
+    profiles:
+      - docker-monitoring
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      INFO: 1
+      PING: 1
+      VERSION: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - thedash
+
+networks:
+  thedash:
+    driver: bridge

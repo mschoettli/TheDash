@@ -19,7 +19,33 @@ docker --version
 docker compose version
 ```
 
-## Quick Start (One Command)
+## OpenMediaVault (Stack) Install
+
+Use `docker-compose.omv.yml` to run directly from prebuilt GHCR images (no local build context needed).
+
+1. In OMV Compose plugin, create a new stack and paste:
+
+- `docker-compose.omv.yml` from:
+  `https://raw.githubusercontent.com/mschoettli/TheDash/main/docker-compose.omv.yml`
+- `.env.example` from:
+  `https://raw.githubusercontent.com/mschoettli/TheDash/main/.env.example`
+
+2. Save env as `.env` and keep defaults or adjust:
+- `THEDASH_PORT`
+- `GHCR_OWNER`
+- `THEDASH_IMAGE_TAG`
+
+3. Deploy the stack.
+
+This pulls:
+- `ghcr.io/<owner>/thedash-backend:<tag>`
+- `ghcr.io/<owner>/thedash-frontend:<tag>`
+
+Optional Docker monitoring in OMV:
+- Set `DOCKER_HOST_URL=http://dockerproxy:2375`
+- Enable compose profile `docker-monitoring`
+
+## Quick Start (Local Build from Git Clone)
 
 1. Copy environment defaults:
 
@@ -33,7 +59,7 @@ On PowerShell:
 Copy-Item .env.example .env
 ```
 
-2. Start TheDash:
+2. Start TheDash (local build):
 
 ```bash
 docker compose up -d
@@ -78,7 +104,7 @@ Stop:
 docker compose down
 ```
 
-Update after pulling new changes:
+Update after pulling new changes (local build compose):
 
 ```bash
 docker compose build --no-cache
@@ -111,6 +137,19 @@ You can also use in-app JSON export/import in Settings.
 - Backend health endpoint: `/api/health`
 - Frontend and backend include Docker health checks in `docker-compose.yml`
 
+## GHCR Publishing
+
+GitHub Actions workflow:
+- `.github/workflows/publish-ghcr.yml`
+
+On push to `main`, images are published to GHCR:
+- `ghcr.io/<repo_owner>/thedash-backend:main`
+- `ghcr.io/<repo_owner>/thedash-frontend:main`
+
+Also published:
+- `sha-<commit>` tags
+- `v*` tags when you push version tags
+
 ## Troubleshooting
 
 Port already in use:
@@ -122,3 +161,7 @@ Docker monitoring shows no containers:
 
 Compose command not found:
 - Install Docker Compose v2 plugin and verify `docker compose version`.
+
+OMV stack cannot pull images:
+- Ensure GHCR package visibility allows pulling (or provide credentials in OMV if private).
+- Verify `GHCR_OWNER` and `THEDASH_IMAGE_TAG` in `.env`.
