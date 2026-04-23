@@ -9,29 +9,44 @@ export interface DockerContainer {
   ports: string[];
 }
 
+const dockerHostUrl = process.env.DOCKER_HOST_URL?.trim();
+
 export function dockerGet(path: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    const req = http.request(
-      {
-        socketPath: "/var/run/docker.sock",
+    const requestOptions: http.RequestOptions = (() => {
+      if (!dockerHostUrl) {
+        return {
+          socketPath: "/var/run/docker.sock",
+          path,
+          method: "GET",
+        };
+      }
+
+      const parsed = new URL(dockerHostUrl);
+      return {
+        protocol: parsed.protocol,
+        hostname: parsed.hostname,
+        port: parsed.port,
         path,
         method: "GET",
-      },
-      (res) => {
-        let data = "";
-        res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch {
-            reject(new Error("Invalid JSON from Docker socket"));
-          }
-        });
-      }
-    );
+      };
+    })();
+
+    const req = http.request(requestOptions, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch {
+          reject(new Error("Invalid JSON from Docker API"));
+        }
+      });
+    });
+
     req.setTimeout(5000, () => {
       req.destroy();
-      reject(new Error("Docker socket timeout"));
+      reject(new Error("Docker API timeout"));
     });
     req.on("error", reject);
     req.end();
