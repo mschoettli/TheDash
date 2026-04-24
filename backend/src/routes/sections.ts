@@ -1,5 +1,6 @@
 import { Router } from "express";
 import db from "../db/client";
+import { attachTags } from "./links";
 
 const router = Router();
 
@@ -9,11 +10,12 @@ router.get("/", (_req, res) => {
     .all() as Array<{ id: number; title: string; sort_order: number }>;
   const links = db
     .prepare("SELECT * FROM links ORDER BY sort_order ASC, id ASC")
-    .all() as Array<{ section_id: number }>;
+    .all() as Array<{ id: number; section_id: number }>;
+  const linksWithTags = attachTags(links);
 
   const result = sections.map((s) => ({
     ...s,
-    links: links.filter((l) => l.section_id === s.id),
+    links: linksWithTags.filter((l) => l.section_id === s.id),
   }));
   res.json(result);
 });

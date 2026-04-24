@@ -150,6 +150,30 @@ Also published:
 - `sha-<commit>` tags
 - `v*` tags when you push version tags
 
+## OMV Auto Update Script
+
+For OpenMediaVault hosts, you can use:
+
+`scripts/update-omv-stack.sh`
+
+It performs:
+- download latest `docker-compose.omv.yml` from GitHub
+- download latest `.env.example`
+- create `.env` if missing
+- append missing env keys from `.env.example` into `.env`
+- run `docker compose pull` and `docker compose up -d --remove-orphans`
+
+Example:
+
+```bash
+chmod +x scripts/update-omv-stack.sh
+STACK_DIR=/srv/dev-disk-by-uuid-XXXX/stacks/thedash \
+REPO_OWNER=mschoettli \
+REPO_NAME=TheDash \
+REPO_REF=main \
+scripts/update-omv-stack.sh
+```
+
 ## Troubleshooting
 
 Port already in use:

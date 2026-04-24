@@ -38,6 +38,19 @@ export function runMigrations(): void {
       sort_order INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS tags (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT    NOT NULL UNIQUE,
+      source     TEXT    NOT NULL DEFAULT 'manual',
+      created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS link_tags (
+      link_id INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+      tag_id  INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (link_id, tag_id)
+    );
+
     CREATE TABLE IF NOT EXISTS notes (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       title      TEXT NOT NULL DEFAULT 'Neue Notiz',
@@ -145,6 +158,36 @@ export function runMigrations(): void {
   }
 
   db.exec("UPDATE tiles SET provider = 'none' WHERE provider IS NULL OR provider = ''");
+
+  if (!columnExists("links", "description")) {
+    db.exec("ALTER TABLE links ADD COLUMN description TEXT");
+  }
+
+  if (!columnExists("links", "image_url")) {
+    db.exec("ALTER TABLE links ADD COLUMN image_url TEXT");
+  }
+
+  if (!columnExists("links", "note")) {
+    db.exec("ALTER TABLE links ADD COLUMN note TEXT");
+  }
+
+  if (!columnExists("links", "is_favorite")) {
+    db.exec("ALTER TABLE links ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0");
+  }
+
+  if (!columnExists("links", "is_archived")) {
+    db.exec("ALTER TABLE links ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0");
+  }
+
+  if (!columnExists("links", "created_at")) {
+    db.exec("ALTER TABLE links ADD COLUMN created_at TEXT");
+    db.exec("UPDATE links SET created_at = datetime('now') WHERE created_at IS NULL");
+  }
+
+  if (!columnExists("links", "updated_at")) {
+    db.exec("ALTER TABLE links ADD COLUMN updated_at TEXT");
+    db.exec("UPDATE links SET updated_at = COALESCE(created_at, datetime('now')) WHERE updated_at IS NULL");
+  }
 
   // Seed default settings
   const insert = db.prepare(

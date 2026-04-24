@@ -78,8 +78,13 @@
     "section_title": "Sektions-Titel",
     "no_sections": "Noch keine Sektionen vorhanden",
     "add_link": "Link hinzufügen",
+    "view_feed": "Feed",
     "view_sections": "Sektionen",
-    "view_kanban": "Kanban"
+    "view_kanban": "Kanban",
+    "capture": "Speichern",
+    "capture_placeholder": "Link einfügen und speichern...",
+    "search": "Lesezeichen suchen...",
+    "all_tags": "Alle"
   },
   "notes": {
     "title": "Notizen",

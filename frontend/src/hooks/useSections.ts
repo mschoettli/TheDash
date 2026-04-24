@@ -10,10 +10,18 @@ export interface Section {
 
 const KEY = ["sections"];
 
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export function useSections() {
   return useQuery<Section[]>({
     queryKey: KEY,
-    queryFn: () => fetch("/api/sections").then((r) => r.json()),
+    queryFn: () => fetchJson<Section[]>("/api/sections"),
   });
 }
 
@@ -21,11 +29,11 @@ export function useCreateSection() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: { title: string }) =>
-      fetch("/api/sections", {
+      fetchJson<Section>("/api/sections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-      }).then((r) => r.json()),
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }
@@ -34,11 +42,11 @@ export function useUpdateSection() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...data }: { id: number; title?: string }) =>
-      fetch(`/api/sections/${id}`, {
+      fetchJson<Section>(`/api/sections/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-      }).then((r) => r.json()),
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }
@@ -47,7 +55,7 @@ export function useDeleteSection() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) =>
-      fetch(`/api/sections/${id}`, { method: "DELETE" }).then((r) => r.json()),
+      fetchJson<{ ok: true }>(`/api/sections/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }

@@ -10,6 +10,7 @@ import settingsRouter from "./routes/settings";
 import faviconRouter from "./routes/favicon";
 import exportRouter from "./routes/export";
 import dashboardRouter from "./routes/dashboard";
+import tagsRouter from "./routes/tags";
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
@@ -20,6 +21,7 @@ app.use("/api/sections", sectionsRouter);
 app.use("/api/notes", notesRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/favicon", faviconRouter);
+app.use("/api/tags", tagsRouter);
 app.use("/api", exportRouter);
 app.use("/api/dashboard", dashboardRouter);
 

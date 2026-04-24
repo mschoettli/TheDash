@@ -8,6 +8,8 @@ router.get("/export", (_req, res) => {
   const tiles = db.prepare("SELECT * FROM tiles ORDER BY sort_order").all();
   const sections = db.prepare("SELECT * FROM sections ORDER BY sort_order").all();
   const links = db.prepare("SELECT * FROM links ORDER BY sort_order").all();
+  const tags = db.prepare("SELECT * FROM tags ORDER BY name").all();
+  const linkTags = db.prepare("SELECT * FROM link_tags ORDER BY link_id, tag_id").all();
   const notes = db.prepare("SELECT * FROM notes ORDER BY updated_at DESC").all();
   const dashboardSections = db
     .prepare("SELECT * FROM dashboard_sections ORDER BY sort_order")
@@ -22,6 +24,8 @@ router.get("/export", (_req, res) => {
     tiles,
     sections,
     links,
+    tags,
+    linkTags,
     notes,
     dashboardSections,
     dashboardCards,
@@ -34,6 +38,8 @@ router.post("/import", (req, res) => {
     tiles,
     sections,
     links,
+    tags,
+    linkTags,
     notes,
     dashboardSections,
     dashboardCards,
@@ -41,6 +47,8 @@ router.post("/import", (req, res) => {
 
   const doImport = db.transaction(() => {
     db.prepare("DELETE FROM links").run();
+    db.prepare("DELETE FROM link_tags").run();
+    db.prepare("DELETE FROM tags").run();
     db.prepare("DELETE FROM sections").run();
     db.prepare("DELETE FROM dashboard_cards").run();
     db.prepare("DELETE FROM dashboard_sections").run();
@@ -79,8 +87,36 @@ router.post("/import", (req, res) => {
 
     for (const l of links ?? []) {
       db.prepare(
-        "INSERT INTO links (id, section_id, name, url, icon_url, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
-      ).run(l.id, l.section_id, l.name, l.url, l.icon_url, l.sort_order);
+        `INSERT INTO links
+          (id, section_id, name, url, icon_url, image_url, description, note, is_favorite, is_archived, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        l.id,
+        l.section_id,
+        l.name,
+        l.url,
+        l.icon_url,
+        l.image_url ?? null,
+        l.description ?? null,
+        l.note ?? null,
+        l.is_favorite ? 1 : 0,
+        l.is_archived ? 1 : 0,
+        l.sort_order,
+        l.created_at ?? new Date().toISOString(),
+        l.updated_at ?? new Date().toISOString()
+      );
+    }
+
+    for (const tag of tags ?? []) {
+      db.prepare(
+        "INSERT INTO tags (id, name, source, created_at) VALUES (?, ?, ?, ?)"
+      ).run(tag.id, tag.name, tag.source ?? "manual", tag.created_at ?? new Date().toISOString());
+    }
+
+    for (const linkTag of linkTags ?? []) {
+      db.prepare(
+        "INSERT OR IGNORE INTO link_tags (link_id, tag_id) VALUES (?, ?)"
+      ).run(linkTag.link_id, linkTag.tag_id);
     }
 
     for (const n of notes ?? []) {

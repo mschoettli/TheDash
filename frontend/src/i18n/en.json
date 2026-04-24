@@ -78,8 +78,13 @@
     "section_title": "Section title",
     "no_sections": "No sections yet",
     "add_link": "Add link",
+    "view_feed": "Feed",
     "view_sections": "Sections",
-    "view_kanban": "Kanban"
+    "view_kanban": "Kanban",
+    "capture": "Save",
+    "capture_placeholder": "Paste a link and save...",
+    "search": "Search bookmarks...",
+    "all_tags": "All"
   },
   "notes": {
     "title": "Notes",
