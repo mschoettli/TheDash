@@ -7,6 +7,7 @@ export interface DockerContainer {
   status: string;
   state: string;
   ports: string[];
+  labels?: Record<string, string>;
 }
 
 interface DockerState {

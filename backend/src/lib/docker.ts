@@ -7,18 +7,27 @@ export interface DockerContainer {
   status: string;
   state: string;
   ports: string[];
+  labels: Record<string, string>;
 }
 
 const dockerHostUrl = process.env.DOCKER_HOST_URL?.trim();
 
 export function dockerGet(path: string): Promise<unknown> {
+  return dockerRequest("GET", path);
+}
+
+export function dockerPost(path: string): Promise<unknown> {
+  return dockerRequest("POST", path);
+}
+
+function dockerRequest(method: "GET" | "POST", path: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const requestOptions: http.RequestOptions = (() => {
       if (!dockerHostUrl) {
         return {
           socketPath: "/var/run/docker.sock",
           path,
-          method: "GET",
+          method,
         };
       }
 
@@ -28,7 +37,7 @@ export function dockerGet(path: string): Promise<unknown> {
         hostname: parsed.hostname,
         port: parsed.port,
         path,
-        method: "GET",
+        method,
       };
     })();
 
@@ -61,6 +70,7 @@ export async function listContainers(): Promise<DockerContainer[]> {
     Status: string;
     State: string;
     Ports: Array<{ PublicPort?: number; PrivatePort: number; Type: string }>;
+    Labels?: Record<string, string>;
   }>;
 
   return raw.map((c) => ({
@@ -72,5 +82,6 @@ export async function listContainers(): Promise<DockerContainer[]> {
     ports: c.Ports.filter((p) => p.PublicPort).map(
       (p) => `${p.PublicPort}:${p.PrivatePort}/${p.Type}`
     ),
+    labels: c.Labels ?? {},
   }));
 }

@@ -3,41 +3,158 @@ import db from "../db/client";
 
 const router = Router();
 
-router.get("/", (_req, res) => {
-  const notes = db
-    .prepare("SELECT * FROM notes ORDER BY updated_at DESC")
-    .all();
-  res.json(notes);
+type NoteFolderRow = {
+  id: number;
+  parent_id: number | null;
+  title: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type NoteRow = {
+  id: number;
+  title: string;
+  content: string;
+  folder_id: number | null;
+  tags: string;
+  is_pinned: number;
+  is_archived: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+function parseTags(value: unknown): string {
+  if (Array.isArray(value)) {
+    return JSON.stringify(value.map((tag) => String(tag).trim()).filter(Boolean));
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return JSON.stringify(parsed);
+    } catch {
+      return JSON.stringify(value.split(",").map((tag) => tag.trim()).filter(Boolean));
+    }
+  }
+  return "[]";
+}
+
+function mapNote(row: NoteRow) {
+  let tags: string[] = [];
+  try {
+    tags = JSON.parse(row.tags || "[]");
+  } catch {
+    tags = [];
+  }
+  return {
+    ...row,
+    tags,
+    is_pinned: Boolean(row.is_pinned),
+    is_archived: Boolean(row.is_archived),
+  };
+}
+
+router.get("/folders", (_req, res) => {
+  const folders = db
+    .prepare("SELECT * FROM note_folders ORDER BY sort_order ASC, title ASC")
+    .all() as NoteFolderRow[];
+  res.json(folders);
 });
 
-router.post("/", (req, res) => {
-  const { title, content } = req.body;
+router.post("/folders", (req, res) => {
+  const title = String(req.body?.title ?? "").trim();
+  const parentId = req.body?.parent_id ? Number(req.body.parent_id) : null;
+  if (!title) {
+    res.status(400).json({ error: "title required" });
+    return;
+  }
+
+  const max = db
+    .prepare("SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM note_folders WHERE parent_id IS ?")
+    .get(parentId) as { maxOrder: number };
   const result = db
-    .prepare("INSERT INTO notes (title, content) VALUES (?, ?)")
-    .run(title ?? "Neue Notiz", content ?? "");
-  const note = db
-    .prepare("SELECT * FROM notes WHERE id = ?")
-    .get(result.lastInsertRowid);
-  res.status(201).json(note);
+    .prepare("INSERT INTO note_folders (parent_id, title, sort_order) VALUES (?, ?, ?)")
+    .run(parentId, title, max.maxOrder + 1);
+  res.status(201).json(db.prepare("SELECT * FROM note_folders WHERE id = ?").get(result.lastInsertRowid));
 });
 
-router.put("/:id", (req, res) => {
-  const existing = db
-    .prepare("SELECT * FROM notes WHERE id = ?")
-    .get(req.params.id) as any;
+router.put("/folders/:id", (req, res) => {
+  const existing = db.prepare("SELECT * FROM note_folders WHERE id = ?").get(req.params.id) as
+    | NoteFolderRow
+    | undefined;
   if (!existing) {
     res.status(404).json({ error: "not found" });
     return;
   }
-  const { title, content } = req.body;
-  db.prepare(
-    "UPDATE notes SET title=?, content=?, updated_at=datetime('now') WHERE id=?"
-  ).run(
-    title ?? existing.title,
-    content ?? existing.content,
+  const title = String(req.body?.title ?? existing.title).trim();
+  const parentId = req.body?.parent_id !== undefined ? req.body.parent_id : existing.parent_id;
+  db.prepare("UPDATE note_folders SET title = ?, parent_id = ?, updated_at = datetime('now') WHERE id = ?").run(
+    title || existing.title,
+    parentId,
     req.params.id
   );
-  res.json(db.prepare("SELECT * FROM notes WHERE id = ?").get(req.params.id));
+  res.json(db.prepare("SELECT * FROM note_folders WHERE id = ?").get(req.params.id));
+});
+
+router.delete("/folders/:id", (req, res) => {
+  db.transaction(() => {
+    db.prepare("UPDATE notes SET folder_id = NULL WHERE folder_id = ?").run(req.params.id);
+    db.prepare("DELETE FROM note_folders WHERE id = ?").run(req.params.id);
+  })();
+  res.json({ ok: true });
+});
+
+router.get("/", (_req, res) => {
+  const notes = db
+    .prepare("SELECT * FROM notes ORDER BY is_pinned DESC, updated_at DESC")
+    .all() as NoteRow[];
+  res.json(notes.map(mapNote));
+});
+
+router.post("/", (req, res) => {
+  const { title, content, folder_id, tags, is_pinned, is_archived } = req.body ?? {};
+  const result = db
+    .prepare(
+      `INSERT INTO notes (title, content, folder_id, tags, is_pinned, is_archived, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+    )
+    .run(
+      title ?? "Neue Notiz",
+      content ?? "",
+      folder_id ?? null,
+      parseTags(tags),
+      is_pinned ? 1 : 0,
+      is_archived ? 1 : 0
+    );
+  const note = db.prepare("SELECT * FROM notes WHERE id = ?").get(result.lastInsertRowid) as NoteRow;
+  res.status(201).json(mapNote(note));
+});
+
+router.put("/:id", (req, res) => {
+  const existing = db.prepare("SELECT * FROM notes WHERE id = ?").get(req.params.id) as NoteRow | undefined;
+  if (!existing) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+
+  const data = req.body ?? {};
+  db.prepare(
+    `UPDATE notes
+     SET title = ?, content = ?, folder_id = ?, tags = ?, is_pinned = ?, is_archived = ?, sort_order = ?, updated_at = datetime('now')
+     WHERE id = ?`
+  ).run(
+    data.title ?? existing.title,
+    data.content ?? existing.content,
+    data.folder_id !== undefined ? data.folder_id : existing.folder_id,
+    data.tags !== undefined ? parseTags(data.tags) : existing.tags,
+    data.is_pinned !== undefined ? (data.is_pinned ? 1 : 0) : existing.is_pinned,
+    data.is_archived !== undefined ? (data.is_archived ? 1 : 0) : existing.is_archived,
+    data.sort_order ?? existing.sort_order,
+    req.params.id
+  );
+
+  res.json(mapNote(db.prepare("SELECT * FROM notes WHERE id = ?").get(req.params.id) as NoteRow));
 });
 
 router.delete("/:id", (req, res) => {

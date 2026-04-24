@@ -85,13 +85,17 @@ export default function BookmarksPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">
-          {t("bookmarks.title")}
-        </h1>
+    <div className="space-y-5 text-slate-100">
+      <div className="rounded-3xl border border-slate-800 bg-slate-950/85 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300/70">
+              Resource Library
+            </div>
+            <h1 className="mt-2 text-2xl font-bold text-white">{t("bookmarks.title")}</h1>
+          </div>
 
-        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
           <div className="inline-flex overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
             {[
               { id: "feed", icon: Rows3, label: t("bookmarks.view_feed") },
@@ -103,8 +107,8 @@ export default function BookmarksPage() {
                 onClick={() => setView(id as typeof view)}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm ${
                   view === id
-                    ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-600 dark:text-slate-300"
+                    ? "bg-cyan-400 text-slate-950"
+                    : "text-slate-400 hover:bg-slate-800"
                 }`}
               >
                 <Icon size={14} /> {label}
@@ -114,16 +118,16 @@ export default function BookmarksPage() {
 
           <button
             onClick={() => setAdding(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
+            className="flex items-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-1.5 text-sm font-medium text-cyan-100 hover:bg-cyan-400/20"
           >
             <Plus size={15} /> {t("bookmarks.add_section")}
           </button>
+          </div>
         </div>
-      </div>
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_280px]">
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2">
-          <Send size={16} className="text-slate-400" />
+        <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_320px]">
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/80 px-3 py-2">
+          <Send size={16} className="text-cyan-300" />
           <input
             value={captureUrl}
             onChange={(event) => setCaptureUrl(event.target.value)}
@@ -131,26 +135,27 @@ export default function BookmarksPage() {
               if (event.key === "Enter") handleCapture();
             }}
             placeholder={t("bookmarks.capture_placeholder")}
-            className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 dark:text-slate-100 outline-none"
+            className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600"
           />
           <button
             disabled={!defaultSectionId || !captureUrl.trim() || captureLink.isPending}
             onClick={handleCapture}
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-40 dark:bg-slate-100 dark:text-slate-900"
+            className="rounded-xl bg-cyan-300 px-3 py-1.5 text-sm font-semibold text-slate-950 disabled:opacity-40"
           >
             {t("bookmarks.capture")}
           </button>
         </div>
 
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2">
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/80 px-3 py-2">
           <Search size={16} className="text-slate-400" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t("bookmarks.search")}
-            className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 dark:text-slate-100 outline-none"
+            className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600"
           />
         </div>
+      </div>
       </div>
 
       {adding && (
@@ -209,7 +214,7 @@ export default function BookmarksPage() {
       )}
 
       {view === "feed" && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filteredLinks.map((link) => (
             <BookmarkCard key={link.id} link={link} onOpen={setSelectedLink} />
           ))}

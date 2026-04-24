@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import MDEditor from "@uiw/react-md-editor";
-import { AlertCircle, CheckCircle2, Loader2, RotateCcw } from "lucide-react";
+import { AlertCircle, Archive, CheckCircle2, Code, Eye, Heading2, ListChecks, Loader2, Pin, RotateCcw, Table2 } from "lucide-react";
 import { Note, useUpdateNote } from "../../hooks/useNotes";
 import { useSettingsStore } from "../../store/useSettingsStore";
 
@@ -62,6 +62,12 @@ export default function NoteEditor({ note }: Props) {
     scheduleUpdate(title, newContent);
   };
 
+  const insertMarkdown = (snippet: string) => {
+    const nextContent = content ? `${content}\n${snippet}` : snippet;
+    setContent(nextContent);
+    scheduleUpdate(title, nextContent);
+  };
+
   const saveLabel =
     saveState === "saving"
       ? t("notes.saving")
@@ -72,15 +78,15 @@ export default function NoteEditor({ note }: Props) {
       : t("notes.autosave");
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="px-6 py-3 border-b border-slate-200 dark:border-slate-700 space-y-2">
+    <div className="flex flex-col flex-1 min-h-0 bg-slate-950">
+      <div className="space-y-3 border-b border-slate-800 px-6 py-4">
         <input
-          className="w-full text-lg font-semibold bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+          className="w-full bg-transparent text-2xl font-semibold text-slate-100 focus:outline-none placeholder:text-slate-600"
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder={t("notes.untitled")}
         />
-        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
           {saveState === "saving" && <Loader2 size={13} className="animate-spin" />}
           {saveState === "saved" && <CheckCircle2 size={13} className="text-emerald-500" />}
           {saveState === "error" && <AlertCircle size={13} className="text-rose-500" />}
@@ -98,6 +104,17 @@ export default function NoteEditor({ note }: Props) {
               <RotateCcw size={12} /> {t("notes.retry")}
             </button>
           )}
+          <span className="ml-auto flex items-center gap-1">
+            <button onClick={() => updateNote.mutate({ id: note.id, is_pinned: !note.is_pinned })} className={`rounded-lg border border-slate-800 px-2 py-1 ${note.is_pinned ? "text-cyan-300" : "text-slate-500"}`}><Pin size={13} /></button>
+            <button onClick={() => updateNote.mutate({ id: note.id, is_archived: !note.is_archived })} className={`rounded-lg border border-slate-800 px-2 py-1 ${note.is_archived ? "text-amber-300" : "text-slate-500"}`}><Archive size={13} /></button>
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => insertMarkdown("## Heading")} className="inline-flex items-center gap-1 rounded-lg border border-slate-800 px-2 py-1 text-xs text-slate-400 hover:text-cyan-300"><Heading2 size={13} /> Heading</button>
+          <button onClick={() => insertMarkdown("- [ ] Task")} className="inline-flex items-center gap-1 rounded-lg border border-slate-800 px-2 py-1 text-xs text-slate-400 hover:text-cyan-300"><ListChecks size={13} /> Task</button>
+          <button onClick={() => insertMarkdown("```\\ncode\\n```")} className="inline-flex items-center gap-1 rounded-lg border border-slate-800 px-2 py-1 text-xs text-slate-400 hover:text-cyan-300"><Code size={13} /> Code</button>
+          <button onClick={() => insertMarkdown("| Column | Value |\\n| --- | --- |\\n| Item | Detail |")} className="inline-flex items-center gap-1 rounded-lg border border-slate-800 px-2 py-1 text-xs text-slate-400 hover:text-cyan-300"><Table2 size={13} /> Table</button>
+          <span className="inline-flex items-center gap-1 rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-200"><Eye size={13} /> Live Preview</span>
         </div>
       </div>
       <div className="flex-1 overflow-hidden" data-color-mode={theme}>

@@ -11,6 +11,8 @@ import faviconRouter from "./routes/favicon";
 import exportRouter from "./routes/export";
 import dashboardRouter from "./routes/dashboard";
 import tagsRouter from "./routes/tags";
+import dockerRouter from "./routes/docker";
+import widgetsRouter from "./routes/widgets";
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
@@ -22,6 +24,8 @@ app.use("/api/notes", notesRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/favicon", faviconRouter);
 app.use("/api/tags", tagsRouter);
+app.use("/api/docker", dockerRouter);
+app.use("/api/widgets", widgetsRouter);
 app.use("/api", exportRouter);
 app.use("/api/dashboard", dashboardRouter);
 

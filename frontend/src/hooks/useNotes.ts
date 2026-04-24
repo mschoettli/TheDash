@@ -1,13 +1,29 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
+export interface NoteFolder {
+  id: number;
+  parent_id: number | null;
+  title: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Note {
   id: number;
   title: string;
   content: string;
+  folder_id: number | null;
+  tags: string[];
+  is_pinned: boolean;
+  is_archived: boolean;
+  sort_order: number;
+  created_at: string;
   updated_at: string;
 }
 
 const KEY = ["notes"];
+const FOLDERS_KEY = ["note-folders"];
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
@@ -24,10 +40,41 @@ export function useNotes() {
   });
 }
 
+export function useNoteFolders() {
+  return useQuery<NoteFolder[]>({
+    queryKey: FOLDERS_KEY,
+    queryFn: () => fetchJson<NoteFolder[]>("/api/notes/folders"),
+  });
+}
+
+export function useCreateNoteFolder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { title: string; parent_id?: number | null }) =>
+      fetchJson<NoteFolder>("/api/notes/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: FOLDERS_KEY }),
+  });
+}
+
+export function useDeleteNoteFolder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => fetchJson<{ ok: true }>(`/api/notes/folders/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: FOLDERS_KEY });
+      qc.invalidateQueries({ queryKey: KEY });
+    },
+  });
+}
+
 export function useCreateNote() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data?: { title?: string; content?: string }) =>
+    mutationFn: (data?: { title?: string; content?: string; folder_id?: number | null }) =>
       fetchJson<Note>("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -11,11 +11,19 @@ router.get("/export", (_req, res) => {
   const tags = db.prepare("SELECT * FROM tags ORDER BY name").all();
   const linkTags = db.prepare("SELECT * FROM link_tags ORDER BY link_id, tag_id").all();
   const notes = db.prepare("SELECT * FROM notes ORDER BY updated_at DESC").all();
+  const noteFolders = db.prepare("SELECT * FROM note_folders ORDER BY sort_order").all();
   const dashboardSections = db
     .prepare("SELECT * FROM dashboard_sections ORDER BY sort_order")
     .all();
   const dashboardCards = db
     .prepare("SELECT * FROM dashboard_cards ORDER BY sort_order")
+    .all();
+  const widgets = db.prepare("SELECT * FROM widgets ORDER BY sort_order").all();
+  const widgetSecrets = db
+    .prepare("SELECT widget_id, key, '***' AS value FROM widget_secrets ORDER BY widget_id, key")
+    .all();
+  const auditLog = db
+    .prepare("SELECT * FROM audit_log ORDER BY created_at DESC, id DESC LIMIT 500")
     .all();
 
   res.setHeader("Content-Disposition", 'attachment; filename="thedash-backup.json"');
@@ -27,8 +35,12 @@ router.get("/export", (_req, res) => {
     tags,
     linkTags,
     notes,
+    noteFolders,
     dashboardSections,
     dashboardCards,
+    widgets,
+    widgetSecrets,
+    auditLog,
   });
 });
 
@@ -41,8 +53,10 @@ router.post("/import", (req, res) => {
     tags,
     linkTags,
     notes,
+    noteFolders,
     dashboardSections,
     dashboardCards,
+    widgets,
   } = req.body;
 
   const doImport = db.transaction(() => {
@@ -52,6 +66,9 @@ router.post("/import", (req, res) => {
     db.prepare("DELETE FROM sections").run();
     db.prepare("DELETE FROM dashboard_cards").run();
     db.prepare("DELETE FROM dashboard_sections").run();
+    db.prepare("DELETE FROM widgets").run();
+    db.prepare("DELETE FROM widget_secrets").run();
+    db.prepare("DELETE FROM note_folders").run();
     db.prepare("DELETE FROM tiles").run();
     db.prepare("DELETE FROM notes").run();
     db.prepare("DELETE FROM settings").run();
@@ -119,10 +136,36 @@ router.post("/import", (req, res) => {
       ).run(linkTag.link_id, linkTag.tag_id);
     }
 
+    for (const folder of noteFolders ?? []) {
+      db.prepare(
+        "INSERT INTO note_folders (id, parent_id, title, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+      ).run(
+        folder.id,
+        folder.parent_id ?? null,
+        folder.title,
+        folder.sort_order ?? 0,
+        folder.created_at ?? new Date().toISOString(),
+        folder.updated_at ?? new Date().toISOString()
+      );
+    }
+
     for (const n of notes ?? []) {
       db.prepare(
-        "INSERT INTO notes (id, title, content, updated_at) VALUES (?, ?, ?, ?)"
-      ).run(n.id, n.title, n.content, n.updated_at);
+        `INSERT INTO notes
+          (id, title, content, folder_id, tags, is_pinned, is_archived, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        n.id,
+        n.title,
+        n.content,
+        n.folder_id ?? null,
+        Array.isArray(n.tags) ? JSON.stringify(n.tags) : n.tags ?? "[]",
+        n.is_pinned ? 1 : 0,
+        n.is_archived ? 1 : 0,
+        n.sort_order ?? 0,
+        n.created_at ?? n.updated_at ?? new Date().toISOString(),
+        n.updated_at ?? new Date().toISOString()
+      );
     }
 
     for (const section of dashboardSections ?? []) {
@@ -143,6 +186,25 @@ router.post("/import", (req, res) => {
         card.sort_order,
         card.created_at,
         card.updated_at
+      );
+    }
+
+    for (const widget of widgets ?? []) {
+      db.prepare(
+        `INSERT INTO widgets
+          (id, type, title, config_json, layout_json, section_id, sort_order, is_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        widget.id,
+        widget.type,
+        widget.title,
+        widget.config_json ?? JSON.stringify(widget.config ?? {}),
+        widget.layout_json ?? JSON.stringify(widget.layout ?? {}),
+        widget.section_id ?? null,
+        widget.sort_order ?? 0,
+        widget.is_enabled === false ? 0 : 1,
+        widget.created_at ?? new Date().toISOString(),
+        widget.updated_at ?? new Date().toISOString()
       );
     }
   });
