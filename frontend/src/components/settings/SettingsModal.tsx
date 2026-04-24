@@ -9,10 +9,42 @@ interface Props {
   onClose: () => void;
 }
 
+function ToggleGroup<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div>
+      <div className="label-xs mb-2">{label}</div>
+      <div className="inline-flex overflow-hidden rounded-lg border border-line/60">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className={`px-3 py-1.5 text-[13px] font-medium transition-colors ${
+              value === opt.value
+                ? "bg-accent text-bg"
+                : "text-t2 hover:bg-line/30 hover:text-t1"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsModal({ open, onClose }: Props) {
   const { t } = useTranslation();
-  const { theme, language, widgetStyle, setTheme, setLanguage, setWidgetStyle } =
-    useSettingsStore();
+  const { theme, language, widgetStyle, setTheme, setLanguage, setWidgetStyle } = useSettingsStore();
   const importRef = useRef<HTMLInputElement>(null);
 
   const handleExport = async () => {
@@ -38,120 +70,62 @@ export default function SettingsModal({ open, onClose }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (res.ok) {
-        window.location.reload();
-      } else {
-        alert(t("settings.import_error"));
-      }
+      if (res.ok) window.location.reload();
+      else alert(t("settings.import_error"));
     } catch {
       alert(t("settings.import_error"));
     }
     e.target.value = "";
   };
 
-  const styleOptions: Array<{ value: "card" | "compact" | "minimal"; label: string }> = [
-    { value: "card", label: t("settings.style_card") },
-    { value: "compact", label: t("settings.style_compact") },
-    { value: "minimal", label: t("settings.style_minimal") },
-  ];
-
   return (
     <Modal open={open} onClose={onClose} title={t("settings.title")}>
-      <div className="space-y-6">
-        {/* Theme */}
-        <div>
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-400 block mb-2">
-            {t("settings.theme")}
-          </label>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setTheme("light")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-                theme === "light"
-                  ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                  : "border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500"
-              }`}
-            >
-              <Sun size={15} /> {t("settings.theme_light")}
-            </button>
-            <button
-              onClick={() => setTheme("dark")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-                theme === "dark"
-                  ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                  : "border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500"
-              }`}
-            >
-              <Moon size={15} /> {t("settings.theme_dark")}
-            </button>
-          </div>
-        </div>
+      <div className="space-y-5">
+        <ToggleGroup
+          label={t("settings.theme")}
+          value={theme}
+          onChange={setTheme}
+          options={[
+            { value: "light" as const, label: `☀ ${t("settings.theme_light")}` },
+            { value: "dark" as const, label: `☾ ${t("settings.theme_dark")}` },
+          ]}
+        />
 
-        {/* Language */}
-        <div>
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-400 block mb-2">
-            {t("settings.language")}
-          </label>
-          <div className="flex gap-2">
-            {(["de", "en"] as const).map((lang) => (
-              <button
-                key={lang}
-                onClick={() => setLanguage(lang)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-                  language === lang
-                    ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                    : "border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500"
-                }`}
-              >
-                {lang === "de" ? "🇩🇪 Deutsch" : "🇬🇧 English"}
-              </button>
-            ))}
-          </div>
-        </div>
+        <ToggleGroup
+          label={t("settings.language")}
+          value={language}
+          onChange={setLanguage}
+          options={[
+            { value: "de" as const, label: "🇩🇪 Deutsch" },
+            { value: "en" as const, label: "🇬🇧 English" },
+          ]}
+        />
 
-        {/* Widget Style */}
-        <div>
-          <label className="text-sm font-medium text-slate-600 dark:text-slate-400 block mb-2">
-            {t("settings.widget_style")}
-          </label>
-          <div className="flex gap-2">
-            {styleOptions.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setWidgetStyle(value)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-                  widgetStyle === value
-                    ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                    : "border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <ToggleGroup
+          label={t("settings.widget_style")}
+          value={widgetStyle}
+          onChange={setWidgetStyle}
+          options={[
+            { value: "card" as const, label: t("settings.style_card") },
+            { value: "compact" as const, label: t("settings.style_compact") },
+            { value: "minimal" as const, label: t("settings.style_minimal") },
+          ]}
+        />
 
-        {/* Export / Import */}
-        <div className="flex gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+        <div className="flex gap-2 pt-2 border-t border-line/40">
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
           >
-            <Download size={15} /> {t("settings.export")}
+            <Download size={13} /> {t("settings.export")}
           </button>
           <button
             onClick={() => importRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
           >
-            <Upload size={15} /> {t("settings.import")}
+            <Upload size={13} /> {t("settings.import")}
           </button>
-          <input
-            ref={importRef}
-            type="file"
-            accept=".json"
-            className="hidden"
-            onChange={handleImport}
-          />
+          <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
         </div>
       </div>
     </Modal>

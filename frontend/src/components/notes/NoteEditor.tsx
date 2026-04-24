@@ -20,9 +20,7 @@ export default function NoteEditor({ note }: Props) {
   const [content, setContent] = useState(note.content);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
-  const [lastPayload, setLastPayload] = useState<{ title: string; content: string } | null>(
-    null
-  );
+  const [lastPayload, setLastPayload] = useState<{ title: string; content: string } | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -46,16 +44,10 @@ export default function NoteEditor({ note }: Props) {
 
   const scheduleUpdate = (newTitle: string, newContent: string) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      void persist({ title: newTitle, content: newContent });
-    }, 800);
+    debounceTimer.current = setTimeout(() => { void persist({ title: newTitle, content: newContent }); }, 800);
   };
 
-  const handleTitleChange = (val: string) => {
-    setTitle(val);
-    scheduleUpdate(val, content);
-  };
-
+  const handleTitleChange = (val: string) => { setTitle(val); scheduleUpdate(val, content); };
   const handleContentChange = (val: string | undefined) => {
     const newContent = val ?? "";
     setContent(newContent);
@@ -63,60 +55,83 @@ export default function NoteEditor({ note }: Props) {
   };
 
   const insertMarkdown = (snippet: string) => {
-    const nextContent = content ? `${content}\n${snippet}` : snippet;
-    setContent(nextContent);
-    scheduleUpdate(title, nextContent);
+    const next = content ? `${content}\n${snippet}` : snippet;
+    setContent(next);
+    scheduleUpdate(title, next);
   };
 
   const saveLabel =
-    saveState === "saving"
-      ? t("notes.saving")
-      : saveState === "saved"
-      ? t("notes.saved")
-      : saveState === "error"
-      ? t("notes.save_error")
-      : t("notes.autosave");
+    saveState === "saving" ? t("notes.saving") :
+    saveState === "saved"  ? t("notes.saved")  :
+    saveState === "error"  ? t("notes.save_error") :
+                             t("notes.autosave");
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-slate-950">
-      <div className="space-y-3 border-b border-slate-800 px-6 py-4">
+    <div className="flex flex-col flex-1 min-h-0 bg-bg">
+      <div className="space-y-3 border-b border-line/60 px-5 py-4">
         <input
-          className="w-full bg-transparent text-2xl font-semibold text-slate-100 focus:outline-none placeholder:text-slate-600"
+          className="w-full bg-transparent text-xl font-semibold text-t1 focus:outline-none placeholder:text-t3"
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder={t("notes.untitled")}
         />
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-          {saveState === "saving" && <Loader2 size={13} className="animate-spin" />}
-          {saveState === "saved" && <CheckCircle2 size={13} className="text-emerald-500" />}
-          {saveState === "error" && <AlertCircle size={13} className="text-rose-500" />}
+
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-t3">
+          {saveState === "saving" && <Loader2 size={12} className="animate-spin" />}
+          {saveState === "saved"  && <CheckCircle2 size={12} className="text-emerald-400" />}
+          {saveState === "error"  && <AlertCircle size={12} className="text-rose-400" />}
           <span>{saveLabel}</span>
           {lastSavedAt && saveState !== "saving" && (
-            <span className="text-slate-400">
+            <span className="text-t3">
               · {new Date(lastSavedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </span>
           )}
           {saveState === "error" && lastPayload && (
             <button
               onClick={() => void persist(lastPayload)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-line hover:bg-line/30"
             >
-              <RotateCcw size={12} /> {t("notes.retry")}
+              <RotateCcw size={11} /> {t("notes.retry")}
             </button>
           )}
+
           <span className="ml-auto flex items-center gap-1">
-            <button onClick={() => updateNote.mutate({ id: note.id, is_pinned: !note.is_pinned })} className={`rounded-lg border border-slate-800 px-2 py-1 ${note.is_pinned ? "text-cyan-300" : "text-slate-500"}`}><Pin size={13} /></button>
-            <button onClick={() => updateNote.mutate({ id: note.id, is_archived: !note.is_archived })} className={`rounded-lg border border-slate-800 px-2 py-1 ${note.is_archived ? "text-amber-300" : "text-slate-500"}`}><Archive size={13} /></button>
+            <button
+              onClick={() => updateNote.mutate({ id: note.id, is_pinned: !note.is_pinned })}
+              className={`rounded-lg border border-line/50 px-2 py-1 transition-colors ${note.is_pinned ? "text-accent" : "text-t3 hover:text-t1"}`}
+            >
+              <Pin size={12} />
+            </button>
+            <button
+              onClick={() => updateNote.mutate({ id: note.id, is_archived: !note.is_archived })}
+              className={`rounded-lg border border-line/50 px-2 py-1 transition-colors ${note.is_archived ? "text-amber-400" : "text-t3 hover:text-t1"}`}
+            >
+              <Archive size={12} />
+            </button>
           </span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => insertMarkdown("## Heading")} className="inline-flex items-center gap-1 rounded-lg border border-slate-800 px-2 py-1 text-xs text-slate-400 hover:text-cyan-300"><Heading2 size={13} /> Heading</button>
-          <button onClick={() => insertMarkdown("- [ ] Task")} className="inline-flex items-center gap-1 rounded-lg border border-slate-800 px-2 py-1 text-xs text-slate-400 hover:text-cyan-300"><ListChecks size={13} /> Task</button>
-          <button onClick={() => insertMarkdown("```\\ncode\\n```")} className="inline-flex items-center gap-1 rounded-lg border border-slate-800 px-2 py-1 text-xs text-slate-400 hover:text-cyan-300"><Code size={13} /> Code</button>
-          <button onClick={() => insertMarkdown("| Column | Value |\\n| --- | --- |\\n| Item | Detail |")} className="inline-flex items-center gap-1 rounded-lg border border-slate-800 px-2 py-1 text-xs text-slate-400 hover:text-cyan-300"><Table2 size={13} /> Table</button>
-          <span className="inline-flex items-center gap-1 rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-xs text-cyan-200"><Eye size={13} /> Live Preview</span>
+
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { label: "Heading", icon: Heading2, snippet: "## Heading" },
+            { label: "Task", icon: ListChecks, snippet: "- [ ] Task" },
+            { label: "Code", icon: Code, snippet: "```\ncode\n```" },
+            { label: "Table", icon: Table2, snippet: "| Column | Value |\n| --- | --- |\n| Item | Detail |" },
+          ].map(({ label, icon: Icon, snippet }) => (
+            <button
+              key={label}
+              onClick={() => insertMarkdown(snippet)}
+              className="inline-flex items-center gap-1 rounded-lg border border-line/50 px-2 py-1 text-[11px] text-t3 hover:text-accent hover:border-accent/30 transition-colors"
+            >
+              <Icon size={12} /> {label}
+            </button>
+          ))}
+          <span className="inline-flex items-center gap-1 rounded-lg border border-accent/20 bg-accent/10 px-2 py-1 text-[11px] text-accent/80">
+            <Eye size={12} /> Live Preview
+          </span>
         </div>
       </div>
+
       <div className="flex-1 overflow-hidden" data-color-mode={theme}>
         <MDEditor
           value={content}

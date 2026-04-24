@@ -12,13 +12,7 @@ import BookmarkPreviewDrawer from "../components/links/BookmarkPreviewDrawer";
 function matchesSearch(link: Link, query: string): boolean {
   const value = query.trim().toLowerCase();
   if (!value) return true;
-  return [
-    link.name,
-    link.url,
-    link.description ?? "",
-    link.note ?? "",
-    ...link.tags.map((tag) => tag.name),
-  ]
+  return [link.name, link.url, link.description ?? "", link.note ?? "", ...link.tags.map((t) => t.name)]
     .join(" ")
     .toLowerCase()
     .includes(value);
@@ -41,11 +35,11 @@ export default function BookmarksPage() {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [selectedLink, setSelectedLink] = useState<Link | null>(null);
 
-  const allLinks = useMemo(() => sections?.flatMap((section) => section.links) ?? [], [sections]);
+  const allLinks = useMemo(() => sections?.flatMap((s) => s.links) ?? [], [sections]);
   const filteredLinks = useMemo(
     () =>
       allLinks.filter((link) => {
-        const tagMatch = activeTag ? link.tags.some((tag) => tag.name === activeTag) : true;
+        const tagMatch = activeTag ? link.tags.some((t) => t.name === activeTag) : true;
         return tagMatch && matchesSearch(link, query);
       }),
     [activeTag, allLinks, query]
@@ -55,114 +49,103 @@ export default function BookmarksPage() {
 
   const handleAddSection = () => {
     if (!newTitle.trim()) return;
-    createSection.mutate(
-      { title: newTitle.trim() },
-      {
-        onSuccess: () => {
-          setNewTitle("");
-          setAdding(false);
-        },
-      }
-    );
+    createSection.mutate({ title: newTitle.trim() }, { onSuccess: () => { setNewTitle(""); setAdding(false); } });
   };
 
   const handleCapture = () => {
     if (!defaultSectionId || !captureUrl.trim()) return;
-    captureLink.mutate(
-      { section_id: defaultSectionId, url: captureUrl.trim() },
-      { onSuccess: () => setCaptureUrl("") }
-    );
+    captureLink.mutate({ section_id: defaultSectionId, url: captureUrl.trim() }, { onSuccess: () => setCaptureUrl("") });
   };
 
   if (isLoading) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-24 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
+          <div key={i} className="h-20 rounded-xl bg-card animate-pulse" />
         ))}
       </div>
     );
   }
 
+  const views = [
+    { id: "feed", icon: Rows3, label: t("bookmarks.view_feed") },
+    { id: "sections", icon: LayoutGrid, label: t("bookmarks.view_sections") },
+    { id: "kanban", icon: Columns3, label: t("bookmarks.view_kanban") },
+  ] as const;
+
   return (
-    <div className="space-y-5 text-slate-100">
-      <div className="rounded-3xl border border-slate-800 bg-slate-950/85 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-4 text-t1">
+
+      {/* ── Header + Controls ────────────────────────────── */}
+      <div className="rounded-xl bg-card border border-line/60 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300/70">
-              Resource Library
-            </div>
-            <h1 className="mt-2 text-2xl font-bold text-white">{t("bookmarks.title")}</h1>
+            <div className="label-xs mb-1">Resource Library</div>
+            <h1 className="text-xl font-semibold text-t1">{t("bookmarks.title")}</h1>
           </div>
 
           <div className="flex items-center gap-2">
-          <div className="inline-flex overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
-            {[
-              { id: "feed", icon: Rows3, label: t("bookmarks.view_feed") },
-              { id: "sections", icon: LayoutGrid, label: t("bookmarks.view_sections") },
-              { id: "kanban", icon: Columns3, label: t("bookmarks.view_kanban") },
-            ].map(({ id, icon: Icon, label }) => (
-              <button
-                key={id}
-                onClick={() => setView(id as typeof view)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm ${
-                  view === id
-                    ? "bg-cyan-400 text-slate-950"
-                    : "text-slate-400 hover:bg-slate-800"
-                }`}
-              >
-                <Icon size={14} /> {label}
-              </button>
-            ))}
-          </div>
+            <div className="inline-flex overflow-hidden rounded-lg border border-line/60">
+              {views.map(({ id, icon: Icon, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setView(id)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                    view === id ? "bg-accent text-bg" : "text-t2 hover:bg-line/30 hover:text-t1"
+                  }`}
+                >
+                  <Icon size={13} /> {label}
+                </button>
+              ))}
+            </div>
 
-          <button
-            onClick={() => setAdding(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-1.5 text-sm font-medium text-cyan-100 hover:bg-cyan-400/20"
-          >
-            <Plus size={15} /> {t("bookmarks.add_section")}
-          </button>
+            <button
+              onClick={() => setAdding(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
+            >
+              <Plus size={13} /> {t("bookmarks.add_section")}
+            </button>
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_320px]">
-        <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/80 px-3 py-2">
-          <Send size={16} className="text-cyan-300" />
-          <input
-            value={captureUrl}
-            onChange={(event) => setCaptureUrl(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") handleCapture();
-            }}
-            placeholder={t("bookmarks.capture_placeholder")}
-            className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600"
-          />
-          <button
-            disabled={!defaultSectionId || !captureUrl.trim() || captureLink.isPending}
-            onClick={handleCapture}
-            className="rounded-xl bg-cyan-300 px-3 py-1.5 text-sm font-semibold text-slate-950 disabled:opacity-40"
-          >
-            {t("bookmarks.capture")}
-          </button>
-        </div>
+        {/* Capture + Search */}
+        <div className="grid gap-2 lg:grid-cols-[1fr_300px]">
+          <div className="flex items-center gap-2 rounded-lg border border-line/60 bg-surface px-3 py-2">
+            <Send size={14} className="text-accent shrink-0" />
+            <input
+              value={captureUrl}
+              onChange={(e) => setCaptureUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleCapture(); }}
+              placeholder={t("bookmarks.capture_placeholder")}
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3"
+            />
+            <button
+              disabled={!defaultSectionId || !captureUrl.trim() || captureLink.isPending}
+              onClick={handleCapture}
+              className="rounded-lg bg-accent px-3 py-1 text-[13px] font-semibold text-bg disabled:opacity-40 hover:opacity-90 transition-opacity"
+            >
+              {t("bookmarks.capture")}
+            </button>
+          </div>
 
-        <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/80 px-3 py-2">
-          <Search size={16} className="text-slate-400" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("bookmarks.search")}
-            className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600"
-          />
+          <div className="flex items-center gap-2 rounded-lg border border-line/60 bg-surface px-3 py-2">
+            <Search size={14} className="text-t3 shrink-0" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("bookmarks.search")}
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3"
+            />
+          </div>
         </div>
       </div>
-      </div>
 
+      {/* ── Add section form ─────────────────────────────── */}
       {adding && (
-        <div className="flex max-w-xl gap-2">
+        <div className="flex max-w-sm gap-2">
           <input
             autoFocus
-            className="flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="flex-1 rounded-lg border border-line bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50"
             placeholder={t("bookmarks.section_title")}
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
@@ -174,20 +157,21 @@ export default function BookmarksPage() {
           <button
             onClick={handleAddSection}
             disabled={!newTitle.trim()}
-            className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-bg disabled:opacity-50 hover:opacity-90 transition-opacity"
           >
             {t("link.save")}
           </button>
         </div>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      {/* ── Tag filter ───────────────────────────────────── */}
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         <button
           onClick={() => setActiveTag(null)}
-          className={`shrink-0 rounded-full px-3 py-1 text-xs ${
+          className={`shrink-0 rounded-lg px-3 py-1 text-[12px] font-medium transition-colors ${
             activeTag === null
-              ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+              ? "bg-accent text-bg"
+              : "bg-surface border border-line/50 text-t2 hover:text-t1"
           }`}
         >
           {t("bookmarks.all_tags")} {allLinks.length}
@@ -196,10 +180,10 @@ export default function BookmarksPage() {
           <button
             key={tag.id}
             onClick={() => setActiveTag(tag.name)}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs ${
+            className={`shrink-0 rounded-lg px-3 py-1 text-[12px] font-medium transition-colors ${
               activeTag === tag.name
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                ? "bg-accent text-bg"
+                : "bg-surface border border-line/50 text-t2 hover:text-t1"
             }`}
           >
             {tag.name} {tag.count}
@@ -207,12 +191,14 @@ export default function BookmarksPage() {
         ))}
       </div>
 
+      {/* ── Empty state ──────────────────────────────────── */}
       {(!sections || sections.length === 0) && !adding && (
-        <div className="py-12 text-center text-sm text-slate-400">
+        <div className="py-12 text-center text-[13px] text-t3">
           {t("bookmarks.no_sections")}
         </div>
       )}
 
+      {/* ── Feed view ────────────────────────────────────── */}
       {view === "feed" && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filteredLinks.map((link) => (
@@ -221,20 +207,22 @@ export default function BookmarksPage() {
         </div>
       )}
 
+      {/* ── Sections view ────────────────────────────────── */}
       {view === "sections" && (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           {sections?.map((section) => (
             <LinkSection key={section.id} section={section} />
           ))}
         </div>
       )}
 
+      {/* ── Kanban view ──────────────────────────────────── */}
       {view === "kanban" && (
-        <div className="flex gap-4 overflow-x-auto pb-2">
+        <div className="flex gap-3 overflow-x-auto pb-2">
           {sections?.map((section) => (
             <div
               key={section.id}
-              className="w-[320px] shrink-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/50"
+              className="w-[280px] shrink-0 rounded-xl bg-card border border-line/60"
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => {
                 if (!dragLinkId) return;
@@ -242,12 +230,12 @@ export default function BookmarksPage() {
                 setDragLinkId(null);
               }}
             >
-              <div className="border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+              <div className="border-b border-line/40 px-3 py-2 text-[13px] font-semibold text-t1">
                 {section.title}
               </div>
-              <div className="min-h-[120px] space-y-2 p-2">
+              <div className="min-h-[100px] space-y-1 p-2">
                 {section.links
-                  .filter((link) => filteredLinks.some((filtered) => filtered.id === link.id))
+                  .filter((link) => filteredLinks.some((f) => f.id === link.id))
                   .map((link) => (
                     <div key={link.id} draggable onDragStart={() => setDragLinkId(link.id)}>
                       <LinkItem link={link} onPreview={setSelectedLink} />

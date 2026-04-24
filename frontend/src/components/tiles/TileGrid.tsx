@@ -13,7 +13,7 @@ export default function TileGrid() {
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="h-24 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse"
+            className="h-24 rounded-xl bg-card animate-pulse"
           />
         ))}
       </div>

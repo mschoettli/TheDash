@@ -28,57 +28,98 @@ export default function NoteList({ notes, folders, selectedId, selectedFolderId,
   };
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-slate-800 bg-slate-950/90">
-      <div className="border-b border-slate-800 p-4">
-        <div className="flex items-center justify-between">
+    <aside className="flex w-64 shrink-0 flex-col border-r border-line/60 bg-surface">
+      <div className="border-b border-line/40 p-4">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300/70">Knowledge</div>
-            <h2 className="mt-1 text-base font-semibold text-slate-100">Notizen</h2>
+            <div className="label-xs mb-0.5">Knowledge</div>
+            <h2 className="text-[15px] font-semibold text-t1">Notizen</h2>
           </div>
-          <button onClick={() => createFolder.mutate({ title: "Neuer Ordner" })} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-cyan-300" title="Ordner erstellen">
-            <FolderPlus size={16} />
+          <button
+            onClick={() => createFolder.mutate({ title: "Neuer Ordner" })}
+            className="rounded-lg p-1.5 text-t3 hover:bg-line/30 hover:text-t1 transition-colors"
+            title="Ordner erstellen"
+          >
+            <FolderPlus size={15} />
           </button>
         </div>
-        <button onClick={() => createInFolder(selectedFolderId)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950">
-          <Plus size={15} /> Neue Notiz
+        <button
+          onClick={() => createInFolder(selectedFolderId)}
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg hover:opacity-90 transition-opacity"
+        >
+          <Plus size={14} /> Neue Notiz
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3">
-        <button onClick={() => onSelectFolder(null)} className={`mb-2 flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm ${selectedFolderId === null ? "bg-cyan-400/10 text-cyan-100" : "text-slate-400 hover:bg-slate-900"}`}>
+      <div className="flex-1 overflow-y-auto p-2">
+        <button
+          onClick={() => onSelectFolder(null)}
+          className={`mb-1 flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
+            selectedFolderId === null ? "bg-accent/10 text-accent" : "text-t2 hover:bg-line/20 hover:text-t1"
+          }`}
+        >
           <span>Alle Notizen</span>
-          <span className="text-xs text-slate-500">{notes.length}</span>
+          <span className="text-[11px] text-t3">{notes.length}</span>
         </button>
 
-        <div className="space-y-1">
+        <div className="space-y-0.5 mb-4">
           {folders.map((folder) => {
-            const count = notes.filter((note) => note.folder_id === folder.id).length;
+            const count = notes.filter((n) => n.folder_id === folder.id).length;
             return (
               <div key={folder.id} className="group">
-                <button onClick={() => onSelectFolder(folder.id)} className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm ${selectedFolderId === folder.id ? "bg-cyan-400/10 text-cyan-100" : "text-slate-400 hover:bg-slate-900"}`}>
-                  <Folder size={15} />
+                <button
+                  onClick={() => onSelectFolder(folder.id)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
+                    selectedFolderId === folder.id ? "bg-accent/10 text-accent" : "text-t2 hover:bg-line/20 hover:text-t1"
+                  }`}
+                >
+                  <Folder size={13} />
                   <span className="min-w-0 flex-1 truncate">{folder.title}</span>
-                  <span className="text-xs text-slate-600">{count}</span>
-                  <span onClick={(event) => { event.stopPropagation(); createInFolder(folder.id); }} className="rounded p-1 opacity-0 hover:bg-slate-800 group-hover:opacity-100"><Plus size={12} /></span>
-                  <span onClick={(event) => { event.stopPropagation(); if (window.confirm(`Ordner ${folder.title} löschen?`)) deleteFolder.mutate(folder.id); }} className="rounded p-1 opacity-0 hover:bg-rose-500/10 hover:text-rose-300 group-hover:opacity-100"><Trash2 size={12} /></span>
+                  <span className="text-[11px] text-t3">{count}</span>
+                  <span
+                    onClick={(e) => { e.stopPropagation(); createInFolder(folder.id); }}
+                    className="rounded p-0.5 opacity-0 hover:bg-line/40 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Plus size={11} />
+                  </span>
+                  <span
+                    onClick={(e) => { e.stopPropagation(); if (window.confirm(`Ordner "${folder.title}" löschen?`)) deleteFolder.mutate(folder.id); }}
+                    className="rounded p-0.5 opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 size={11} />
+                  </span>
                 </button>
               </div>
             );
           })}
         </div>
 
-        <div className="mt-5 space-y-1">
+        <div className="space-y-0.5">
           {notes
-            .filter((note) => selectedFolderId === null || note.folder_id === selectedFolderId)
+            .filter((n) => selectedFolderId === null || n.folder_id === selectedFolderId)
             .map((note) => (
-              <div key={note.id} onClick={() => onSelect(note.id)} className={`group cursor-pointer rounded-xl border px-3 py-2 ${selectedId === note.id ? "border-cyan-400/40 bg-cyan-400/10" : "border-slate-900 bg-slate-900/50 hover:border-slate-700"}`}>
+              <div
+                key={note.id}
+                onClick={() => onSelect(note.id)}
+                className={`group cursor-pointer rounded-lg border px-3 py-2 transition-all ${
+                  selectedId === note.id
+                    ? "border-accent/30 bg-accent/10"
+                    : "border-transparent hover:border-line/40 hover:bg-line/15"
+                }`}
+              >
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-slate-100">{note.title || "Ohne Titel"}</div>
-                    <div className="mt-1 text-[11px] text-slate-500">{new Date(note.updated_at).toLocaleString()}</div>
+                    <div className="truncate text-[13px] font-medium text-t1">{note.title || "Ohne Titel"}</div>
+                    <div className="mt-0.5 text-[10px] text-t3">{new Date(note.updated_at).toLocaleString()}</div>
                   </div>
-                  <button onClick={(event) => { event.stopPropagation(); if (window.confirm("Notiz löschen?")) deleteNote.mutate(note.id, { onSuccess: () => selectedId === note.id && onSelect(-1) }); }} className="rounded p-1 text-slate-600 opacity-0 hover:bg-rose-500/10 hover:text-rose-300 group-hover:opacity-100">
-                    <Trash2 size={13} />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm("Notiz löschen?")) deleteNote.mutate(note.id, { onSuccess: () => selectedId === note.id && onSelect(-1) });
+                    }}
+                    className="rounded p-0.5 text-t3 opacity-0 hover:bg-rose-500/10 hover:text-rose-400 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 size={12} />
                   </button>
                 </div>
               </div>

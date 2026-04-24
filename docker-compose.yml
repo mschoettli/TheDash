@@ -1,5 +1,6 @@
 services:
   backend:
+    container_name: thedash-backend
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -28,6 +29,7 @@ services:
       - thedash
 
   frontend:
+    container_name: thedash-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -47,6 +49,7 @@ services:
       - thedash
 
   dockerproxy:
+    container_name: thedash-dockerproxy
     image: tecnativa/docker-socket-proxy:0.1
     profiles:
       - docker-monitoring

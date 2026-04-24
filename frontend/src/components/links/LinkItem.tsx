@@ -11,36 +11,22 @@ interface Props {
 
 export default function LinkItem({ link, onPreview }: Props) {
   const [editOpen, setEditOpen] = useState(false);
+
   const content = (
     <>
-      <FaviconImg
-        url={link.url}
-        name={link.name}
-        size={20}
-        explicitIconUrl={link.icon_url}
-      />
-      <span className="text-sm text-slate-700 dark:text-slate-200 truncate">
-        {link.name}
-      </span>
+      <FaviconImg url={link.url} name={link.name} size={18} explicitIconUrl={link.icon_url} />
+      <span className="text-[13px] text-t1 truncate">{link.name}</span>
     </>
   );
 
   return (
-    <div className="group relative flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+    <div className="group relative flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-line/20 transition-colors">
       {onPreview ? (
-        <button
-          onClick={() => onPreview(link)}
-          className="flex items-center gap-3 flex-1 min-w-0 text-left"
-        >
+        <button onClick={() => onPreview(link)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
           {content}
         </button>
       ) : (
-        <a
-          href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 flex-1 min-w-0"
-        >
+        <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 flex-1 min-w-0">
           {content}
         </a>
       )}
@@ -48,15 +34,15 @@ export default function LinkItem({ link, onPreview }: Props) {
         href={link.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-400 hover:text-slate-600 transition-all"
+        className="opacity-0 group-hover:opacity-100 p-1 rounded text-t3 hover:text-accent transition-all"
       >
-        <ExternalLink size={13} />
+        <ExternalLink size={12} />
       </a>
       <button
         onClick={() => setEditOpen(true)}
-        className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-400 hover:text-indigo-500 transition-all"
+        className="opacity-0 group-hover:opacity-100 p-1 rounded text-t3 hover:text-accent transition-all"
       >
-        <Pencil size={13} />
+        <Pencil size={12} />
       </button>
       <LinkEditModal open={editOpen} onClose={() => setEditOpen(false)} link={link} />
     </div>

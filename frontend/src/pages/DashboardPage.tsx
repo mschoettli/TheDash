@@ -3,7 +3,6 @@ import {
   Activity,
   AlertTriangle,
   Boxes,
-  CheckCircle2,
   Eye,
   LayoutDashboard,
   Pause,
@@ -12,7 +11,6 @@ import {
   RefreshCw,
   Save,
   Server,
-  ShieldCheck,
   SlidersHorizontal,
   Trash2,
   X,
@@ -43,12 +41,12 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(1024, index)).toFixed(1)} ${units[index]}`;
 }
 
-function StatCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+function StatCard({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="rounded-2xl border border-cyan-400/10 bg-slate-950/70 p-4 shadow-[0_18px_60px_rgba(2,8,23,0.25)]">
-      <div className="text-[11px] uppercase tracking-[0.24em] text-cyan-200/60">{label}</div>
-      <div className="mt-2 text-2xl font-semibold text-slate-50">{value}</div>
-      <div className="mt-1 text-xs text-slate-400">{detail}</div>
+    <div className="rounded-xl bg-card border border-line/60 p-4">
+      <div className="label-xs mb-2">{label}</div>
+      <div className="text-2xl font-semibold text-t1 tabular-nums">{value}</div>
+      <div className="mt-1 text-[11px] text-t3">{sub}</div>
     </div>
   );
 }
@@ -63,17 +61,19 @@ function ContainerRow({ container }: { container: DiscoveredContainer }) {
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2">
-      <span className={`h-2.5 w-2.5 rounded-full ${isRunning ? "bg-emerald-400" : "bg-slate-500"}`} />
+    <div className="flex items-center gap-3 rounded-lg border border-line/50 bg-surface px-3 py-2">
+      <span className={`h-2 w-2 shrink-0 rounded-full ${isRunning ? "bg-emerald-400" : "bg-t3"}`} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-slate-100">{container.name}</div>
-        <div className="truncate text-[11px] text-slate-500">{container.image}</div>
+        <div className="truncate text-[13px] font-medium text-t1">{container.name}</div>
+        <div className="truncate text-[11px] text-t3">{container.image}</div>
       </div>
-      <div className="hidden text-xs text-slate-400 md:block">{container.ports.join(", ") || "no public port"}</div>
-      <div className="flex items-center gap-1">
-        <button onClick={() => runAction("start")} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-emerald-300"><Play size={14} /></button>
-        <button onClick={() => runAction("stop")} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-amber-300"><Pause size={14} /></button>
-        <button onClick={() => runAction("restart")} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-cyan-300"><RefreshCw size={14} /></button>
+      <div className="hidden text-[11px] text-t3 md:block tabular-nums">
+        {container.ports.join(", ") || "—"}
+      </div>
+      <div className="flex items-center gap-0.5">
+        <button onClick={() => runAction("start")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-emerald-400 transition-colors"><Play size={13} /></button>
+        <button onClick={() => runAction("stop")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-amber-400 transition-colors"><Pause size={13} /></button>
+        <button onClick={() => runAction("restart")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-accent transition-colors"><RefreshCw size={13} /></button>
       </div>
     </div>
   );
@@ -82,26 +82,28 @@ function ContainerRow({ container }: { container: DiscoveredContainer }) {
 function DiscoveryCard({ container }: { container: DiscoveredContainer }) {
   const adopt = useAdoptContainer();
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-xl bg-card border border-line/60 p-4 flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${container.state === "running" ? "bg-emerald-400" : "bg-slate-500"}`} />
-            <h3 className="truncate text-sm font-semibold text-slate-100">{container.app.name}</h3>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${container.state === "running" ? "bg-emerald-400" : "bg-t3"}`} />
+            <h3 className="truncate text-[13px] font-semibold text-t1">{container.app.name}</h3>
           </div>
-          <p className="mt-1 truncate text-xs text-slate-500">{container.app.href ?? container.image}</p>
+          <p className="truncate text-[11px] text-t3">{container.app.href ?? container.image}</p>
         </div>
-        <span className="rounded-full border border-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-400">
+        <span className="shrink-0 rounded-md border border-line px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-t3">
           {container.app.is_labeled ? "label" : "auto"}
         </span>
       </div>
-      {container.app.description && <p className="mt-3 line-clamp-2 text-xs text-slate-400">{container.app.description}</p>}
+      {container.app.description && (
+        <p className="line-clamp-2 text-[11px] text-t2">{container.app.description}</p>
+      )}
       <button
         disabled={!container.app.href || adopt.isPending}
         onClick={() => adopt.mutate(container.id)}
-        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-auto inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40 hover:opacity-90 transition-opacity"
       >
-        <Plus size={15} /> Als App übernehmen
+        <Plus size={14} /> Übernehmen
       </button>
     </div>
   );
@@ -128,147 +130,253 @@ export default function DashboardPage() {
   const moveCard = useMoveDashboardCard();
 
   const containers = discovery?.containers ?? [];
-  const runningCount = containers.filter((container) => container.state === "running").length;
-  const unhealthyCount = containers.filter((container) => /unhealthy|exited|dead/i.test(container.status)).length;
+  const runningCount = containers.filter((c) => c.state === "running").length;
+  const unhealthyCount = containers.filter((c) => /unhealthy|exited|dead/i.test(c.status)).length;
   const mainDisk = disks[0];
   const discoveredSuggestions = containers.filter(
-    (container) => !tiles?.some((tile) => tile.url === container.app.href || tile.name === container.app.name)
+    (c) => !tiles?.some((t) => t.url === c.app.href || t.name === c.app.name)
   );
-  const tileMap = useMemo(() => new Map((tiles ?? []).map((tile) => [tile.id, tile.name])), [tiles]);
+  const tileMap = useMemo(() => new Map((tiles ?? []).map((t) => [t.id, t.name])), [tiles]);
 
   return (
-    <div className="min-h-full space-y-6 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_32rem),radial-gradient(circle_at_top_right,rgba(16,185,129,0.1),transparent_28rem)] text-slate-100">
-      <section className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5 shadow-2xl">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200">
-              <ShieldCheck size={14} /> Homelab Command Center
-            </div>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight text-white md:text-4xl">TheDash Operations</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-400">Docker-Apps, Systemzustand, Widgets und Arbeitsbereiche in einer kontrollierten Oberfläche.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {!editMode ? (
-              <button onClick={() => setEditMode(true)} className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/20">
-                <SlidersHorizontal size={16} /> Bearbeiten
-              </button>
-            ) : (
-              <>
-                <button onClick={() => setEditMode(false)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950"><Save size={16} /> Speichern</button>
-                <button onClick={() => setEditMode(false)} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300"><X size={16} /> Abbrechen</button>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="CPU" value={`${Math.round(cpu)}%`} detail="Host load" />
-          <StatCard label="RAM" value={`${Math.round(ram.percent)}%`} detail={`${formatBytes(ram.used)} / ${formatBytes(ram.total)}`} />
-          <StatCard label="Docker" value={`${runningCount}/${containers.length}`} detail="running containers" />
-          <StatCard label="Alerts" value={`${unhealthyCount}`} detail={mainDisk ? `Disk ${Math.round(mainDisk.percent)}%` : "No disk data"} />
-        </div>
-      </section>
+    <div className="space-y-5 text-t1">
 
+      {/* ── Top bar ─────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="label-xs mb-1">Overview</div>
+          <h1 className="text-xl font-semibold text-t1">Dashboard</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {!editMode ? (
+            <button
+              onClick={() => setEditMode(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
+            >
+              <SlidersHorizontal size={14} /> Bearbeiten
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => setEditMode(false)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-[13px] font-medium text-emerald-400"
+              >
+                <Save size={14} /> Speichern
+              </button>
+              <button
+                onClick={() => setEditMode(false)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2"
+              >
+                <X size={14} /> Abbrechen
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Stats ───────────────────────────────────────── */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="CPU" value={`${Math.round(cpu)}%`} sub="Host load" />
+        <StatCard label="RAM" value={`${Math.round(ram.percent)}%`} sub={`${formatBytes(ram.used)} / ${formatBytes(ram.total)}`} />
+        <StatCard label="Docker" value={`${runningCount} / ${containers.length}`} sub="Running containers" />
+        <StatCard label="Alerts" value={`${unhealthyCount}`} sub={mainDisk ? `Disk ${Math.round(mainDisk.percent)}%` : "No disk data"} />
+      </div>
+
+      {/* ── Edit tools ──────────────────────────────────── */}
       {editMode && (
-        <section className="grid gap-4 rounded-3xl border border-amber-400/20 bg-slate-950/80 p-4 lg:grid-cols-[1fr_1fr]">
+        <div className="grid gap-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 sm:grid-cols-2">
           <div>
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-100"><Plus size={16} /> Dashboard bearbeiten</h2>
+            <div className="label-xs mb-2">Neue Sektion</div>
             <div className="flex gap-2">
-              <input value={sectionTitle} onChange={(e) => setSectionTitle(e.target.value)} placeholder="Neue Sektion" className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none" />
-              <button onClick={() => { if (!sectionTitle.trim()) return; createSection.mutate({ title: sectionTitle.trim() }, { onSuccess: () => setSectionTitle("") }); }} className="rounded-xl bg-amber-300 px-3 py-2 text-sm font-semibold text-slate-950">+ Sektion</button>
+              <input
+                value={sectionTitle}
+                onChange={(e) => setSectionTitle(e.target.value)}
+                placeholder="Sektions-Titel"
+                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] text-t1 outline-none focus:border-accent/50"
+              />
+              <button
+                onClick={() => {
+                  if (!sectionTitle.trim()) return;
+                  createSection.mutate({ title: sectionTitle.trim() }, { onSuccess: () => setSectionTitle("") });
+                }}
+                className="rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg"
+              >
+                + Sektion
+              </button>
             </div>
           </div>
           <div>
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-cyan-100"><Boxes size={16} /> Widget-Katalog</h2>
+            <div className="label-xs mb-2"><Boxes size={10} className="inline mr-1" />Widget-Katalog</div>
             <div className="flex gap-2">
-              <select value={selectedWidgetType} onChange={(e) => setSelectedWidgetType(e.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100">
-                {catalog?.map((item) => <option key={item.type} value={item.type}>{item.title} · {item.category}</option>)}
+              <select
+                value={selectedWidgetType}
+                onChange={(e) => setSelectedWidgetType(e.target.value)}
+                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] text-t1 outline-none"
+              >
+                {catalog?.map((item) => (
+                  <option key={item.type} value={item.type}>{item.title} · {item.category}</option>
+                ))}
               </select>
-              <button onClick={() => { const item = catalog?.find((entry) => entry.type === selectedWidgetType); if (item) createWidget.mutate({ type: item.type, title: item.title }); }} className="rounded-xl bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950">+ Widget</button>
+              <button
+                onClick={() => {
+                  const item = catalog?.find((e) => e.type === selectedWidgetType);
+                  if (item) createWidget.mutate({ type: item.type, title: item.title });
+                }}
+                className="rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg"
+              >
+                + Widget
+              </button>
             </div>
           </div>
-        </section>
+        </div>
       )}
 
-      <section className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
-        <div className="rounded-3xl border border-slate-800 bg-slate-950/75 p-4">
+      {/* ── Apps + Docker ────────────────────────────────── */}
+      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <div className="rounded-xl bg-card border border-line/60 p-4">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-slate-300"><LayoutDashboard size={16} /> Apps</h2>
-            <span className="text-xs text-slate-500">{tiles?.length ?? 0} tiles</span>
+            <div className="label-xs flex items-center gap-1.5"><LayoutDashboard size={11} /> Apps</div>
+            <span className="text-[11px] text-t3">{tiles?.length ?? 0} tiles</span>
           </div>
-          {tiles && tiles.length > 0 ? <TileGrid /> : <div className="rounded-2xl border border-dashed border-slate-800 py-12 text-center text-sm text-slate-500">Keine Apps angelegt. Im Edit Mode Docker-Apps übernehmen.</div>}
+          {tiles && tiles.length > 0 ? (
+            <TileGrid />
+          ) : (
+            <div className="rounded-lg border border-dashed border-line py-10 text-center text-[13px] text-t3">
+              Keine Apps angelegt. Im Edit-Modus Docker-Apps übernehmen.
+            </div>
+          )}
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-3xl border border-slate-800 bg-slate-950/75 p-4">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-slate-300"><Server size={16} /> Docker Control</h2>
-            <div className="space-y-2">
-              {containers.slice(0, 8).map((container) => <ContainerRow key={container.id} container={container} />)}
-              {discovery?.status === "disabled" && <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-100">Docker Monitoring ist deaktiviert oder nicht erreichbar.</div>}
+          <div className="rounded-xl bg-card border border-line/60 p-4">
+            <div className="label-xs mb-3 flex items-center gap-1.5"><Server size={11} /> Docker</div>
+            <div className="space-y-1.5">
+              {containers.slice(0, 8).map((c) => <ContainerRow key={c.id} container={c} />)}
+              {discovery?.status === "disabled" && (
+                <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-3 text-[12px] text-amber-300">
+                  Docker-Monitoring ist deaktiviert.
+                </div>
+              )}
+              {!containers.length && discovery?.status !== "disabled" && (
+                <div className="text-[13px] text-t3">Keine Container gefunden.</div>
+              )}
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-800 bg-slate-950/75 p-4">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-slate-300"><Activity size={16} /> Widgets</h2>
-            <div className="grid gap-2">
-              {widgets?.map((widget) => (
-                <div key={widget.id} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2">
+          <div className="rounded-xl bg-card border border-line/60 p-4">
+            <div className="label-xs mb-3 flex items-center gap-1.5"><Activity size={11} /> Widgets</div>
+            <div className="space-y-1.5">
+              {widgets?.map((w) => (
+                <div key={w.id} className="flex items-center justify-between rounded-lg border border-line/50 bg-surface px-3 py-2">
                   <div>
-                    <div className="text-sm font-medium text-slate-100">{widget.title}</div>
-                    <div className="text-[11px] uppercase tracking-wider text-slate-500">{widget.type}</div>
+                    <div className="text-[13px] font-medium text-t1">{w.title}</div>
+                    <div className="label-xs mt-0.5">{w.type}</div>
                   </div>
-                  {editMode && <button onClick={() => deleteWidget.mutate(widget.id)} className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300"><Trash2 size={14} /></button>}
+                  {editMode && (
+                    <button onClick={() => deleteWidget.mutate(w.id)} className="rounded p-1 text-t3 hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
               ))}
-              {!widgets?.length && <div className="text-sm text-slate-500">Noch keine Widgets konfiguriert.</div>}
+              {!widgets?.length && <div className="text-[13px] text-t3">Keine Widgets konfiguriert.</div>}
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section className="rounded-3xl border border-slate-800 bg-slate-950/75 p-4">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-slate-300"><Eye size={16} /> Discovered Apps</h2>
-          <span className="text-xs text-slate-500">Labels + Auto</span>
+      {/* ── Discovered Apps ──────────────────────────────── */}
+      {discoveredSuggestions.length > 0 && (
+        <div className="rounded-xl bg-card border border-line/60 p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="label-xs flex items-center gap-1.5"><Eye size={11} /> Discovered Apps</div>
+            <span className="text-[11px] text-t3">Labels + Auto-Detect</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {discoveredSuggestions.slice(0, 8).map((c) => <DiscoveryCard key={c.id} container={c} />)}
+          </div>
         </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {discoveredSuggestions.slice(0, 8).map((container) => <DiscoveryCard key={container.id} container={container} />)}
-          {!discoveredSuggestions.length && <div className="rounded-2xl border border-slate-800 p-4 text-sm text-slate-500">Keine neuen Container-Vorschläge.</div>}
-        </div>
-      </section>
+      )}
 
-      <section className="rounded-3xl border border-slate-800 bg-slate-950/75 p-4">
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-slate-300"><AlertTriangle size={16} /> Dashboard Board</h2>
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {dashboardSections?.map((section) => (
-            <div key={section.id} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (!draggedCardId) return; moveCard.mutate({ id: draggedCardId, section_id: section.id, sort_order: 99999 }); setDraggedCardId(null); }} className="w-[320px] shrink-0 rounded-2xl border border-slate-800 bg-slate-900/60">
-              <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
-                <h3 className="truncate text-sm font-semibold text-slate-100">{section.title}</h3>
-                {editMode && <button onClick={() => deleteSection.mutate(section.id)} className="rounded p-1 text-slate-500 hover:text-rose-300"><Trash2 size={14} /></button>}
-              </div>
-              <div className="min-h-[130px] space-y-2 p-3">
-                {section.cards.map((card) => (
-                  <div key={card.id} draggable={editMode} onDragStart={() => setDraggedCardId(card.id)} className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2">
-                    <div className="flex justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-slate-100">{card.title}</div>
-                        {card.description && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{card.description}</p>}
-                        {card.tile_id && <p className="mt-1 text-[11px] text-cyan-300">{tileMap.get(card.tile_id) ?? `Tile #${card.tile_id}`}</p>}
+      {/* ── Dashboard Board ──────────────────────────────── */}
+      {((dashboardSections && dashboardSections.length > 0) || editMode) && (
+        <div className="rounded-xl bg-card border border-line/60 p-4">
+          <div className="label-xs mb-4 flex items-center gap-1.5"><AlertTriangle size={11} /> Dashboard Board</div>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {dashboardSections?.map((section) => (
+              <div
+                key={section.id}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => {
+                  if (!draggedCardId) return;
+                  moveCard.mutate({ id: draggedCardId, section_id: section.id, sort_order: 99999 });
+                  setDraggedCardId(null);
+                }}
+                className="w-[280px] shrink-0 rounded-xl border border-line/60 bg-surface"
+              >
+                <div className="flex items-center justify-between border-b border-line/40 px-3 py-2">
+                  <h3 className="truncate text-[13px] font-semibold text-t1">{section.title}</h3>
+                  {editMode && (
+                    <button onClick={() => deleteSection.mutate(section.id)} className="rounded p-0.5 text-t3 hover:text-rose-400 transition-colors">
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+                <div className="min-h-[100px] space-y-1.5 p-2">
+                  {section.cards.map((card) => (
+                    <div
+                      key={card.id}
+                      draggable={editMode}
+                      onDragStart={() => setDraggedCardId(card.id)}
+                      className="rounded-lg border border-line/40 bg-card px-3 py-2"
+                    >
+                      <div className="flex justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-[13px] font-medium text-t1">{card.title}</div>
+                          {card.description && (
+                            <p className="mt-0.5 line-clamp-2 text-[11px] text-t3">{card.description}</p>
+                          )}
+                          {card.tile_id && (
+                            <p className="mt-0.5 text-[10px] text-accent">{tileMap.get(card.tile_id) ?? `Tile #${card.tile_id}`}</p>
+                          )}
+                        </div>
+                        {editMode && (
+                          <button onClick={() => deleteCard.mutate(card.id)} className="shrink-0 text-t3 hover:text-rose-400 transition-colors">
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
-                      {editMode && <button onClick={() => deleteCard.mutate(card.id)} className="text-slate-500 hover:text-rose-300"><Trash2 size={13} /></button>}
                     </div>
-                  </div>
-                ))}
-                {editMode && (
-                  <div className="flex gap-2 pt-1">
-                    <input value={cardDrafts[section.id] ?? ""} onChange={(e) => setCardDrafts((prev) => ({ ...prev, [section.id]: e.target.value }))} placeholder="Neue Karte" className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-100" />
-                    <button onClick={() => { const title = (cardDrafts[section.id] ?? "").trim(); if (!title) return; createCard.mutate({ section_id: section.id, title }, { onSuccess: () => setCardDrafts((prev) => ({ ...prev, [section.id]: "" })) }); }} className="rounded-lg bg-cyan-300 px-2 text-xs font-semibold text-slate-950">+</button>
-                  </div>
-                )}
+                  ))}
+                  {editMode && (
+                    <div className="flex gap-1.5 pt-1">
+                      <input
+                        value={cardDrafts[section.id] ?? ""}
+                        onChange={(e) => setCardDrafts((prev) => ({ ...prev, [section.id]: e.target.value }))}
+                        placeholder="Neue Karte"
+                        className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-[12px] text-t1 outline-none focus:border-accent/50"
+                      />
+                      <button
+                        onClick={() => {
+                          const title = (cardDrafts[section.id] ?? "").trim();
+                          if (!title) return;
+                          createCard.mutate(
+                            { section_id: section.id, title },
+                            { onSuccess: () => setCardDrafts((prev) => ({ ...prev, [section.id]: "" })) }
+                          );
+                        }}
+                        className="rounded-lg bg-accent px-2 text-[12px] font-semibold text-bg"
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </section>
+      )}
     </div>
   );
 }

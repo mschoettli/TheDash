@@ -10,13 +10,11 @@ interface Props {
 
 export default function TileCompact({ tile, online, apiData }: Props) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-sm transition-all duration-200">
-      <FaviconImg url={tile.url} name={tile.name} size={24} explicitIconUrl={tile.icon_url} />
-      <span className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200 truncate">
-        {tile.name}
-      </span>
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-card border border-line/60 hover:border-accent/30 transition-all duration-200">
+      <FaviconImg url={tile.url} name={tile.name} size={22} explicitIconUrl={tile.icon_url} />
+      <span className="flex-1 text-[13px] font-medium text-t1 truncate">{tile.name}</span>
       {apiData?.status === "ok" && (
-        <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+        <span className="text-[11px] text-t3 whitespace-nowrap tabular-nums">
           ▶ {apiData.activeStreams ?? 0}
         </span>
       )}

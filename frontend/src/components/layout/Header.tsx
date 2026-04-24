@@ -35,93 +35,99 @@ export default function Header() {
 
   return (
     <>
-      <header className="shrink-0 border-b border-slate-200 dark:border-slate-700/60 bg-white/90 dark:bg-slate-900/80 backdrop-blur-sm">
-        <div className="h-16 px-4 md:px-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
-            <span className="text-xl font-bold tracking-tight text-slate-800 dark:text-white shrink-0">
-              The<span className="text-indigo-500">Dash</span>
-            </span>
+      <header className="shrink-0 bg-surface border-b border-line/60">
+        <div className="h-14 px-4 md:px-6 flex items-center gap-5">
 
-            <div className="hidden sm:flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
-              <span>
-                {now.toLocaleDateString(undefined, {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                })}
-              </span>
-              <span className="font-mono text-slate-500 dark:text-slate-400">
-                {now.toLocaleTimeString(undefined, {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                })}
-              </span>
-            </div>
+          {/* Logo */}
+          <span className="text-[15px] font-bold tracking-tight text-t1 shrink-0">
+            The<span className="text-accent">Dash</span>
+          </span>
 
-            <nav className="hidden md:flex items-center gap-1">
-              {navItems.map(({ to, icon: Icon, key }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={to === "/"}
-                  className={({ isActive }) =>
-                    `flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
-                        : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    }`
-                  }
-                >
-                  <Icon size={16} />
-                  {t(key)}
-                </NavLink>
-              ))}
-            </nav>
-          </div>
+          {/* Nav */}
+          <nav className="hidden md:flex items-center gap-0.5">
+            {navItems.map(({ to, icon: Icon, key }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === "/"}
+                className={({ isActive }) =>
+                  `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                    isActive
+                      ? "bg-accent/10 text-accent"
+                      : "text-t2 hover:text-t1 hover:bg-line/30"
+                  }`
+                }
+              >
+                <Icon size={14} />
+                {t(key)}
+              </NavLink>
+            ))}
+          </nav>
 
-          <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <div className="hidden lg:flex items-center gap-2 overflow-x-auto max-w-[50vw] pb-1">
-              <MetricBar label={t("metrics.cpu")} value={`${Math.round(cpu)}%`} percent={cpu} />
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Metrics */}
+          <div className="hidden lg:flex items-center gap-1.5">
+            <MetricBar label={t("metrics.cpu")} value={`${Math.round(cpu)}%`} percent={cpu} />
+            <MetricBar
+              label={t("metrics.ram")}
+              value={`${formatBytes(ram.used)} · ${Math.round(ram.percent)}%`}
+              percent={ram.percent}
+            />
+            {mainDisk && (
               <MetricBar
-                label={t("metrics.ram")}
-                value={`${formatBytes(ram.used)} (${Math.round(ram.percent)}%)`}
-                percent={ram.percent}
+                label={t("metrics.disk")}
+                value={`${formatBytes(mainDisk.used)} · ${Math.round(mainDisk.percent)}%`}
+                percent={mainDisk.percent}
               />
-              {mainDisk && (
-                <MetricBar
-                  label={t("metrics.disk")}
-                  value={`${formatBytes(mainDisk.used)} (${Math.round(mainDisk.percent)}%)`}
-                  percent={mainDisk.percent}
-                />
-              )}
-            </div>
-
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-300 transition-colors"
-              title={t("header.settings")}
-            >
-              <Settings size={20} />
-            </button>
+            )}
           </div>
+
+          {/* Datetime */}
+          <div className="hidden sm:flex items-center gap-2 text-[13px] text-t2 shrink-0 tabular-nums border-l border-line/50 pl-4">
+            <span>
+              {now.toLocaleDateString(undefined, {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+              })}
+            </span>
+            <span className="font-mono text-t3">
+              {now.toLocaleTimeString(undefined, {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </span>
+          </div>
+
+          {/* Settings */}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="p-1.5 rounded-lg text-t2 hover:text-t1 hover:bg-line/40 transition-colors"
+            title={t("header.settings")}
+          >
+            <Settings size={17} />
+          </button>
         </div>
 
-        <div className="md:hidden px-4 pb-3 flex items-center gap-1 overflow-x-auto">
+        {/* Mobile nav */}
+        <div className="md:hidden px-4 pb-2.5 flex items-center gap-0.5 border-t border-line/40">
           {navItems.map(({ to, icon: Icon, key }) => (
             <NavLink
               key={to}
               to={to}
               end={to === "/"}
               className={({ isActive }) =>
-                `flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                   isActive
-                    ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    ? "bg-accent/10 text-accent"
+                    : "text-t2 hover:text-t1 hover:bg-line/30"
                 }`
               }
             >
-              <Icon size={16} />
+              <Icon size={14} />
               {t(key)}
             </NavLink>
           ))}

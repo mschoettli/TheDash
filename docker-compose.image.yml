@@ -1,6 +1,7 @@
 services:
   backend:
-    image: ghcr.io/${GHCR_OWNER:-mschoettli}/thedash-backend:${THEDASH_IMAGE_TAG:-main}
+    container_name: thedash-backend
+    image: ghcr.io/${GHCR_OWNER:-mschoettli}/thedash-backend:${THEDASH_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file: .env
     environment:
@@ -26,7 +27,8 @@ services:
       - thedash
 
   frontend:
-    image: ghcr.io/${GHCR_OWNER:-mschoettli}/thedash-frontend:${THEDASH_IMAGE_TAG:-main}
+    container_name: thedash-frontend
+    image: ghcr.io/${GHCR_OWNER:-mschoettli}/thedash-frontend:${THEDASH_IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
       - "${THEDASH_PORT:-8080}:80"
@@ -43,6 +45,7 @@ services:
       - thedash
 
   dockerproxy:
+    container_name: thedash-dockerproxy
     image: tecnativa/docker-socket-proxy:0.1
     profiles:
       - docker-monitoring

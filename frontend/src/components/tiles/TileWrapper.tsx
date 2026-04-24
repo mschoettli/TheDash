@@ -90,7 +90,7 @@ export default function TileWrapper({ tile }: Props) {
           e.preventDefault();
           setEditOpen(true);
         }}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-white/80 dark:bg-slate-700/80 shadow text-slate-500 dark:text-slate-400 hover:text-indigo-500 transition-all"
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-surface/90 border border-line/50 text-t3 hover:text-accent transition-all"
         title="Bearbeiten"
       >
         <Pencil size={13} />

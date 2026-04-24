@@ -24,67 +24,47 @@ export default function BookmarkPreviewDrawer({ link, onClose }: BookmarkPreview
 
   useEffect(() => {
     setNote(link?.note ?? "");
-    setTagInput(link?.tags.map((tag) => tag.name).join(", ") ?? "");
+    setTagInput(link?.tags.map((t) => t.name).join(", ") ?? "");
   }, [link]);
 
   const parsedTags = useMemo(
-    () =>
-      tagInput
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean),
+    () => tagInput.split(",").map((t) => t.trim()).filter(Boolean),
     [tagInput]
   );
 
   if (!link) return null;
 
   const saveDetails = () => {
-    updateLink.mutate({
-      id: link.id,
-      note,
-      tags: parsedTags as any,
-    });
+    updateLink.mutate({ id: link.id, note, tags: parsedTags as any });
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/30">
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/40">
       <button className="flex-1 cursor-default" onClick={onClose} aria-label="Close preview" />
-      <aside className="h-full w-full max-w-xl overflow-y-auto border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 px-4 py-3 backdrop-blur">
+      <aside className="h-full w-full max-w-lg overflow-y-auto border-l border-line/60 bg-surface shadow-2xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line/40 bg-surface/95 px-4 py-3 backdrop-blur">
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
-              {link.name}
-            </div>
-            <div className="text-xs text-slate-400 truncate">{getHost(link.url)}</div>
+            <div className="text-[14px] font-semibold text-t1 truncate">{link.name}</div>
+            <div className="text-[11px] text-t3 truncate">{getHost(link.url)}</div>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <X size={18} />
+          <button onClick={onClose} className="rounded p-1.5 text-t3 hover:bg-line/30 hover:text-t1 transition-colors">
+            <X size={16} />
           </button>
         </div>
 
         {link.image_url ? (
-          <img src={link.image_url} alt="" className="h-56 w-full object-cover bg-slate-100" />
+          <img src={link.image_url} alt="" className="h-52 w-full object-cover bg-card" />
         ) : (
-          <div className="h-40 flex items-center justify-center bg-slate-50 dark:bg-slate-800">
-            <FaviconImg
-              url={link.url}
-              name={link.name}
-              explicitIconUrl={link.icon_url}
-              size={56}
-            />
+          <div className="h-36 flex items-center justify-center bg-card border-b border-line/40">
+            <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={52} />
           </div>
         )}
 
         <div className="space-y-5 p-5">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">{link.name}</h2>
+            <h2 className="text-[15px] font-semibold text-t1">{link.name}</h2>
             {link.description && (
-              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                {link.description}
-              </p>
+              <p className="mt-1.5 text-[13px] leading-6 text-t2">{link.description}</p>
             )}
           </div>
 
@@ -93,53 +73,49 @@ export default function BookmarkPreviewDrawer({ link, onClose }: BookmarkPreview
               href={link.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-sm text-white dark:bg-slate-100 dark:text-slate-900"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[13px] font-medium text-bg hover:opacity-90 transition-opacity"
             >
-              <ExternalLink size={14} /> Open
+              <ExternalLink size={13} /> Open
             </a>
             <button
               onClick={() => updateLink.mutate({ id: link.id, is_favorite: !link.is_favorite })}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-600 dark:text-slate-300"
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[13px] transition-colors ${link.is_favorite ? "border-amber-400/40 bg-amber-400/10 text-amber-400" : "border-line text-t2 hover:border-amber-400/30"}`}
             >
-              <Star size={14} /> Fav
+              <Star size={13} /> Fav
             </button>
             <button
               onClick={() => updateLink.mutate({ id: link.id, is_archived: !link.is_archived })}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-600 dark:text-slate-300"
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[13px] transition-colors ${link.is_archived ? "border-accent/30 bg-accent/10 text-accent" : "border-line text-t2 hover:border-accent/30"}`}
             >
-              <Archive size={14} /> Archive
+              <Archive size={13} /> Arch.
             </button>
             <button
               onClick={() => deleteLink.mutate(link.id, { onSuccess: onClose })}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-sm text-rose-500"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-400/20 px-3 py-2 text-[13px] text-rose-400 hover:bg-rose-500/10 transition-colors"
             >
-              <Trash2 size={14} /> Delete
+              <Trash2 size={13} /> Del.
             </button>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-              Tags
-            </label>
+            <div className="label-xs mb-1.5">Tags</div>
             <input
               value={tagInput}
-              onChange={(event) => setTagInput(event.target.value)}
+              onChange={(e) => setTagInput(e.target.value)}
               onBlur={saveDetails}
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100"
+              className="w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50"
               placeholder="homelab, docs, ideas"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-              Note
-            </label>
+            <div className="label-xs mb-1.5">Notiz</div>
             <textarea
               value={note}
-              onChange={(event) => setNote(event.target.value)}
+              onChange={(e) => setNote(e.target.value)}
               onBlur={saveDetails}
-              rows={7}
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100"
+              rows={6}
+              className="w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 resize-none"
               placeholder="Private notes for this bookmark..."
             />
           </div>

@@ -3,10 +3,22 @@ import { useTranslation } from "react-i18next";
 import Modal from "../ui/Modal";
 import { useCreateTile, useUpdateTile, useDeleteTile, Tile, TileProvider } from "../../hooks/useTiles";
 
+const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
+const selectCls = `${input} appearance-none`;
+
 interface Props {
   open: boolean;
   onClose: () => void;
   tile?: Tile;
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="label-xs mb-1.5">{label}</div>
+      {children}
+    </div>
+  );
 }
 
 export default function TileEditModal({ open, onClose, tile }: Props) {
@@ -40,166 +52,90 @@ export default function TileEditModal({ open, onClose, tile }: Props) {
   const del = useDeleteTile();
 
   const handleSave = () => {
-    const data = {
-      name,
-      url,
-      icon_url: iconUrl || null,
-      style,
-      api_url: apiUrl || null,
-      api_key: apiKey || null,
-      provider,
-      sort_order: tile?.sort_order ?? 0,
-    };
-
-    if (isEdit && tile) {
-      update.mutate({ id: tile.id, ...data }, { onSuccess: onClose });
-    } else {
-      create.mutate(data, { onSuccess: onClose });
-    }
+    const data = { name, url, icon_url: iconUrl || null, style, api_url: apiUrl || null, api_key: apiKey || null, provider, sort_order: tile?.sort_order ?? 0 };
+    if (isEdit && tile) update.mutate({ id: tile.id, ...data }, { onSuccess: onClose });
+    else create.mutate(data, { onSuccess: onClose });
   };
 
   const handleDelete = () => {
     if (!tile) return;
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
+    if (!confirmDelete) { setConfirmDelete(true); return; }
     del.mutate(tile.id, { onSuccess: onClose });
   };
 
-  const styleOptions: Array<{ value: Tile["style"]; label: string }> = [
-    { value: "card", label: t("settings.style_card") },
-    { value: "compact", label: t("settings.style_compact") },
-    { value: "minimal", label: t("settings.style_minimal") },
+  const styleOptions = [
+    { value: "card" as const, label: t("settings.style_card") },
+    { value: "compact" as const, label: t("settings.style_compact") },
+    { value: "minimal" as const, label: t("settings.style_minimal") },
   ];
 
-  const providerOptions: Array<{ value: TileProvider; label: string }> = [
-    { value: "none", label: t("tile.provider_none") },
-    { value: "jellyfin", label: "Jellyfin" },
-    { value: "plex", label: "Plex" },
-    { value: "emby", label: "Emby" },
+  const providerOptions = [
+    { value: "none" as TileProvider, label: t("tile.provider_none") },
+    { value: "jellyfin" as TileProvider, label: "Jellyfin" },
+    { value: "plex" as TileProvider, label: "Plex" },
+    { value: "emby" as TileProvider, label: "Emby" },
   ];
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={isEdit ? t("tile.edit_title") : t("tile.add_title")}
-    >
+    <Modal open={open} onClose={onClose} title={isEdit ? t("tile.edit_title") : t("tile.add_title")}>
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
-            {t("tile.name")} *
-          </label>
-          <input
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="My Service"
-          />
-        </div>
+        <Field label={`${t("tile.name")} *`}>
+          <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="My Service" />
+        </Field>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
-            {t("tile.url")} *
-          </label>
-          <input
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="http://server:8080"
-          />
-        </div>
+        <Field label={`${t("tile.url")} *`}>
+          <input className={input} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://server:8080" />
+        </Field>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
-            {t("tile.icon")}
-          </label>
-          <input
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            value={iconUrl}
-            onChange={(e) => setIconUrl(e.target.value)}
-            placeholder="https://..."
-          />
-        </div>
+        <Field label={t("tile.icon")}>
+          <input className={input} value={iconUrl} onChange={(e) => setIconUrl(e.target.value)} placeholder="https://..." />
+        </Field>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
-            {t("tile.style")}
-          </label>
-          <div className="flex gap-2">
+        <Field label={t("tile.style")}>
+          <div className="inline-flex overflow-hidden rounded-lg border border-line/60">
             {styleOptions.map(({ value, label }) => (
               <button
                 key={value}
                 onClick={() => setStyle(value)}
-                className={`flex-1 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                  style === value
-                    ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                    : "border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400"
+                className={`flex-1 py-1.5 px-3 text-[13px] font-medium transition-colors ${
+                  style === value ? "bg-accent text-bg" : "text-t2 hover:bg-line/30 hover:text-t1"
                 }`}
               >
                 {label}
               </button>
             ))}
           </div>
-        </div>
+        </Field>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
-            {t("tile.provider")}
-          </label>
-          <select
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as TileProvider)}
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          >
-            {providerOptions.map((entry) => (
-              <option key={entry.value} value={entry.value}>
-                {entry.label}
-              </option>
-            ))}
+        <Field label={t("tile.provider")}>
+          <select value={provider} onChange={(e) => setProvider(e.target.value as TileProvider)} className={selectCls}>
+            {providerOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </select>
-        </div>
+        </Field>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
-            {t("tile.api")}
-          </label>
-          <input
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            value={apiUrl}
-            onChange={(e) => setApiUrl(e.target.value)}
-            placeholder="http://media-server:8096"
-          />
-        </div>
+        <Field label={t("tile.api")}>
+          <input className={input} value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} placeholder="http://media-server:8096" />
+        </Field>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
-            {t("tile.api_key")}
-          </label>
-          <input
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="Optional token"
-          />
-        </div>
+        <Field label={t("tile.api_key")}>
+          <input className={input} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Optional token" />
+        </Field>
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex gap-2 pt-1">
           <button
             onClick={handleSave}
             disabled={!name || !url}
-            className="flex-1 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+            className="flex-1 rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40 hover:opacity-90 transition-opacity"
           >
             {t("tile.save")}
           </button>
           {isEdit && (
             <button
               onClick={handleDelete}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`rounded-lg px-4 py-2 text-[13px] font-medium transition-colors ${
                 confirmDelete
-                  ? "bg-rose-500 hover:bg-rose-600 text-white"
-                  : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-500"
+                  ? "bg-rose-500 text-white"
+                  : "border border-line text-t2 hover:border-rose-400/40 hover:text-rose-400"
               }`}
             >
               {confirmDelete ? t("common.yes") : t("tile.delete")}

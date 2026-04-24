@@ -10,18 +10,10 @@ interface ModalProps {
   maxWidth?: string;
 }
 
-export default function Modal({
-  open,
-  onClose,
-  title,
-  children,
-  maxWidth = "max-w-lg",
-}: ModalProps) {
+export default function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }: ModalProps) {
   useEffect(() => {
     if (!open) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
@@ -35,31 +27,26 @@ export default function Modal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={onClose}
-          />
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
           <motion.div
-            className={`relative w-full ${maxWidth} bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden`}
-            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            className={`relative w-full ${maxWidth} bg-surface border border-line/70 rounded-2xl shadow-2xl overflow-hidden`}
+            initial={{ opacity: 0, scale: 0.96, y: 6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 8 }}
-            transition={{ duration: 0.15 }}
+            exit={{ opacity: 0, scale: 0.96, y: 6 }}
+            transition={{ duration: 0.14 }}
           >
             {title && (
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                  {title}
-                </h2>
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-line/60">
+                <h2 className="text-[15px] font-semibold text-t1">{title}</h2>
                 <button
                   onClick={onClose}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
+                  className="p-1.5 rounded-lg text-t3 hover:text-t1 hover:bg-line/30 transition-colors"
                 >
-                  <X size={18} />
+                  <X size={16} />
                 </button>
               </div>
             )}
-            <div className="p-6">{children}</div>
+            <div className="p-5">{children}</div>
           </motion.div>
         </motion.div>
       )}
