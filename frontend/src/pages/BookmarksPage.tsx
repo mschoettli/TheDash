@@ -2,12 +2,13 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Columns3, LayoutGrid, Plus, Search, Send, Rows3 } from "lucide-react";
 import { useSections, useCreateSection } from "../hooks/useSections";
-import { Link, useCaptureLink, useUpdateLink } from "../hooks/useLinks";
+import { Link, suggestAutoTags, useUpdateLink } from "../hooks/useLinks";
 import { useTags } from "../hooks/useTags";
 import LinkSection from "../components/links/LinkSection";
 import LinkItem from "../components/links/LinkItem";
 import BookmarkCard from "../components/links/BookmarkCard";
 import BookmarkPreviewDrawer from "../components/links/BookmarkPreviewDrawer";
+import LinkEditModal from "../components/links/LinkEditModal";
 
 function matchesSearch(link: Link, query: string): boolean {
   const value = query.trim().toLowerCase();
@@ -23,7 +24,6 @@ export default function BookmarksPage() {
   const { data: sections, isLoading } = useSections();
   const { data: tags } = useTags();
   const createSection = useCreateSection();
-  const captureLink = useCaptureLink();
   const updateLink = useUpdateLink();
 
   const [newTitle, setNewTitle] = useState("");
@@ -31,6 +31,7 @@ export default function BookmarksPage() {
   const [view, setView] = useState<"feed" | "sections" | "kanban">("feed");
   const [dragLinkId, setDragLinkId] = useState<number | null>(null);
   const [captureUrl, setCaptureUrl] = useState("");
+  const [captureDraft, setCaptureDraft] = useState<Partial<Link> | null>(null);
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [selectedLink, setSelectedLink] = useState<Link | null>(null);
@@ -54,7 +55,24 @@ export default function BookmarksPage() {
 
   const handleCapture = () => {
     if (!defaultSectionId || !captureUrl.trim()) return;
-    captureLink.mutate({ section_id: defaultSectionId, url: captureUrl.trim() }, { onSuccess: () => setCaptureUrl("") });
+    const url = captureUrl.trim();
+    let name = url;
+    try {
+      name = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, "");
+    } catch {
+      name = url;
+    }
+    setCaptureDraft({
+      section_id: defaultSectionId,
+      url,
+      name,
+      tags: suggestAutoTags(url, name).map((tag, index) => ({
+        id: -index - 1,
+        name: tag,
+        source: "auto",
+        created_at: new Date().toISOString(),
+      })),
+    } as Partial<Link>);
   };
 
   if (isLoading) {
@@ -120,7 +138,7 @@ export default function BookmarksPage() {
               className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3"
             />
             <button
-              disabled={!defaultSectionId || !captureUrl.trim() || captureLink.isPending}
+              disabled={!defaultSectionId || !captureUrl.trim()}
               onClick={handleCapture}
               className="rounded-lg bg-accent px-3 py-1 text-[13px] font-semibold text-bg disabled:opacity-40 hover:opacity-90 transition-opacity"
             >
@@ -248,6 +266,15 @@ export default function BookmarksPage() {
       )}
 
       <BookmarkPreviewDrawer link={selectedLink} onClose={() => setSelectedLink(null)} />
+      <LinkEditModal
+        open={Boolean(captureDraft)}
+        onClose={() => {
+          setCaptureDraft(null);
+          setCaptureUrl("");
+        }}
+        initial={captureDraft ?? undefined}
+        defaultSectionId={defaultSectionId}
+      />
     </div>
   );
 }

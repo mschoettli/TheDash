@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Activity,
-  AlertTriangle,
   Boxes,
   Eye,
   LayoutDashboard,
   Pause,
+  Pencil,
   Play,
   Plus,
   RefreshCw,
@@ -15,48 +16,119 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import Modal from "../components/ui/Modal";
 import TileGrid from "../components/tiles/TileGrid";
-import { useMetricsStore } from "../store/useMetricsStore";
+import TileEditModal from "../components/tiles/TileEditModal";
+import { Tile } from "../hooks/useTiles";
 import { useTiles } from "../hooks/useTiles";
+import { DiscoveredContainer, useDockerAction, useDockerDiscovery } from "../hooks/useDockerDiscovery";
 import {
-  useCreateDashboardCard,
-  useCreateDashboardSection,
-  useDashboardSections,
-  useDeleteDashboardCard,
-  useDeleteDashboardSection,
-  useMoveDashboardCard,
-} from "../hooks/useDashboardBoard";
-import {
-  DiscoveredContainer,
-  useAdoptContainer,
-  useDockerAction,
-  useDockerDiscovery,
-} from "../hooks/useDockerDiscovery";
-import { useCreateWidget, useDeleteWidget, useWidgetCatalog, useWidgets } from "../hooks/useWidgets";
+  useCreateWidget,
+  useDeleteWidget,
+  useUpdateWidget,
+  useWidgetCatalog,
+  useWidgets,
+  WidgetCatalogItem,
+  WidgetInstance,
+} from "../hooks/useWidgets";
 
-function formatBytes(bytes: number): string {
-  if (!bytes || bytes <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${(bytes / Math.pow(1024, index)).toFixed(1)} ${units[index]}`;
+const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
+
+function hostFromUrl(url: string | null): string {
+  if (!url) return "";
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub: string }) {
+function WidgetEditModal({
+  open,
+  onClose,
+  widget,
+  catalog,
+}: {
+  open: boolean;
+  onClose: () => void;
+  widget?: WidgetInstance | null;
+  catalog: WidgetCatalogItem[];
+}) {
+  const { t } = useTranslation();
+  const createWidget = useCreateWidget();
+  const updateWidget = useUpdateWidget();
+  const [type, setType] = useState(widget?.type ?? catalog[0]?.type ?? "docker");
+  const selected = catalog.find((item) => item.type === type) ?? catalog[0];
+  const [title, setTitle] = useState(widget?.title ?? selected?.title ?? "");
+  const [endpoint, setEndpoint] = useState(String(widget?.config?.endpoint ?? ""));
+  const [notes, setNotes] = useState(String(widget?.config?.notes ?? ""));
+
+  useEffect(() => {
+    if (!open) return;
+    const current = widget ? catalog.find((item) => item.type === widget.type) : selected;
+    setType(widget?.type ?? current?.type ?? "docker");
+    setTitle(widget?.title ?? current?.title ?? "");
+    setEndpoint(String(widget?.config?.endpoint ?? ""));
+    setNotes(String(widget?.config?.notes ?? ""));
+  }, [open, widget, catalog, selected]);
+
+  const save = () => {
+    if (!title.trim() || !type) return;
+    const payload = {
+      type,
+      title: title.trim(),
+      config: { endpoint: endpoint.trim(), notes: notes.trim() },
+      layout: widget?.layout ?? {},
+      section_id: widget?.section_id ?? null,
+      sort_order: widget?.sort_order ?? 0,
+      is_enabled: true,
+    };
+    if (widget) updateWidget.mutate({ id: widget.id, ...payload }, { onSuccess: onClose });
+    else createWidget.mutate(payload, { onSuccess: onClose });
+  };
+
   return (
-    <div className="rounded-xl bg-card border border-line/60 p-4">
-      <div className="label-xs mb-2">{label}</div>
-      <div className="text-2xl font-semibold text-t1 tabular-nums">{value}</div>
-      <div className="mt-1 text-[11px] text-t3">{sub}</div>
-    </div>
+    <Modal open={open} onClose={onClose} title={widget ? t("dashboard.edit_widget") : t("dashboard.add_widget")}>
+      <div className="space-y-4">
+        <div>
+          <div className="label-xs mb-1.5">{t("dashboard.widget_type")}</div>
+          <select className={input} value={type} onChange={(event) => {
+            const next = event.target.value;
+            setType(next);
+            setTitle(catalog.find((item) => item.type === next)?.title ?? "");
+          }}>
+            {catalog.map((item) => (
+              <option key={item.type} value={item.type}>{item.title} · {item.category}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <div className="label-xs mb-1.5">{t("dashboard.widget_title")}</div>
+          <input className={input} value={title} onChange={(event) => setTitle(event.target.value)} />
+        </div>
+        <div>
+          <div className="label-xs mb-1.5">{t("dashboard.widget_endpoint")}</div>
+          <input className={input} value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="http://service:port or API URL" />
+        </div>
+        <div>
+          <div className="label-xs mb-1.5">{t("dashboard.widget_notes")}</div>
+          <textarea className={`${input} resize-none`} rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} />
+        </div>
+        <button onClick={save} disabled={!title.trim()} className="w-full rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
+          {t("common.save")}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
-function ContainerRow({ container }: { container: DiscoveredContainer }) {
+function ContainerRow({ container, onAdopt }: { container: DiscoveredContainer; onAdopt: (container: DiscoveredContainer) => void }) {
+  const { t } = useTranslation();
   const dockerAction = useDockerAction();
   const isRunning = container.state === "running";
 
   const runAction = (action: "start" | "stop" | "restart") => {
-    if (!window.confirm(`${action} ${container.name}?`)) return;
+    if (!window.confirm(t("dashboard.confirm_docker_action", { action, name: container.name }))) return;
     dockerAction.mutate({ id: container.id, action });
   };
 
@@ -64,319 +136,151 @@ function ContainerRow({ container }: { container: DiscoveredContainer }) {
     <div className="flex items-center gap-3 rounded-lg border border-line/50 bg-surface px-3 py-2">
       <span className={`h-2 w-2 shrink-0 rounded-full ${isRunning ? "bg-emerald-400" : "bg-t3"}`} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium text-t1">{container.name}</div>
-        <div className="truncate text-[11px] text-t3">{container.image}</div>
+        <div className="truncate text-[13px] font-medium text-t1">{container.app.name}</div>
+        <div className="truncate text-[11px] text-t3">{container.app.href ?? container.image}</div>
       </div>
-      <div className="hidden text-[11px] text-t3 md:block tabular-nums">
-        {container.ports.join(", ") || "—"}
-      </div>
-      <div className="flex items-center gap-0.5">
-        <button onClick={() => runAction("start")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-emerald-400 transition-colors"><Play size={13} /></button>
-        <button onClick={() => runAction("stop")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-amber-400 transition-colors"><Pause size={13} /></button>
-        <button onClick={() => runAction("restart")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-accent transition-colors"><RefreshCw size={13} /></button>
-      </div>
-    </div>
-  );
-}
-
-function DiscoveryCard({ container }: { container: DiscoveredContainer }) {
-  const adopt = useAdoptContainer();
-  return (
-    <div className="rounded-xl bg-card border border-line/60 p-4 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${container.state === "running" ? "bg-emerald-400" : "bg-t3"}`} />
-            <h3 className="truncate text-[13px] font-semibold text-t1">{container.app.name}</h3>
-          </div>
-          <p className="truncate text-[11px] text-t3">{container.app.href ?? container.image}</p>
-        </div>
-        <span className="shrink-0 rounded-md border border-line px-1.5 py-0.5 text-[9px] uppercase tracking-widest text-t3">
-          {container.app.is_labeled ? "label" : "auto"}
-        </span>
-      </div>
-      {container.app.description && (
-        <p className="line-clamp-2 text-[11px] text-t2">{container.app.description}</p>
-      )}
-      <button
-        disabled={!container.app.href || adopt.isPending}
-        onClick={() => adopt.mutate(container.id)}
-        className="mt-auto inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40 hover:opacity-90 transition-opacity"
-      >
-        <Plus size={14} /> Übernehmen
+      <button onClick={() => onAdopt(container)} className="rounded-lg border border-line px-2 py-1 text-[12px] text-t2 hover:border-accent/40 hover:text-accent">
+        <Plus size={12} className="inline" /> {t("dashboard.app")}
       </button>
+      <div className="flex items-center gap-0.5">
+        <button onClick={() => runAction("start")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-emerald-500"><Play size={13} /></button>
+        <button onClick={() => runAction("stop")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-amber-500"><Pause size={13} /></button>
+        <button onClick={() => runAction("restart")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-accent"><RefreshCw size={13} /></button>
+      </div>
     </div>
   );
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const [editMode, setEditMode] = useState(false);
-  const [sectionTitle, setSectionTitle] = useState("");
-  const [draggedCardId, setDraggedCardId] = useState<number | null>(null);
-  const [cardDrafts, setCardDrafts] = useState<Record<number, string>>({});
-  const [selectedWidgetType, setSelectedWidgetType] = useState("docker");
-  const { cpu, ram, disks } = useMetricsStore();
+  const [appModalOpen, setAppModalOpen] = useState(false);
+  const [draftApp, setDraftApp] = useState<Partial<Tile> | null>(null);
+  const [widgetModalOpen, setWidgetModalOpen] = useState(false);
+  const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
   const { data: tiles } = useTiles();
   const { data: discovery } = useDockerDiscovery();
-  const { data: dashboardSections } = useDashboardSections();
   const { data: widgets } = useWidgets();
-  const { data: catalog } = useWidgetCatalog();
-  const createWidget = useCreateWidget();
+  const { data: catalog = [] } = useWidgetCatalog();
   const deleteWidget = useDeleteWidget();
-  const createSection = useCreateDashboardSection();
-  const deleteSection = useDeleteDashboardSection();
-  const createCard = useCreateDashboardCard();
-  const deleteCard = useDeleteDashboardCard();
-  const moveCard = useMoveDashboardCard();
 
   const containers = discovery?.containers ?? [];
-  const runningCount = containers.filter((c) => c.state === "running").length;
-  const unhealthyCount = containers.filter((c) => /unhealthy|exited|dead/i.test(c.status)).length;
-  const mainDisk = disks[0];
-  const discoveredSuggestions = containers.filter(
-    (c) => !tiles?.some((t) => t.url === c.app.href || t.name === c.app.name)
+  const suggestions = containers.filter(
+    (container) => !tiles?.some((tile) => tile.url === container.app.href || tile.name === container.app.name)
   );
-  const tileMap = useMemo(() => new Map((tiles ?? []).map((t) => [t.id, t.name])), [tiles]);
+
+  const openAppModal = (initial?: Partial<Tile>) => {
+    setDraftApp(initial ?? null);
+    setAppModalOpen(true);
+  };
+
+  const adoptContainer = (container: DiscoveredContainer) => {
+    openAppModal({
+      name: container.app.name,
+      url: container.app.href ?? "",
+      icon_url: container.app.icon,
+      style: "card",
+      provider: "none",
+      api_url: null,
+      api_key: null,
+      sort_order: 0,
+    });
+  };
 
   return (
     <div className="space-y-5 text-t1">
-
-      {/* ── Top bar ─────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="label-xs mb-1">Overview</div>
-          <h1 className="text-xl font-semibold text-t1">Dashboard</h1>
+          <div className="label-xs mb-1">{t("dashboard.overview")}</div>
+          <h1 className="text-xl font-semibold text-t1">{t("dashboard.title")}</h1>
         </div>
         <div className="flex items-center gap-2">
           {!editMode ? (
-            <button
-              onClick={() => setEditMode(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
-            >
-              <SlidersHorizontal size={14} /> Bearbeiten
+            <button onClick={() => setEditMode(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40">
+              <SlidersHorizontal size={14} /> {t("dashboard.edit")}
             </button>
           ) : (
             <>
-              <button
-                onClick={() => setEditMode(false)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-[13px] font-medium text-emerald-400"
-              >
-                <Save size={14} /> Speichern
-              </button>
-              <button
-                onClick={() => setEditMode(false)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2"
-              >
-                <X size={14} /> Abbrechen
-              </button>
+              <button onClick={() => openAppModal()} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg"><Plus size={14} /> {t("dashboard.add_app")}</button>
+              <button onClick={() => { setEditingWidget(null); setWidgetModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1"><Boxes size={14} /> {t("dashboard.add_widget")}</button>
+              <button onClick={() => setEditMode(false)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-[13px] font-medium text-emerald-600 dark:text-emerald-400"><Save size={14} /> {t("common.done")}</button>
+              <button onClick={() => setEditMode(false)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2"><X size={14} /> {t("common.cancel")}</button>
             </>
           )}
         </div>
       </div>
 
-      {/* ── Stats ───────────────────────────────────────── */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="CPU" value={`${Math.round(cpu)}%`} sub="Host load" />
-        <StatCard label="RAM" value={`${Math.round(ram.percent)}%`} sub={`${formatBytes(ram.used)} / ${formatBytes(ram.total)}`} />
-        <StatCard label="Docker" value={`${runningCount} / ${containers.length}`} sub="Running containers" />
-        <StatCard label="Alerts" value={`${unhealthyCount}`} sub={mainDisk ? `Disk ${Math.round(mainDisk.percent)}%` : "No disk data"} />
-      </div>
-
-      {/* ── Edit tools ──────────────────────────────────── */}
-      {editMode && (
-        <div className="grid gap-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 sm:grid-cols-2">
-          <div>
-            <div className="label-xs mb-2">Neue Sektion</div>
-            <div className="flex gap-2">
-              <input
-                value={sectionTitle}
-                onChange={(e) => setSectionTitle(e.target.value)}
-                placeholder="Sektions-Titel"
-                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] text-t1 outline-none focus:border-accent/50"
-              />
-              <button
-                onClick={() => {
-                  if (!sectionTitle.trim()) return;
-                  createSection.mutate({ title: sectionTitle.trim() }, { onSuccess: () => setSectionTitle("") });
-                }}
-                className="rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg"
-              >
-                + Sektion
-              </button>
-            </div>
-          </div>
-          <div>
-            <div className="label-xs mb-2"><Boxes size={10} className="inline mr-1" />Widget-Katalog</div>
-            <div className="flex gap-2">
-              <select
-                value={selectedWidgetType}
-                onChange={(e) => setSelectedWidgetType(e.target.value)}
-                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] text-t1 outline-none"
-              >
-                {catalog?.map((item) => (
-                  <option key={item.type} value={item.type}>{item.title} · {item.category}</option>
-                ))}
-              </select>
-              <button
-                onClick={() => {
-                  const item = catalog?.find((e) => e.type === selectedWidgetType);
-                  if (item) createWidget.mutate({ type: item.type, title: item.title });
-                }}
-                className="rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg"
-              >
-                + Widget
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Apps + Docker ────────────────────────────────── */}
-      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
-        <div className="rounded-xl bg-card border border-line/60 p-4">
+      <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
+        <section className="rounded-xl bg-card border border-line/60 p-4">
           <div className="mb-4 flex items-center justify-between">
-            <div className="label-xs flex items-center gap-1.5"><LayoutDashboard size={11} /> Apps</div>
-            <span className="text-[11px] text-t3">{tiles?.length ?? 0} tiles</span>
+            <div className="label-xs flex items-center gap-1.5"><LayoutDashboard size={11} /> {t("dashboard.apps")}</div>
+            <span className="text-[11px] text-t3">{tiles?.length ?? 0}</span>
           </div>
-          {tiles && tiles.length > 0 ? (
-            <TileGrid />
-          ) : (
+          {tiles && tiles.length > 0 ? <TileGrid /> : (
             <div className="rounded-lg border border-dashed border-line py-10 text-center text-[13px] text-t3">
-              Keine Apps angelegt. Im Edit-Modus Docker-Apps übernehmen.
+              {t("dashboard.empty_apps")}
             </div>
           )}
-        </div>
+        </section>
 
-        <div className="space-y-4">
-          <div className="rounded-xl bg-card border border-line/60 p-4">
-            <div className="label-xs mb-3 flex items-center gap-1.5"><Server size={11} /> Docker</div>
-            <div className="space-y-1.5">
-              {containers.slice(0, 8).map((c) => <ContainerRow key={c.id} container={c} />)}
-              {discovery?.status === "disabled" && (
-                <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-3 text-[12px] text-amber-300">
-                  Docker-Monitoring ist deaktiviert.
-                </div>
-              )}
-              {!containers.length && discovery?.status !== "disabled" && (
-                <div className="text-[13px] text-t3">Keine Container gefunden.</div>
-              )}
+        <aside className="space-y-4">
+          <section className="rounded-xl bg-card border border-line/60 p-4">
+            <div className="label-xs mb-3 flex items-center gap-1.5"><Server size={11} /> {t("dashboard.docker")}</div>
+            {discovery?.status === "disabled" ? (
+              <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-[12px] text-amber-700 dark:text-amber-300">
+                {t("dashboard.docker_disabled")}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {containers.slice(0, 8).map((container) => <ContainerRow key={container.id} container={container} onAdopt={adoptContainer} />)}
+                {!containers.length && <div className="text-[13px] text-t3">{t("dashboard.no_containers")}</div>}
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-xl bg-card border border-line/60 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="label-xs flex items-center gap-1.5"><Activity size={11} /> {t("dashboard.widgets")}</div>
+              {editMode && <button onClick={() => { setEditingWidget(null); setWidgetModalOpen(true); }} className="text-[12px] text-accent">+ {t("dashboard.widget")}</button>}
             </div>
-          </div>
-
-          <div className="rounded-xl bg-card border border-line/60 p-4">
-            <div className="label-xs mb-3 flex items-center gap-1.5"><Activity size={11} /> Widgets</div>
             <div className="space-y-1.5">
-              {widgets?.map((w) => (
-                <div key={w.id} className="flex items-center justify-between rounded-lg border border-line/50 bg-surface px-3 py-2">
-                  <div>
-                    <div className="text-[13px] font-medium text-t1">{w.title}</div>
-                    <div className="label-xs mt-0.5">{w.type}</div>
+              {widgets?.map((widget) => (
+                <div key={widget.id} className="rounded-lg border border-line/50 bg-surface px-3 py-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-medium text-t1">{widget.title}</div>
+                      <div className="label-xs mt-0.5">{widget.type}{widget.config.endpoint ? ` · ${hostFromUrl(String(widget.config.endpoint))}` : ""}</div>
+                    </div>
+                    {editMode && (
+                      <div className="flex gap-1">
+                        <button onClick={() => { setEditingWidget(widget); setWidgetModalOpen(true); }} className="rounded p-1 text-t3 hover:text-accent"><Pencil size={13} /></button>
+                        <button onClick={() => deleteWidget.mutate(widget.id)} className="rounded p-1 text-t3 hover:text-rose-500"><Trash2 size={13} /></button>
+                      </div>
+                    )}
                   </div>
-                  {editMode && (
-                    <button onClick={() => deleteWidget.mutate(w.id)} className="rounded p-1 text-t3 hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
-                      <Trash2 size={13} />
-                    </button>
-                  )}
+                  {Boolean(widget.config.notes) && <p className="mt-1 text-[12px] text-t3 line-clamp-2">{String(widget.config.notes)}</p>}
                 </div>
               ))}
-              {!widgets?.length && <div className="text-[13px] text-t3">Keine Widgets konfiguriert.</div>}
+              {!widgets?.length && <div className="text-[13px] text-t3">{t("dashboard.empty_widgets")}</div>}
             </div>
-          </div>
-        </div>
+          </section>
+        </aside>
       </div>
 
-      {/* ── Discovered Apps ──────────────────────────────── */}
-      {discoveredSuggestions.length > 0 && (
-        <div className="rounded-xl bg-card border border-line/60 p-4">
+      {suggestions.length > 0 && (
+        <section className="rounded-xl bg-card border border-line/60 p-4">
           <div className="mb-4 flex items-center justify-between">
-            <div className="label-xs flex items-center gap-1.5"><Eye size={11} /> Discovered Apps</div>
-            <span className="text-[11px] text-t3">Labels + Auto-Detect</span>
+            <div className="label-xs flex items-center gap-1.5"><Eye size={11} /> {t("dashboard.discovered_apps")}</div>
+            <span className="text-[11px] text-t3">{suggestions.length}</span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {discoveredSuggestions.slice(0, 8).map((c) => <DiscoveryCard key={c.id} container={c} />)}
+          <div className="grid gap-2 lg:grid-cols-2">
+            {suggestions.map((container) => <ContainerRow key={container.id} container={container} onAdopt={adoptContainer} />)}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* ── Dashboard Board ──────────────────────────────── */}
-      {((dashboardSections && dashboardSections.length > 0) || editMode) && (
-        <div className="rounded-xl bg-card border border-line/60 p-4">
-          <div className="label-xs mb-4 flex items-center gap-1.5"><AlertTriangle size={11} /> Dashboard Board</div>
-          <div className="flex gap-3 overflow-x-auto pb-1">
-            {dashboardSections?.map((section) => (
-              <div
-                key={section.id}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  if (!draggedCardId) return;
-                  moveCard.mutate({ id: draggedCardId, section_id: section.id, sort_order: 99999 });
-                  setDraggedCardId(null);
-                }}
-                className="w-[280px] shrink-0 rounded-xl border border-line/60 bg-surface"
-              >
-                <div className="flex items-center justify-between border-b border-line/40 px-3 py-2">
-                  <h3 className="truncate text-[13px] font-semibold text-t1">{section.title}</h3>
-                  {editMode && (
-                    <button onClick={() => deleteSection.mutate(section.id)} className="rounded p-0.5 text-t3 hover:text-rose-400 transition-colors">
-                      <Trash2 size={13} />
-                    </button>
-                  )}
-                </div>
-                <div className="min-h-[100px] space-y-1.5 p-2">
-                  {section.cards.map((card) => (
-                    <div
-                      key={card.id}
-                      draggable={editMode}
-                      onDragStart={() => setDraggedCardId(card.id)}
-                      className="rounded-lg border border-line/40 bg-card px-3 py-2"
-                    >
-                      <div className="flex justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="truncate text-[13px] font-medium text-t1">{card.title}</div>
-                          {card.description && (
-                            <p className="mt-0.5 line-clamp-2 text-[11px] text-t3">{card.description}</p>
-                          )}
-                          {card.tile_id && (
-                            <p className="mt-0.5 text-[10px] text-accent">{tileMap.get(card.tile_id) ?? `Tile #${card.tile_id}`}</p>
-                          )}
-                        </div>
-                        {editMode && (
-                          <button onClick={() => deleteCard.mutate(card.id)} className="shrink-0 text-t3 hover:text-rose-400 transition-colors">
-                            <Trash2 size={12} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {editMode && (
-                    <div className="flex gap-1.5 pt-1">
-                      <input
-                        value={cardDrafts[section.id] ?? ""}
-                        onChange={(e) => setCardDrafts((prev) => ({ ...prev, [section.id]: e.target.value }))}
-                        placeholder="Neue Karte"
-                        className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-[12px] text-t1 outline-none focus:border-accent/50"
-                      />
-                      <button
-                        onClick={() => {
-                          const title = (cardDrafts[section.id] ?? "").trim();
-                          if (!title) return;
-                          createCard.mutate(
-                            { section_id: section.id, title },
-                            { onSuccess: () => setCardDrafts((prev) => ({ ...prev, [section.id]: "" })) }
-                          );
-                        }}
-                        className="rounded-lg bg-accent px-2 text-[12px] font-semibold text-bg"
-                      >
-                        +
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <TileEditModal open={appModalOpen} onClose={() => setAppModalOpen(false)} initial={draftApp ?? undefined} />
+      <WidgetEditModal open={widgetModalOpen} onClose={() => setWidgetModalOpen(false)} widget={editingWidget} catalog={catalog} />
     </div>
   );
 }

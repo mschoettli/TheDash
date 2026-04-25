@@ -2,22 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Design Tokens ──────────────────────────────────────────── */
 :root {
-  --bg:       6   9  18;
-  --surface:  10  15  28;
-  --card:     14  20  38;
-  --line:     28  38  64;
-  --t1:      218 228 244;
-  --t2:       94 113 148;
-  --t3:       44  57  88;
-  --accent:   34 211 238;   /* cyan-400 */
+  color-scheme: light;
+  --bg: 246 248 252;
+  --surface: 255 255 255;
+  --card: 255 255 255;
+  --line: 209 217 230;
+  --t1: 15 23 42;
+  --t2: 71 85 105;
+  --t3: 125 140 160;
+  --accent: 8 145 178;
 }
 
-/* ─── Base ───────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; }
+.dark {
+  color-scheme: dark;
+  --bg: 6 9 18;
+  --surface: 10 15 28;
+  --card: 14 20 38;
+  --line: 28 38 64;
+  --t1: 218 228 244;
+  --t2: 148 163 184;
+  --t3: 94 113 148;
+  --accent: 34 211 238;
+}
 
-html { color-scheme: dark; }
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
   background-color: rgb(var(--bg));
@@ -25,13 +34,11 @@ body {
   @apply font-sans antialiased;
 }
 
-/* ─── Scrollbar ──────────────────────────────────────────────── */
 ::-webkit-scrollbar          { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track    { background: transparent; }
 ::-webkit-scrollbar-thumb    { background: rgb(var(--line)); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: rgb(var(--t3)); }
 
-/* ─── Utility classes ────────────────────────────────────────── */
 .card {
   background-color: rgb(var(--card));
   border: 1px solid rgb(var(--line) / 0.6);

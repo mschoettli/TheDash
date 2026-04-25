@@ -2,16 +2,17 @@ import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import MDEditor from "@uiw/react-md-editor";
 import { AlertCircle, Archive, CheckCircle2, Code, Eye, Heading2, ListChecks, Loader2, Pin, RotateCcw, Table2 } from "lucide-react";
-import { Note, useUpdateNote } from "../../hooks/useNotes";
+import { Note, NoteFolder, useUpdateNote } from "../../hooks/useNotes";
 import { useSettingsStore } from "../../store/useSettingsStore";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 interface Props {
   note: Note;
+  folder: NoteFolder | null;
 }
 
-export default function NoteEditor({ note }: Props) {
+export default function NoteEditor({ note, folder }: Props) {
   const { t } = useTranslation();
   const theme = useSettingsStore((s) => s.theme);
   const updateNote = useUpdateNote();
@@ -69,6 +70,11 @@ export default function NoteEditor({ note }: Props) {
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-bg">
       <div className="space-y-3 border-b border-line/60 px-5 py-4">
+        <div className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.16em] text-t3">
+          <span>{folder?.title ?? t("notes.unfiled")}</span>
+          <span>/</span>
+          <span className="truncate text-accent">{title || t("notes.untitled")}</span>
+        </div>
         <input
           className="w-full bg-transparent text-xl font-semibold text-t1 focus:outline-none placeholder:text-t3"
           value={title}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import Modal from "../ui/Modal";
-import { useCreateLink, useUpdateLink, useDeleteLink, Link } from "../../hooks/useLinks";
+import { useCreateLink, useUpdateLink, useDeleteLink, Link, suggestAutoTags } from "../../hooks/useLinks";
 import { useSections, useCreateSection } from "../../hooks/useSections";
 
 const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
@@ -11,6 +11,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   link?: Link;
+  initial?: Partial<Link>;
   defaultSectionId?: number;
 }
 
@@ -23,28 +24,40 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export default function LinkEditModal({ open, onClose, link, defaultSectionId }: Props) {
+export default function LinkEditModal({ open, onClose, link, initial, defaultSectionId }: Props) {
   const { t } = useTranslation();
   const isEdit = Boolean(link);
   const { data: sections } = useSections();
 
-  const [name, setName] = useState(link?.name ?? "");
-  const [url, setUrl] = useState(link?.url ?? "");
-  const [iconUrl, setIconUrl] = useState(link?.icon_url ?? "");
-  const [sectionId, setSectionId] = useState<number | "new">(link?.section_id ?? defaultSectionId ?? "new");
+  const [name, setName] = useState(link?.name ?? initial?.name ?? "");
+  const [url, setUrl] = useState(link?.url ?? initial?.url ?? "");
+  const [description, setDescription] = useState(link?.description ?? initial?.description ?? "");
+  const [iconUrl, setIconUrl] = useState(link?.icon_url ?? initial?.icon_url ?? "");
+  const [imageUrl, setImageUrl] = useState(link?.image_url ?? initial?.image_url ?? "");
+  const [tagInput, setTagInput] = useState(link?.tags.map((tag) => tag.name).join(", ") ?? "");
+  const [autoTagNames, setAutoTagNames] = useState<Set<string>>(() => new Set(link?.tags.filter((tag) => tag.source === "auto").map((tag) => tag.name) ?? []));
+  const [isFavorite, setIsFavorite] = useState(Boolean(link?.is_favorite ?? initial?.is_favorite));
+  const [isArchived, setIsArchived] = useState(Boolean(link?.is_archived ?? initial?.is_archived));
+  const [sectionId, setSectionId] = useState<number | "new">(link?.section_id ?? initial?.section_id ?? defaultSectionId ?? "new");
   const [newSectionTitle, setNewSectionTitle] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setName(link?.name ?? "");
-      setUrl(link?.url ?? "");
-      setIconUrl(link?.icon_url ?? "");
-      setSectionId(link?.section_id ?? defaultSectionId ?? (sections?.[0]?.id ?? "new"));
+      setName(link?.name ?? initial?.name ?? "");
+      setUrl(link?.url ?? initial?.url ?? "");
+      setDescription(link?.description ?? initial?.description ?? "");
+      setIconUrl(link?.icon_url ?? initial?.icon_url ?? "");
+      setImageUrl(link?.image_url ?? initial?.image_url ?? "");
+      setTagInput(link?.tags.map((tag) => tag.name).join(", ") ?? initial?.tags?.map((tag) => tag.name).join(", ") ?? "");
+      setAutoTagNames(new Set((link?.tags ?? initial?.tags ?? []).filter((tag) => tag.source === "auto").map((tag) => tag.name)));
+      setIsFavorite(Boolean(link?.is_favorite ?? initial?.is_favorite));
+      setIsArchived(Boolean(link?.is_archived ?? initial?.is_archived));
+      setSectionId(link?.section_id ?? initial?.section_id ?? defaultSectionId ?? (sections?.[0]?.id ?? "new"));
       setNewSectionTitle("");
       setConfirmDelete(false);
     }
-  }, [open, link, defaultSectionId, sections]);
+  }, [open, link, initial, defaultSectionId, sections]);
 
   const createLink = useCreateLink();
   const updateLink = useUpdateLink();
@@ -58,9 +71,33 @@ export default function LinkEditModal({ open, onClose, link, defaultSectionId }:
       const newSection = await createSection.mutateAsync({ title: newSectionTitle.trim() });
       targetSectionId = newSection.id;
     }
-    const data = { section_id: targetSectionId, name, url, icon_url: iconUrl || null, sort_order: link?.sort_order ?? 0 };
+    const tags = tagInput
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .map((name) => ({ name, source: autoTagNames.has(name) ? "auto" as const : "manual" as const }));
+    const data = {
+      section_id: targetSectionId,
+      name,
+      url,
+      description: description || null,
+      icon_url: iconUrl || null,
+      image_url: imageUrl || null,
+      tags,
+      is_favorite: isFavorite,
+      is_archived: isArchived,
+      sort_order: link?.sort_order ?? 0,
+    };
     if (isEdit && link) updateLink.mutate({ id: link.id, ...data }, { onSuccess: onClose });
     else createLink.mutate(data, { onSuccess: onClose });
+  };
+
+  const applyAutoTags = () => {
+    const current = tagInput.split(",").map((tag) => tag.trim()).filter(Boolean);
+    const suggested = suggestAutoTags(url, name, description);
+    const merged = Array.from(new Set([...current, ...suggested]));
+    setAutoTagNames((values) => new Set([...values, ...suggested]));
+    setTagInput(merged.join(", "));
   };
 
   const handleDelete = () => {
@@ -84,6 +121,23 @@ export default function LinkEditModal({ open, onClose, link, defaultSectionId }:
           <input className={input} value={iconUrl} onChange={(e) => setIconUrl(e.target.value)} placeholder="https://..." />
         </Field>
 
+        <Field label={t("link.description")}>
+          <textarea className={`${input} resize-none`} rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("link.description_placeholder")} />
+        </Field>
+
+        <Field label={t("link.preview_image")}>
+          <input className={input} value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
+        </Field>
+
+        <Field label={t("link.tags")}>
+          <div className="flex gap-2">
+            <input className={input} value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="docs, homelab, media" />
+            <button type="button" onClick={applyAutoTags} className="shrink-0 rounded-lg border border-line px-3 py-2 text-[12px] font-medium text-t2 hover:border-accent/40 hover:text-accent">
+              {t("link.auto_tags")}
+            </button>
+          </div>
+        </Field>
+
         <Field label={t("link.section")}>
           <select className={selectCls} value={sectionId} onChange={(e) => setSectionId(e.target.value === "new" ? "new" : Number(e.target.value))}>
             {sections?.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
@@ -96,6 +150,17 @@ export default function LinkEditModal({ open, onClose, link, defaultSectionId }:
             <input className={input} value={newSectionTitle} onChange={(e) => setNewSectionTitle(e.target.value)} placeholder="Meine Sektion" />
           </Field>
         )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex items-center gap-2 rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t2">
+            <input type="checkbox" checked={isFavorite} onChange={(e) => setIsFavorite(e.target.checked)} />
+            {t("link.favorite")}
+          </label>
+          <label className="flex items-center gap-2 rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t2">
+            <input type="checkbox" checked={isArchived} onChange={(e) => setIsArchived(e.target.checked)} />
+            {t("link.archive")}
+          </label>
+        </div>
 
         <div className="flex gap-2 pt-1">
           <button

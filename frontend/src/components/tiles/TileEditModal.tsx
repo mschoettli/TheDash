@@ -10,6 +10,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   tile?: Tile;
+  initial?: Partial<Tile>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -21,31 +22,31 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export default function TileEditModal({ open, onClose, tile }: Props) {
+export default function TileEditModal({ open, onClose, tile, initial }: Props) {
   const { t } = useTranslation();
   const isEdit = Boolean(tile);
 
-  const [name, setName] = useState(tile?.name ?? "");
-  const [url, setUrl] = useState(tile?.url ?? "");
-  const [iconUrl, setIconUrl] = useState(tile?.icon_url ?? "");
-  const [style, setStyle] = useState<Tile["style"]>(tile?.style ?? "card");
-  const [apiUrl, setApiUrl] = useState(tile?.api_url ?? "");
-  const [apiKey, setApiKey] = useState(tile?.api_key ?? "");
-  const [provider, setProvider] = useState<TileProvider>(tile?.provider ?? "none");
+  const [name, setName] = useState(tile?.name ?? initial?.name ?? "");
+  const [url, setUrl] = useState(tile?.url ?? initial?.url ?? "");
+  const [iconUrl, setIconUrl] = useState(tile?.icon_url ?? initial?.icon_url ?? "");
+  const [style, setStyle] = useState<Tile["style"]>(tile?.style ?? initial?.style ?? "card");
+  const [apiUrl, setApiUrl] = useState(tile?.api_url ?? initial?.api_url ?? "");
+  const [apiKey, setApiKey] = useState(tile?.api_key ?? initial?.api_key ?? "");
+  const [provider, setProvider] = useState<TileProvider>(tile?.provider ?? initial?.provider ?? "none");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setName(tile?.name ?? "");
-      setUrl(tile?.url ?? "");
-      setIconUrl(tile?.icon_url ?? "");
-      setStyle(tile?.style ?? "card");
-      setApiUrl(tile?.api_url ?? "");
-      setApiKey(tile?.api_key ?? "");
-      setProvider(tile?.provider ?? "none");
+      setName(tile?.name ?? initial?.name ?? "");
+      setUrl(tile?.url ?? initial?.url ?? "");
+      setIconUrl(tile?.icon_url ?? initial?.icon_url ?? "");
+      setStyle(tile?.style ?? initial?.style ?? "card");
+      setApiUrl(tile?.api_url ?? initial?.api_url ?? "");
+      setApiKey(tile?.api_key ?? initial?.api_key ?? "");
+      setProvider(tile?.provider ?? initial?.provider ?? "none");
       setConfirmDelete(false);
     }
-  }, [open, tile]);
+  }, [open, tile, initial]);
 
   const create = useCreateTile();
   const update = useUpdateTile();

@@ -7,7 +7,7 @@ const router = Router();
 export interface TagRow {
   id: number;
   name: string;
-  source: "manual" | "auto";
+  source: "manual" | "auto" | "ai";
   created_at: string;
 }
 
@@ -64,28 +64,30 @@ export function attachTags<T extends { id: number }>(links: T[]): Array<T & { ta
 function syncLinkTags(linkId: number, tags: unknown): void {
   if (!Array.isArray(tags)) return;
 
-  const cleanNames = Array.from(
-    new Set(
-      tags
-        .map((tag) => (typeof tag === "string" ? tag : tag?.name))
-        .filter((name): name is string => typeof name === "string")
-        .map((name) => name.trim())
-        .filter(Boolean)
-    )
-  );
+  const cleanTags = new Map<string, "manual" | "auto" | "ai">();
+  tags.forEach((tag) => {
+    const value = tag as any;
+    const name = typeof value === "string" ? value : value?.name;
+    if (typeof name !== "string") return;
+    const source = typeof value === "object" && value && ["manual", "auto", "ai"].includes(value.source)
+      ? (value.source as "manual" | "auto" | "ai")
+      : "manual";
+    const cleanName = name.trim();
+    if (cleanName) cleanTags.set(cleanName, source);
+  });
 
   db.prepare("DELETE FROM link_tags WHERE link_id = ?").run(linkId);
 
   const insertTag = db.prepare(
-    "INSERT OR IGNORE INTO tags (name, source) VALUES (?, 'manual')"
+    "INSERT OR IGNORE INTO tags (name, source) VALUES (?, ?)"
   );
   const selectTag = db.prepare("SELECT id FROM tags WHERE name = ?");
   const insertLinkTag = db.prepare(
     "INSERT OR IGNORE INTO link_tags (link_id, tag_id) VALUES (?, ?)"
   );
 
-  cleanNames.forEach((name) => {
-    insertTag.run(name);
+  cleanTags.forEach((source, name) => {
+    insertTag.run(name, source);
     const row = selectTag.get(name) as { id: number } | undefined;
     if (row) insertLinkTag.run(linkId, row.id);
   });

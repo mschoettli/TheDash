@@ -34,6 +34,10 @@ function mapWidget(row: any) {
   };
 }
 
+function isKnownWidgetType(type: string): boolean {
+  return CATALOG.some((item) => item.type === type);
+}
+
 router.get("/catalog", (_req, res) => res.json(CATALOG));
 
 router.get("/", (_req, res) => {
@@ -46,6 +50,10 @@ router.post("/", (req, res) => {
   const title = String(req.body?.title ?? "").trim();
   if (!type || !title) {
     res.status(400).json({ error: "type and title required" });
+    return;
+  }
+  if (!isKnownWidgetType(type)) {
+    res.status(400).json({ error: "unknown widget type" });
     return;
   }
   const result = db
@@ -70,10 +78,20 @@ router.put("/:id", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
+  if (req.body?.type !== undefined && !isKnownWidgetType(String(req.body.type))) {
+    res.status(400).json({ error: "unknown widget type" });
+    return;
+  }
+  const title = String(req.body?.title ?? existing.title).trim();
+  if (!title) {
+    res.status(400).json({ error: "title required" });
+    return;
+  }
   db.prepare(
-    "UPDATE widgets SET title = ?, config_json = ?, layout_json = ?, section_id = ?, sort_order = ?, is_enabled = ?, updated_at = datetime('now') WHERE id = ?"
+    "UPDATE widgets SET type = ?, title = ?, config_json = ?, layout_json = ?, section_id = ?, sort_order = ?, is_enabled = ?, updated_at = datetime('now') WHERE id = ?"
   ).run(
-    req.body?.title ?? existing.title,
+    req.body?.type ?? existing.type,
+    title,
     JSON.stringify(req.body?.config ?? JSON.parse(existing.config_json || "{}")),
     JSON.stringify(req.body?.layout ?? JSON.parse(existing.layout_json || "{}")),
     req.body?.section_id !== undefined ? req.body.section_id : existing.section_id,

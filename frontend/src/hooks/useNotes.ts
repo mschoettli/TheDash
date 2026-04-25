@@ -60,6 +60,19 @@ export function useCreateNoteFolder() {
   });
 }
 
+export function useUpdateNoteFolder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<NoteFolder> & { id: number }) =>
+      fetchJson<NoteFolder>(`/api/notes/folders/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: FOLDERS_KEY }),
+  });
+}
+
 export function useDeleteNoteFolder() {
   const qc = useQueryClient();
   return useMutation({
@@ -74,7 +87,7 @@ export function useDeleteNoteFolder() {
 export function useCreateNote() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data?: { title?: string; content?: string; folder_id?: number | null }) =>
+    mutationFn: (data?: { title?: string; content?: string; folder_id?: number | null; tags?: string[] }) =>
       fetchJson<Note>("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

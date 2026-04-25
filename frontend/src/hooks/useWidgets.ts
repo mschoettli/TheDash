@@ -55,6 +55,19 @@ export function useCreateWidget() {
   });
 }
 
+export function useUpdateWidget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<WidgetInstance> & { id: number }) =>
+      fetchJson<WidgetInstance>(`/api/widgets/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
+}
+
 export function useDeleteWidget() {
   const qc = useQueryClient();
   return useMutation({

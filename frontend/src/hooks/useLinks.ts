@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 export interface LinkTag {
   id: number;
   name: string;
-  source: "manual" | "auto";
+  source: "manual" | "auto" | "ai";
   created_at: string;
 }
 
@@ -27,6 +27,9 @@ export interface Link {
 const SECTIONS_KEY = ["sections"];
 const TAGS_KEY = ["tags"];
 
+type LinkInputTag = string | { name: string; source?: "manual" | "auto" | "ai" };
+type LinkMutationData = Omit<Partial<Link>, "tags"> & { tags?: LinkInputTag[] };
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
@@ -43,7 +46,7 @@ function invalidateBookmarks(qc: ReturnType<typeof useQueryClient>) {
 export function useCreateLink() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<Link> & { section_id: number; name: string; url: string }) =>
+    mutationFn: (data: LinkMutationData & { section_id: number; name: string; url: string }) =>
       fetchJson<Link>("/api/links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -56,7 +59,7 @@ export function useCreateLink() {
 export function useCaptureLink() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { section_id: number; url: string; tags?: string[] }) =>
+    mutationFn: (data: { section_id: number; url: string; tags?: LinkInputTag[] }) =>
       fetchJson<Link>("/api/links/capture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -66,10 +69,30 @@ export function useCaptureLink() {
   });
 }
 
+export function suggestAutoTags(url: string, title?: string, description?: string): string[] {
+  const values = new Set<string>();
+  try {
+    const host = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, "");
+    host
+      .split(".")
+      .filter((part) => part.length > 2 && !["com", "net", "org", "local"].includes(part))
+      .forEach((part) => values.add(part.toLowerCase()));
+  } catch {
+    // ignore invalid URL while typing
+  }
+  `${title ?? ""} ${description ?? ""}`
+    .toLowerCase()
+    .split(/[^a-z0-9äöüß]+/i)
+    .filter((word) => word.length > 4)
+    .slice(0, 5)
+    .forEach((word) => values.add(word));
+  return Array.from(values).slice(0, 8);
+}
+
 export function useUpdateLink() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<Link> & { id: number }) =>
+    mutationFn: ({ id, ...data }: LinkMutationData & { id: number }) =>
       fetchJson<Link>(`/api/links/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
