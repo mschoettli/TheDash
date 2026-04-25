@@ -90,6 +90,9 @@
     "preview_image": "Preview image (optional)",
     "tags": "Tags",
     "auto_tags": "Auto tags",
+    "ai_tags": "AI tags",
+    "suggesting_tags": "Checking...",
+    "actions": "Actions",
     "favorite": "Favorite",
     "favorite_short": "Fav",
     "archive": "Archive",
@@ -145,9 +148,25 @@
     "stat_pinned": "Pinned",
     "stat_todos": "Open todos",
     "stat_tags": "Tags",
+    "folders": "Folders",
     "quick_note": "Quick Note",
     "quick_placeholder": "Thought, task or Markdown snippet...",
-    "recent": "Recently edited"
+    "recent": "Recently edited",
+    "tile_all_desc": "Overview of all active notes.",
+    "tile_folders_desc": "Structured areas of your knowledge base.",
+    "tile_pinned_desc": "Important notes for fast access.",
+    "tile_todos_desc": "Open Markdown checklists across all notes.",
+    "tile_unfiled_desc": "Notes that are not assigned to a folder yet.",
+    "tile_archive_desc": "Hidden or completed notes.",
+    "tile_tags_desc": "Topic labels across all notes.",
+    "tile_recent_desc": "Jump back into recently edited content.",
+    "folder_tile_desc": "Open folder and show contents in the tree.",
+    "no_folders": "No folders yet."
+  },
+  "icons": {
+    "picker": "Icon picker",
+    "auto_detected": "Auto detected",
+    "use_auto": "Use auto"
   },
   "metrics": {
     "cpu": "CPU",

@@ -1,4 +1,4 @@
-import { Archive, ExternalLink, Pencil, Star, Tags, Trash2 } from "lucide-react";
+import { Archive, ExternalLink, MoreHorizontal, Pencil, Star, Tags, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useDeleteLink, useUpdateLink } from "../../hooks/useLinks";
@@ -21,6 +21,7 @@ function getHost(url: string): string {
 export default function BookmarkCard({ link, onOpen }: BookmarkCardProps) {
   const { t } = useTranslation();
   const [editOpen, setEditOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const updateLink = useUpdateLink();
   const deleteLink = useDeleteLink();
 
@@ -69,43 +70,54 @@ export default function BookmarkCard({ link, onOpen }: BookmarkCardProps) {
           <Tags size={12} />
           <span>{link.tags.length}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <a
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(event) => event.stopPropagation()}
-            className="rounded-md p-1.5 text-t3 hover:bg-line/30 hover:text-accent"
-            aria-label={t("link.open")}
-          >
-            <ExternalLink size={13} />
-          </a>
-          <button onClick={() => setEditOpen(true)} className="rounded-md p-1.5 text-t3 hover:bg-line/30 hover:text-accent" aria-label={t("link.edit")}>
-            <Pencil size={13} />
-          </button>
-          <button
-            onClick={() => updateLink.mutate({ id: link.id, is_favorite: !link.is_favorite })}
-            className={`rounded-md p-1.5 hover:bg-line/30 ${link.is_favorite ? "text-amber-500" : "text-t3 hover:text-amber-500"}`}
-            aria-label={t("link.favorite")}
-          >
-            <Star size={13} />
-          </button>
-          <button
-            onClick={() => updateLink.mutate({ id: link.id, is_archived: !link.is_archived })}
-            className={`rounded-md p-1.5 hover:bg-line/30 ${link.is_archived ? "text-accent" : "text-t3 hover:text-accent"}`}
-            aria-label={t("link.archive")}
-          >
-            <Archive size={13} />
-          </button>
-          <button
-            onClick={() => {
-              if (window.confirm(t("link.confirm_delete"))) deleteLink.mutate(link.id);
-            }}
-            className="rounded-md p-1.5 text-t3 hover:bg-rose-500/10 hover:text-rose-500"
-            aria-label={t("link.delete")}
-          >
-            <Trash2 size={13} />
-          </button>
+        <div className="flex min-h-7 items-center gap-1">
+          {actionsOpen ? (
+            <>
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(event) => event.stopPropagation()}
+                className="rounded-md p-1.5 text-t3 hover:bg-line/30 hover:text-accent"
+                aria-label={t("link.open")}
+              >
+                <ExternalLink size={13} />
+              </a>
+              <button onClick={() => setEditOpen(true)} className="rounded-md p-1.5 text-t3 hover:bg-line/30 hover:text-accent" aria-label={t("link.edit")}>
+                <Pencil size={13} />
+              </button>
+              <button
+                onClick={() => updateLink.mutate({ id: link.id, is_favorite: !link.is_favorite })}
+                className={`rounded-md p-1.5 hover:bg-line/30 ${link.is_favorite ? "text-amber-500" : "text-t3 hover:text-amber-500"}`}
+                aria-label={t("link.favorite")}
+              >
+                <Star size={13} />
+              </button>
+              <button
+                onClick={() => updateLink.mutate({ id: link.id, is_archived: !link.is_archived })}
+                className={`rounded-md p-1.5 hover:bg-line/30 ${link.is_archived ? "text-accent" : "text-t3 hover:text-accent"}`}
+                aria-label={t("link.archive")}
+              >
+                <Archive size={13} />
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm(t("link.confirm_delete"))) deleteLink.mutate(link.id);
+                }}
+                className="rounded-md p-1.5 text-t3 hover:bg-rose-500/10 hover:text-rose-500"
+                aria-label={t("link.delete")}
+              >
+                <Trash2 size={13} />
+              </button>
+              <button onClick={() => setActionsOpen(false)} className="rounded-md p-1.5 text-t3 hover:bg-line/30 hover:text-t1" aria-label={t("common.cancel")}>
+                <X size={13} />
+              </button>
+            </>
+          ) : (
+            <button onClick={() => setActionsOpen(true)} className="rounded-md p-1.5 text-t3 hover:bg-line/30 hover:text-accent" aria-label={t("link.actions")}>
+              <MoreHorizontal size={15} />
+            </button>
+          )}
         </div>
       </div>
       <LinkEditModal open={editOpen} onClose={() => setEditOpen(false)} link={link} />

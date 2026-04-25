@@ -1,25 +1,38 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Clock, FileText, Pin, Plus, Tags } from "lucide-react";
+import { Archive, BarChart3, Clock, FileText, Folder, Inbox, Pin, Plus, Tags } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Note, useCreateNote, useNoteFolders, useNotes } from "../hooks/useNotes";
 import NoteList, { NoteScope } from "../components/notes/NoteList";
 import NoteEditor from "../components/notes/NoteEditor";
 
-function StatCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | number }) {
+function DashboardTile({
+  icon: Icon,
+  label,
+  value,
+  description,
+  onClick,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  description: string;
+  onClick?: () => void;
+}) {
   return (
-    <div className="rounded-xl border border-line/60 bg-card p-4">
-      <div className="label-xs mb-2 flex items-center gap-1.5"><Icon size={10} /> {label}</div>
-      <div className="text-2xl font-semibold tabular-nums text-t1">{value}</div>
-    </div>
+    <button
+      onClick={onClick}
+      className="group rounded-2xl border border-line/60 bg-card p-4 text-left transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/5"
+    >
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-accent/20 bg-accent/10 text-accent">
+          <Icon size={18} />
+        </span>
+        <span className="text-2xl font-semibold tabular-nums text-t1">{value}</span>
+      </div>
+      <div className="text-[14px] font-semibold text-t1">{label}</div>
+      <div className="mt-1 line-clamp-2 text-[12px] leading-5 text-t3">{description}</div>
+    </button>
   );
-}
-
-function filterNotes(notes: Note[], scope: NoteScope): Note[] {
-  if (scope === "all") return notes.filter((note) => !note.is_archived);
-  if (scope === "unfiled") return notes.filter((note) => note.folder_id === null && !note.is_archived);
-  if (scope === "pinned") return notes.filter((note) => note.is_pinned && !note.is_archived);
-  if (scope === "archived") return notes.filter((note) => note.is_archived);
-  return notes.filter((note) => note.folder_id === scope && !note.is_archived);
 }
 
 export default function NotesPage() {
@@ -37,8 +50,10 @@ export default function NotesPage() {
 
   const selectedNote = notes.find((note) => note.id === selectedId);
   const selectedFolder = selectedNote?.folder_id ? folders.find((folder) => folder.id === selectedNote.folder_id) ?? null : null;
-  const scopedNotes = filterNotes(notes, selectedScope);
   const pinned = notes.filter((note) => note.is_pinned && !note.is_archived);
+  const archived = notes.filter((note) => note.is_archived);
+  const unfiled = notes.filter((note) => note.folder_id === null && !note.is_archived);
+  const recent = [...notes].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
   const openTasks = useMemo(
     () => notes.reduce((total, note) => total + (note.content.match(/- \[ \]/g)?.length ?? 0), 0),
     [notes]
@@ -78,10 +93,14 @@ export default function NotesPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard icon={FileText} label={t("notes.stat_notes")} value={notes.length} />
-              <StatCard icon={Pin} label={t("notes.stat_pinned")} value={pinned.length} />
-              <StatCard icon={BarChart3} label={t("notes.stat_todos")} value={openTasks} />
-              <StatCard icon={Tags} label={t("notes.stat_tags")} value={allTags.size} />
+              <DashboardTile icon={FileText} label={t("notes.stat_notes")} value={notes.length} description={t("notes.tile_all_desc")} onClick={() => setSelectedScope("all")} />
+              <DashboardTile icon={Folder} label={t("notes.folders")} value={folders.length} description={t("notes.tile_folders_desc")} />
+              <DashboardTile icon={Pin} label={t("notes.stat_pinned")} value={pinned.length} description={t("notes.tile_pinned_desc")} onClick={() => setSelectedScope("pinned")} />
+              <DashboardTile icon={BarChart3} label={t("notes.stat_todos")} value={openTasks} description={t("notes.tile_todos_desc")} />
+              <DashboardTile icon={Inbox} label={t("notes.unfiled")} value={unfiled.length} description={t("notes.tile_unfiled_desc")} onClick={() => setSelectedScope("unfiled")} />
+              <DashboardTile icon={Archive} label={t("notes.archive")} value={archived.length} description={t("notes.tile_archive_desc")} onClick={() => setSelectedScope("archived")} />
+              <DashboardTile icon={Tags} label={t("notes.stat_tags")} value={allTags.size} description={t("notes.tile_tags_desc")} />
+              <DashboardTile icon={Clock} label={t("notes.recent")} value={recent.length ? new Date(recent[0].updated_at).toLocaleDateString() : "-"} description={t("notes.tile_recent_desc")} />
             </div>
 
             <div className="rounded-xl border border-line/60 bg-card p-4">
@@ -124,7 +143,7 @@ export default function NotesPage() {
               <section className="rounded-xl border border-line/60 bg-card p-4">
                 <div className="label-xs mb-3 flex items-center gap-1.5"><Clock size={10} /> {t("notes.recent")}</div>
                 <div className="space-y-1">
-                  {scopedNotes.slice(0, 6).map((note) => (
+                  {recent.slice(0, 6).map((note) => (
                     <button
                       key={note.id}
                       onClick={() => setSelectedId(note.id)}
@@ -134,10 +153,33 @@ export default function NotesPage() {
                       <div className="mt-0.5 text-[11px] text-t3">{new Date(note.updated_at).toLocaleString()}</div>
                     </button>
                   ))}
-                  {!scopedNotes.length && <p className="text-[13px] text-t3">{t("notes.no_notes")}</p>}
+                  {!recent.length && <p className="text-[13px] text-t3">{t("notes.no_notes")}</p>}
                 </div>
               </section>
             </div>
+
+            <section className="rounded-xl border border-line/60 bg-card p-4">
+              <div className="label-xs mb-3 flex items-center gap-1.5"><Folder size={10} /> {t("notes.folders")}</div>
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {folders.map((folder) => {
+                  const count = notes.filter((note) => note.folder_id === folder.id && !note.is_archived).length;
+                  return (
+                    <button
+                      key={folder.id}
+                      onClick={() => setSelectedScope(folder.id)}
+                      className="rounded-xl border border-line/50 bg-surface p-3 text-left transition-colors hover:border-accent/35"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="truncate text-[13px] font-semibold text-t1">{folder.title}</div>
+                        <div className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">{count}</div>
+                      </div>
+                      <div className="mt-1 text-[11px] text-t3">{t("notes.folder_tile_desc")}</div>
+                    </button>
+                  );
+                })}
+                {!folders.length && <p className="text-[13px] text-t3">{t("notes.no_folders")}</p>}
+              </div>
+            </section>
           </div>
         )}
       </main>

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import Modal from "../ui/Modal";
 import { useCreateTile, useUpdateTile, useDeleteTile, Tile, TileProvider } from "../../hooks/useTiles";
+import IconPicker from "../ui/IconPicker";
+import { detectIconKey, iconValue, isRegistryIcon } from "../../lib/iconRegistry";
 
 const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
 const selectCls = `${input} appearance-none`;
@@ -48,6 +50,11 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
     }
   }, [open, tile, initial]);
 
+  useEffect(() => {
+    if (!open || tile || initial?.icon_url || iconUrl) return;
+    if (name.trim()) setIconUrl(iconValue(detectIconKey(name)));
+  }, [open, tile, initial, iconUrl, name]);
+
   const create = useCreateTile();
   const update = useUpdateTile();
   const del = useDeleteTile();
@@ -91,6 +98,8 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
         <Field label={t("tile.icon")}>
           <input className={input} value={iconUrl} onChange={(e) => setIconUrl(e.target.value)} placeholder="https://..." />
         </Field>
+
+        <IconPicker value={isRegistryIcon(iconUrl) ? iconUrl : null} name={name} onChange={setIconUrl} />
 
         <Field label={t("tile.style")}>
           <div className="inline-flex overflow-hidden rounded-lg border border-line/60">

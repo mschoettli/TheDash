@@ -7,6 +7,11 @@ export interface LinkTag {
   created_at: string;
 }
 
+export interface TagSuggestion {
+  name: string;
+  source: "auto" | "ai";
+}
+
 export interface Link {
   id: number;
   section_id: number;
@@ -87,6 +92,15 @@ export function suggestAutoTags(url: string, title?: string, description?: strin
     .slice(0, 5)
     .forEach((word) => values.add(word));
   return Array.from(values).slice(0, 8);
+}
+
+export async function fetchTagSuggestions(data: { url: string; title?: string; description?: string }): Promise<TagSuggestion[]> {
+  const response = await fetchJson<{ provider: "auto" | "ai"; suggestions: TagSuggestion[] }>("/api/links/tag-suggestions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return response.suggestions;
 }
 
 export function useUpdateLink() {

@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { isRegistryIcon } from "../../lib/iconRegistry";
+import IconBadge from "./IconBadge";
 
 interface FaviconImgProps {
   url: string;
@@ -41,6 +43,10 @@ export default function FaviconImg({
   const [iconUrl, setIconUrl] = useState<string | null>(explicitIconUrl ?? null);
   const [failed, setFailed] = useState(false);
   const { letter, color } = letterAvatar(name);
+
+  if (isRegistryIcon(explicitIconUrl)) {
+    return <IconBadge value={explicitIconUrl} name={name} size={size} className={className} />;
+  }
 
   useEffect(() => {
     if (explicitIconUrl) {

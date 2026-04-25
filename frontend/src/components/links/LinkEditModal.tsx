@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import Modal from "../ui/Modal";
-import { useCreateLink, useUpdateLink, useDeleteLink, Link, suggestAutoTags } from "../../hooks/useLinks";
+import { fetchTagSuggestions, useCreateLink, useUpdateLink, useDeleteLink, Link, suggestAutoTags } from "../../hooks/useLinks";
 import { useSections, useCreateSection } from "../../hooks/useSections";
 
 const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
@@ -36,6 +36,8 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
   const [imageUrl, setImageUrl] = useState(link?.image_url ?? initial?.image_url ?? "");
   const [tagInput, setTagInput] = useState(link?.tags.map((tag) => tag.name).join(", ") ?? "");
   const [autoTagNames, setAutoTagNames] = useState<Set<string>>(() => new Set(link?.tags.filter((tag) => tag.source === "auto").map((tag) => tag.name) ?? []));
+  const [aiTagNames, setAiTagNames] = useState<Set<string>>(() => new Set(link?.tags.filter((tag) => tag.source === "ai").map((tag) => tag.name) ?? []));
+  const [suggestingTags, setSuggestingTags] = useState(false);
   const [isFavorite, setIsFavorite] = useState(Boolean(link?.is_favorite ?? initial?.is_favorite));
   const [isArchived, setIsArchived] = useState(Boolean(link?.is_archived ?? initial?.is_archived));
   const [sectionId, setSectionId] = useState<number | "new">(link?.section_id ?? initial?.section_id ?? defaultSectionId ?? "new");
@@ -51,6 +53,8 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
       setImageUrl(link?.image_url ?? initial?.image_url ?? "");
       setTagInput(link?.tags.map((tag) => tag.name).join(", ") ?? initial?.tags?.map((tag) => tag.name).join(", ") ?? "");
       setAutoTagNames(new Set((link?.tags ?? initial?.tags ?? []).filter((tag) => tag.source === "auto").map((tag) => tag.name)));
+      setAiTagNames(new Set((link?.tags ?? initial?.tags ?? []).filter((tag) => tag.source === "ai").map((tag) => tag.name)));
+      setSuggestingTags(false);
       setIsFavorite(Boolean(link?.is_favorite ?? initial?.is_favorite));
       setIsArchived(Boolean(link?.is_archived ?? initial?.is_archived));
       setSectionId(link?.section_id ?? initial?.section_id ?? defaultSectionId ?? (sections?.[0]?.id ?? "new"));
@@ -75,7 +79,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
       .split(",")
       .map((tag) => tag.trim())
       .filter(Boolean)
-      .map((name) => ({ name, source: autoTagNames.has(name) ? "auto" as const : "manual" as const }));
+      .map((name) => ({ name, source: aiTagNames.has(name) ? "ai" as const : autoTagNames.has(name) ? "auto" as const : "manual" as const }));
     const data = {
       section_id: targetSectionId,
       name,
@@ -98,6 +102,21 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
     const merged = Array.from(new Set([...current, ...suggested]));
     setAutoTagNames((values) => new Set([...values, ...suggested]));
     setTagInput(merged.join(", "));
+  };
+
+  const applySuggestedTags = async () => {
+    setSuggestingTags(true);
+    try {
+      const suggestions = await fetchTagSuggestions({ url, title: name, description });
+      const current = tagInput.split(",").map((tag) => tag.trim()).filter(Boolean);
+      const suggestedNames = suggestions.map((tag) => tag.name);
+      const merged = Array.from(new Set([...current, ...suggestedNames]));
+      setAutoTagNames((values) => new Set([...values, ...suggestions.filter((tag) => tag.source === "auto").map((tag) => tag.name)]));
+      setAiTagNames((values) => new Set([...values, ...suggestions.filter((tag) => tag.source === "ai").map((tag) => tag.name)]));
+      setTagInput(merged.join(", "));
+    } finally {
+      setSuggestingTags(false);
+    }
   };
 
   const handleDelete = () => {
@@ -134,6 +153,9 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
             <input className={input} value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="docs, homelab, media" />
             <button type="button" onClick={applyAutoTags} className="shrink-0 rounded-lg border border-line px-3 py-2 text-[12px] font-medium text-t2 hover:border-accent/40 hover:text-accent">
               {t("link.auto_tags")}
+            </button>
+            <button type="button" onClick={applySuggestedTags} disabled={suggestingTags} className="shrink-0 rounded-lg border border-line px-3 py-2 text-[12px] font-medium text-t2 hover:border-accent/40 hover:text-accent disabled:opacity-40">
+              {suggestingTags ? t("link.suggesting_tags") : t("link.ai_tags")}
             </button>
           </div>
         </Field>

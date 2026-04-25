@@ -113,19 +113,24 @@ router.get("/", (_req, res) => {
 });
 
 router.post("/", (req, res) => {
-  const { title, content, folder_id, tags, is_pinned, is_archived } = req.body ?? {};
+  const { title, content, folder_id, tags, is_pinned, is_archived, sort_order } = req.body ?? {};
+  const folderId = folder_id ?? null;
+  const minOrder = db
+    .prepare("SELECT COALESCE(MIN(sort_order), 0) AS minOrder FROM notes WHERE folder_id IS ?")
+    .get(folderId) as { minOrder: number };
   const result = db
     .prepare(
-      `INSERT INTO notes (title, content, folder_id, tags, is_pinned, is_archived, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+      `INSERT INTO notes (title, content, folder_id, tags, is_pinned, is_archived, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
     )
     .run(
       title ?? "Neue Notiz",
       content ?? "",
-      folder_id ?? null,
+      folderId,
       parseTags(tags),
       is_pinned ? 1 : 0,
-      is_archived ? 1 : 0
+      is_archived ? 1 : 0,
+      sort_order ?? minOrder.minOrder - 1
     );
   const note = db.prepare("SELECT * FROM notes WHERE id = ?").get(result.lastInsertRowid) as NoteRow;
   res.status(201).json(mapNote(note));

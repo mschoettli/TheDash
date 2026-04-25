@@ -17,8 +17,11 @@ import {
   X,
 } from "lucide-react";
 import Modal from "../components/ui/Modal";
+import IconBadge from "../components/ui/IconBadge";
+import IconPicker from "../components/ui/IconPicker";
 import TileGrid from "../components/tiles/TileGrid";
 import TileEditModal from "../components/tiles/TileEditModal";
+import { detectIconKey, iconValue } from "../lib/iconRegistry";
 import { Tile } from "../hooks/useTiles";
 import { useTiles } from "../hooks/useTiles";
 import { DiscoveredContainer, useDockerAction, useDockerDiscovery } from "../hooks/useDockerDiscovery";
@@ -60,6 +63,7 @@ function WidgetEditModal({
   const [type, setType] = useState(widget?.type ?? catalog[0]?.type ?? "docker");
   const selected = catalog.find((item) => item.type === type) ?? catalog[0];
   const [title, setTitle] = useState(widget?.title ?? selected?.title ?? "");
+  const [icon, setIcon] = useState(String(widget?.config?.icon ?? iconValue(detectIconKey(widget?.title ?? selected?.title ?? ""))));
   const [endpoint, setEndpoint] = useState(String(widget?.config?.endpoint ?? ""));
   const [notes, setNotes] = useState(String(widget?.config?.notes ?? ""));
 
@@ -68,16 +72,22 @@ function WidgetEditModal({
     const current = widget ? catalog.find((item) => item.type === widget.type) : selected;
     setType(widget?.type ?? current?.type ?? "docker");
     setTitle(widget?.title ?? current?.title ?? "");
+    setIcon(String(widget?.config?.icon ?? iconValue(detectIconKey(widget?.title ?? current?.title ?? ""))));
     setEndpoint(String(widget?.config?.endpoint ?? ""));
     setNotes(String(widget?.config?.notes ?? ""));
   }, [open, widget, catalog, selected]);
+
+  useEffect(() => {
+    if (!open || widget) return;
+    setIcon(iconValue(detectIconKey(title)));
+  }, [open, title, widget]);
 
   const save = () => {
     if (!title.trim() || !type) return;
     const payload = {
       type,
       title: title.trim(),
-      config: { endpoint: endpoint.trim(), notes: notes.trim() },
+      config: { endpoint: endpoint.trim(), notes: notes.trim(), icon },
       layout: widget?.layout ?? {},
       section_id: widget?.section_id ?? null,
       sort_order: widget?.sort_order ?? 0,
@@ -106,6 +116,7 @@ function WidgetEditModal({
           <div className="label-xs mb-1.5">{t("dashboard.widget_title")}</div>
           <input className={input} value={title} onChange={(event) => setTitle(event.target.value)} />
         </div>
+        <IconPicker value={icon} name={title} onChange={setIcon} />
         <div>
           <div className="label-xs mb-1.5">{t("dashboard.widget_endpoint")}</div>
           <input className={input} value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="http://service:port or API URL" />
@@ -248,8 +259,13 @@ export default function DashboardPage() {
                 <div key={widget.id} className="rounded-lg border border-line/50 bg-surface px-3 py-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="text-[13px] font-medium text-t1">{widget.title}</div>
-                      <div className="label-xs mt-0.5">{widget.type}{widget.config.endpoint ? ` · ${hostFromUrl(String(widget.config.endpoint))}` : ""}</div>
+                      <div className="flex items-center gap-2">
+                        <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={28} />
+                        <div className="min-w-0">
+                          <div className="truncate text-[13px] font-medium text-t1">{widget.title}</div>
+                          <div className="label-xs mt-0.5">{widget.type}{widget.config.endpoint ? ` · ${hostFromUrl(String(widget.config.endpoint))}` : ""}</div>
+                        </div>
+                      </div>
                     </div>
                     {editMode && (
                       <div className="flex gap-1">

@@ -24,6 +24,35 @@ function fallbackTitle(url: string): string {
   }
 }
 
+function suggestTags(input: { url: string; title?: string; description?: string }) {
+  const values = new Map<string, "auto" | "ai">();
+  try {
+    const host = new URL(normalizeUrl(input.url)).hostname.replace(/^www\./, "");
+    host
+      .split(".")
+      .filter((part) => part.length > 2 && !["com", "net", "org", "local"].includes(part))
+      .forEach((part) => values.set(part.toLowerCase(), "auto"));
+  } catch {
+    // Invalid URLs can still produce title/description based suggestions.
+  }
+
+  `${input.title ?? ""} ${input.description ?? ""}`
+    .toLowerCase()
+    .split(/[^a-z0-9äöüß]+/i)
+    .filter((word) => word.length > 4)
+    .slice(0, 8)
+    .forEach((word) => values.set(word, "auto"));
+
+  const aiProvider = process.env.AI_TAGGING_PROVIDER ?? "";
+  if (aiProvider) {
+    Array.from(values.keys())
+      .slice(0, 5)
+      .forEach((tag) => values.set(tag, "ai"));
+  }
+
+  return Array.from(values.entries()).slice(0, 10).map(([name, source]) => ({ name, source }));
+}
+
 function getTagsForLinks(linkIds: number[]): Map<number, TagRow[]> {
   const result = new Map<number, TagRow[]>();
   if (linkIds.length === 0) return result;
@@ -178,6 +207,22 @@ router.post("/capture", async (req, res) => {
   const id = insert();
   const link = db.prepare("SELECT * FROM links WHERE id = ?").get(id) as any;
   res.status(201).json(attachTags([link])[0]);
+});
+
+router.post("/tag-suggestions", async (req, res) => {
+  const url = String(req.body?.url ?? "").trim();
+  const title = String(req.body?.title ?? "").trim();
+  const description = String(req.body?.description ?? "").trim();
+
+  if (!url && !title && !description) {
+    res.status(400).json({ error: "url, title or description required" });
+    return;
+  }
+
+  res.json({
+    provider: process.env.AI_TAGGING_PROVIDER ? "ai" : "auto",
+    suggestions: suggestTags({ url, title, description }),
+  });
 });
 
 router.put("/:id", (req, res) => {

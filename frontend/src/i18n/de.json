@@ -90,6 +90,9 @@
     "preview_image": "Preview-Bild (optional)",
     "tags": "Tags",
     "auto_tags": "Auto-Tags",
+    "ai_tags": "KI-Tags",
+    "suggesting_tags": "Prüft...",
+    "actions": "Aktionen",
     "favorite": "Favorit",
     "favorite_short": "Fav",
     "archive": "Archivieren",
@@ -145,9 +148,25 @@
     "stat_pinned": "Angepinnt",
     "stat_todos": "Offene Todos",
     "stat_tags": "Tags",
+    "folders": "Ordner",
     "quick_note": "Quick Note",
     "quick_placeholder": "Gedanke, Aufgabe oder Markdown-Snippet...",
-    "recent": "Zuletzt bearbeitet"
+    "recent": "Zuletzt bearbeitet",
+    "tile_all_desc": "Gesamtüberblick über alle aktiven Notizen.",
+    "tile_folders_desc": "Strukturierte Bereiche deiner Wissensbasis.",
+    "tile_pinned_desc": "Wichtige Notizen für schnellen Zugriff.",
+    "tile_todos_desc": "Offene Markdown-Checklisten in allen Notizen.",
+    "tile_unfiled_desc": "Notizen, die noch keinem Ordner zugeordnet sind.",
+    "tile_archive_desc": "Ausgeblendete oder abgeschlossene Notizen.",
+    "tile_tags_desc": "Thematische Markierungen über alle Notizen.",
+    "tile_recent_desc": "Schneller Einstieg in die zuletzt bearbeiteten Inhalte.",
+    "folder_tile_desc": "Ordner öffnen und Inhalte im Baum anzeigen.",
+    "no_folders": "Noch keine Ordner vorhanden."
+  },
+  "icons": {
+    "picker": "Icon-Picker",
+    "auto_detected": "Automatisch erkannt",
+    "use_auto": "Auto verwenden"
   },
   "metrics": {
     "cpu": "CPU",

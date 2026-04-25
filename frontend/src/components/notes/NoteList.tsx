@@ -189,7 +189,7 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
           {scopeButton("archived", Archive, t("notes.archive"), archived.length)}
         </div>
 
-        {unfiled.length > 0 && selectedScope === "unfiled" && <div className="mb-3 space-y-0.5">{unfiled.map(renderNote)}</div>}
+        {unfiled.length > 0 && <div className="mb-3 space-y-0.5">{unfiled.map(renderNote)}</div>}
 
         <div className="space-y-1">
           {folders.map((folder) => {
