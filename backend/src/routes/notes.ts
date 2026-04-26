@@ -102,9 +102,11 @@ router.put("/folders/:id", (req, res) => {
   }
   const title = String(req.body?.title ?? existing.title).trim();
   const parentId = req.body?.parent_id !== undefined ? req.body.parent_id : existing.parent_id;
-  db.prepare("UPDATE note_folders SET title = ?, parent_id = ?, updated_at = datetime('now') WHERE id = ?").run(
+  const sortOrder = req.body?.sort_order !== undefined ? Number(req.body.sort_order) : existing.sort_order;
+  db.prepare("UPDATE note_folders SET title = ?, parent_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?").run(
     title || existing.title,
     parentId,
+    Number.isFinite(sortOrder) ? sortOrder : existing.sort_order,
     req.params.id
   );
   res.json(db.prepare("SELECT * FROM note_folders WHERE id = ?").get(req.params.id));

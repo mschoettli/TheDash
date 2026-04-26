@@ -67,6 +67,105 @@ function hostFromUrl(url: string | null): string {
   }
 }
 
+function widgetEndpointLabel(widget: WidgetInstance): string {
+  const endpoint = String(widget.config.endpoint ?? "").trim();
+  if (!endpoint || widget.config.showAddress === false) return "";
+  return hostFromUrl(endpoint);
+}
+
+function WidgetContent({ widget }: { widget: WidgetInstance }) {
+  const { t } = useTranslation();
+  const endpoint = String(widget.config.endpoint ?? "").trim();
+  const notes = String(widget.config.notes ?? "").trim();
+  const label = widgetEndpointLabel(widget);
+  const rows: Record<string, Array<{ label: string; value: string }>> = {
+    docker: [
+      { label: t("widgets.scope"), value: t("widgets.containers") },
+      { label: t("widgets.actions"), value: t("widgets.start_stop_restart") },
+    ],
+    system: [
+      { label: "CPU", value: "Host" },
+      { label: "RAM", value: "Host" },
+    ],
+    media: [
+      { label: t("widgets.movies"), value: "API" },
+      { label: t("widgets.streams"), value: t("widgets.live") },
+    ],
+    downloads: [
+      { label: t("widgets.queue"), value: t("widgets.client") },
+      { label: t("widgets.speed"), value: "API" },
+    ],
+    network: [
+      { label: "DNS", value: "Status" },
+      { label: t("widgets.latency"), value: t("widgets.monitor") },
+    ],
+    rss: [
+      { label: "Feed", value: endpoint ? t("widgets.ready") : t("widgets.missing") },
+      { label: t("widgets.items"), value: t("widgets.latest") },
+    ],
+    weather: [
+      { label: t("widgets.location"), value: endpoint || t("widgets.missing") },
+      { label: t("widgets.forecast"), value: t("widgets.daily") },
+    ],
+    notebook: [
+      { label: t("widgets.mode"), value: t("widgets.quick_note") },
+      { label: t("widgets.storage"), value: t("widgets.local") },
+    ],
+    calendar: [
+      { label: t("widgets.events"), value: t("widgets.upcoming") },
+      { label: t("widgets.source"), value: endpoint ? "ICS" : t("widgets.manual") },
+    ],
+    iframe: [
+      { label: t("widgets.embed"), value: endpoint ? t("widgets.ready") : t("widgets.missing") },
+      { label: t("widgets.display"), value: t("widgets.panel") },
+    ],
+    releases: [
+      { label: t("widgets.repo"), value: endpoint || t("widgets.missing") },
+      { label: t("widgets.version"), value: t("widgets.latest") },
+    ],
+    video: [
+      { label: t("widgets.stream"), value: endpoint ? t("widgets.ready") : t("widgets.missing") },
+      { label: t("widgets.mode"), value: t("widgets.player") },
+    ],
+    automation: [
+      { label: t("widgets.trigger"), value: endpoint ? "Webhook" : t("widgets.missing") },
+      { label: t("widgets.safety"), value: t("widgets.confirm") },
+    ],
+    entity: [
+      { label: t("widgets.entity"), value: endpoint || t("widgets.missing") },
+      { label: t("widgets.state"), value: t("widgets.live") },
+    ],
+    stocks: [
+      { label: "Symbol", value: endpoint || t("widgets.missing") },
+      { label: t("widgets.price"), value: t("widgets.market") },
+    ],
+    minecraft: [
+      { label: "Server", value: endpoint || t("widgets.missing") },
+      { label: t("widgets.players"), value: t("tile.online") },
+    ],
+    notifications: [
+      { label: t("widgets.inbox"), value: t("widgets.recent") },
+      { label: t("widgets.severity"), value: t("widgets.all") },
+    ],
+  };
+  const values = rows[widget.type] ?? [{ label: "Status", value: t("widgets.configured") }];
+
+  return (
+    <div className="mt-3 space-y-3">
+      {label && <div className="truncate rounded-lg border border-line/40 bg-card px-2 py-1 text-[11px] text-t3">{label}</div>}
+      <div className="grid grid-cols-2 gap-1.5">
+        {values.slice(0, 4).map((item) => (
+          <div key={`${item.label}-${item.value}`} className="rounded-xl border border-line/40 bg-card px-2 py-2">
+            <div className="label-xs mb-1">{item.label}</div>
+            <div className="truncate text-[12px] font-semibold text-t1">{item.value}</div>
+          </div>
+        ))}
+      </div>
+      {notes && <p className="text-[12px] leading-relaxed text-t3 line-clamp-2">{notes}</p>}
+    </div>
+  );
+}
+
 function WidgetEditModal({
   open,
   onClose,
@@ -296,7 +395,7 @@ export default function DashboardPage() {
                         <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={28} />
                         <div className="min-w-0">
                           <div className="truncate text-[13px] font-medium text-t1">{widget.title}</div>
-                          <div className="label-xs mt-0.5">{widget.type}{widget.config.endpoint && widget.config.showAddress !== false ? ` · ${hostFromUrl(String(widget.config.endpoint))}` : ""}</div>
+                          <div className="label-xs mt-0.5">{widget.type}</div>
                         </div>
                       </div>
                     </div>
@@ -307,7 +406,7 @@ export default function DashboardPage() {
                       </div>
                     )}
                   </div>
-                  {Boolean(widget.config.notes) && <p className="mt-1 text-[12px] text-t3 line-clamp-2">{String(widget.config.notes)}</p>}
+                  <WidgetContent widget={widget} />
                 </div>
               ))}
               {!widgets?.length && <div className="text-[13px] text-t3">{t("dashboard.empty_widgets")}</div>}

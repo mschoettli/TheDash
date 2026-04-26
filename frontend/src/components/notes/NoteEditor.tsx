@@ -32,7 +32,7 @@ export default function NoteEditor({ note, folder }: Props) {
     setTagInput(note.tags.join(", "));
     setSaveState("idle");
     setLastPayload(null);
-  }, [note.id, note.title, note.content]);
+  }, [note.id, note.title, note.content, note.tags]);
 
   async function persist(target: { title: string; content: string; tags?: string[] }) {
     setSaveState("saving");
@@ -52,6 +52,10 @@ export default function NoteEditor({ note, folder }: Props) {
   };
 
   const handleTitleChange = (val: string) => { setTitle(val); scheduleUpdate(val, content); };
+  const saveTitleNow = () => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    void persist({ title: title.trim() || t("notes.untitled"), content });
+  };
   const handleContentChange = (val: string | undefined) => {
     const newContent = val ?? "";
     setContent(newContent);
@@ -98,6 +102,14 @@ export default function NoteEditor({ note, folder }: Props) {
           className="w-full bg-transparent text-xl font-semibold text-t1 focus:outline-none placeholder:text-t3"
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
+          onBlur={saveTitleNow}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              saveTitleNow();
+              event.currentTarget.blur();
+            }
+          }}
           placeholder={t("notes.untitled")}
         />
 

@@ -46,7 +46,10 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
   const [openFolders, setOpenFolders] = useState<Set<number>>(() => new Set(folders.map((folder) => folder.id)));
   const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
   const [folderTitle, setFolderTitle] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [noteTitleDraft, setNoteTitleDraft] = useState("");
   const [dragNoteId, setDragNoteId] = useState<number | null>(null);
+  const [dragFolderId, setDragFolderId] = useState<number | null>(null);
   const [deleteNoteTarget, setDeleteNoteTarget] = useState<Note | null>(null);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<NoteFolder | null>(null);
 
@@ -99,10 +102,41 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
     updateFolder.mutate({ id: editingFolderId, title: folderTitle.trim() }, { onSuccess: () => setEditingFolderId(null) });
   };
 
+  const startRenameNote = (note: Note) => {
+    setEditingNoteId(note.id);
+    setNoteTitleDraft(noteTitle(note));
+  };
+
+  const saveNoteTitle = () => {
+    if (!editingNoteId || !noteTitleDraft.trim()) return;
+    updateNote.mutate({ id: editingNoteId, title: noteTitleDraft.trim() }, { onSuccess: () => setEditingNoteId(null) });
+  };
+
   const moveDraggedNote = (folderId: number | null) => {
     if (!dragNoteId) return;
     updateNote.mutate({ id: dragNoteId, folder_id: folderId });
     setDragNoteId(null);
+  };
+
+  const isDescendantFolder = (folderId: number, maybeParentId: number): boolean => {
+    const children = childFolders.get(maybeParentId) ?? [];
+    return children.some((child) => child.id === folderId || isDescendantFolder(folderId, child.id));
+  };
+
+  const moveDraggedFolder = (parentId: number | null) => {
+    if (!dragFolderId) return;
+    if (parentId === dragFolderId || (parentId !== null && isDescendantFolder(parentId, dragFolderId))) {
+      setDragFolderId(null);
+      return;
+    }
+    const siblings = (childFolders.get(parentId) ?? []).filter((folder) => folder.id !== dragFolderId);
+    updateFolder.mutate({ id: dragFolderId, parent_id: parentId, sort_order: siblings.length });
+    setOpenFolders((current) => {
+      const next = new Set(current);
+      if (parentId !== null) next.add(parentId);
+      return next;
+    });
+    setDragFolderId(null);
   };
 
   const duplicateNote = (note: Note) => {
@@ -120,8 +154,13 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
     return (
       <button
         onClick={() => onSelectScope(scope)}
-        onDragOver={(event) => scope === "unfiled" && event.preventDefault()}
-        onDrop={() => scope === "unfiled" && moveDraggedNote(null)}
+        onDragOver={(event) => {
+          if (scope === "unfiled" || scope === "all") event.preventDefault();
+        }}
+        onDrop={() => {
+          if (scope === "unfiled") moveDraggedNote(null);
+          if (scope === "all") moveDraggedFolder(null);
+        }}
         className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
           active ? "bg-accent/10 text-accent" : "text-t2 hover:bg-line/20 hover:text-t1"
         }`}
@@ -137,7 +176,11 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
     <div
       key={note.id}
       draggable
-      onDragStart={() => setDragNoteId(note.id)}
+      onDragStart={() => {
+        setDragNoteId(note.id);
+        setDragFolderId(null);
+      }}
+      onDragEnd={() => setDragNoteId(null)}
       onClick={() => onSelect(note.id)}
       className={`group ml-6 cursor-pointer rounded-lg border px-2.5 py-2 transition-all ${
         selectedId === note.id ? "border-accent/30 bg-accent/10" : "border-transparent hover:border-line/40 hover:bg-line/15"
@@ -146,10 +189,28 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
       <div className="flex items-start gap-2">
         <FileText size={13} className="mt-0.5 shrink-0 text-t3" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium text-t1">{noteTitle(note)}</div>
+          {editingNoteId === note.id ? (
+            <input
+              autoFocus
+              value={noteTitleDraft}
+              onChange={(event) => setNoteTitleDraft(event.target.value)}
+              onClick={(event) => event.stopPropagation()}
+              onBlur={saveNoteTitle}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") saveNoteTitle();
+                if (event.key === "Escape") setEditingNoteId(null);
+              }}
+              className="w-full rounded border border-line/60 bg-card px-1 text-[13px] font-medium text-t1 outline-none"
+            />
+          ) : (
+            <div className="truncate text-[13px] font-medium text-t1">{noteTitle(note)}</div>
+          )}
           <div className="mt-0.5 text-[10px] text-t3">{new Date(note.updated_at).toLocaleString()}</div>
         </div>
         <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <button onClick={(event) => { event.stopPropagation(); startRenameNote(note); }} className="rounded p-0.5 text-t3 hover:text-accent">
+            <Edit3 size={11} />
+          </button>
           <button onClick={(event) => { event.stopPropagation(); updateNote.mutate({ id: note.id, is_pinned: !note.is_pinned }); }} className="rounded p-0.5 text-t3 hover:text-accent">
             <Pin size={11} />
           </button>
@@ -181,10 +242,21 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
     return (
       <div key={folder.id}>
         <div
+          draggable={editingFolderId !== folder.id}
+          onDragStart={(event) => {
+            event.stopPropagation();
+            setDragFolderId(folder.id);
+            setDragNoteId(null);
+          }}
+          onDragEnd={() => setDragFolderId(null)}
           className="group flex items-center gap-1 rounded-lg px-1 py-1"
           style={{ paddingLeft: depth * 12 + 4 }}
           onDragOver={(event) => event.preventDefault()}
-          onDrop={() => moveDraggedNote(folder.id)}
+          onDrop={(event) => {
+            event.stopPropagation();
+            if (dragFolderId) moveDraggedFolder(folder.id);
+            else moveDraggedNote(folder.id);
+          }}
         >
           <button onClick={() => toggleFolder(folder.id)} className="rounded p-1 text-t3 hover:bg-line/30 hover:text-t1">
             {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}

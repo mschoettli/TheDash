@@ -76,14 +76,19 @@ export default function BookmarksPage() {
     } as Partial<Link>);
   };
 
-  const moveLinkToSection = (sectionId: number, targetSortOrder?: number) => {
+  const moveLinkToSection = (sectionId: number, beforeLinkId?: number) => {
     if (!dragLinkId) return;
     const section = sections?.find((item) => item.id === sectionId);
-    const maxOrder = Math.max(0, ...(section?.links.map((link) => link.sort_order) ?? [0]));
-    updateLink.mutate({
-      id: dragLinkId,
-      section_id: sectionId,
-      sort_order: targetSortOrder !== undefined ? targetSortOrder - 1 : maxOrder + 1,
+    const dragged = allLinks.find((link) => link.id === dragLinkId);
+    if (!section || !dragged) return;
+    const ordered = [...section.links]
+      .filter((link) => link.id !== dragLinkId)
+      .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+    const targetIndex = beforeLinkId ? ordered.findIndex((link) => link.id === beforeLinkId) : -1;
+    const insertAt = targetIndex >= 0 ? targetIndex : ordered.length;
+    ordered.splice(insertAt, 0, dragged);
+    ordered.forEach((link, index) => {
+      updateLink.mutate({ id: link.id, section_id: sectionId, sort_order: index });
     });
     setDragLinkId(null);
     setDragOverLinkId(null);
@@ -278,7 +283,7 @@ export default function BookmarksPage() {
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={(event) => {
                         event.stopPropagation();
-                        moveLinkToSection(section.id, link.sort_order);
+                        moveLinkToSection(section.id, link.id);
                       }}
                       className={dragOverLinkId === link.id ? "rounded-lg ring-2 ring-accent/40" : ""}
                     >
