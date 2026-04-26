@@ -127,3 +127,16 @@ export function useDeleteLink() {
     onSuccess: () => invalidateBookmarks(qc),
   });
 }
+
+export function useReorderLinks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: Array<{ id: number; section_id: number; sort_order: number }>) =>
+      fetchJson<{ ok: true }>("/api/links/reorder/batch", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      }),
+    onSuccess: () => invalidateBookmarks(qc),
+  });
+}

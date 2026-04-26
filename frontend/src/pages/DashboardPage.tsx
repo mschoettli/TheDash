@@ -30,6 +30,7 @@ import {
   useCreateWidget,
   useDeleteWidget,
   useUpdateWidget,
+  useWidgetMetrics,
   useWidgetCatalog,
   useWidgets,
   WidgetCatalogItem,
@@ -75,6 +76,7 @@ function widgetEndpointLabel(widget: WidgetInstance): string {
 
 function WidgetContent({ widget }: { widget: WidgetInstance }) {
   const { t } = useTranslation();
+  const { data: metrics } = useWidgetMetrics(widget.id, ["docker", "system", "rss", "weather"].includes(widget.type));
   const endpoint = String(widget.config.endpoint ?? "").trim();
   const notes = String(widget.config.notes ?? "").trim();
   const label = widgetEndpointLabel(widget);
@@ -148,7 +150,7 @@ function WidgetContent({ widget }: { widget: WidgetInstance }) {
       { label: t("widgets.severity"), value: t("widgets.all") },
     ],
   };
-  const values = rows[widget.type] ?? [{ label: "Status", value: t("widgets.configured") }];
+  const values = metrics?.cards?.length ? metrics.cards : rows[widget.type] ?? [{ label: "Status", value: t("widgets.configured") }];
 
   return (
     <div className="mt-3 space-y-3">
@@ -161,6 +163,7 @@ function WidgetContent({ widget }: { widget: WidgetInstance }) {
           </div>
         ))}
       </div>
+      {metrics?.status === "error" && <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-400">{metrics.error ?? t("widgets.unavailable")}</div>}
       {notes && <p className="text-[12px] leading-relaxed text-t3 line-clamp-2">{notes}</p>}
     </div>
   );

@@ -89,6 +89,19 @@ export function useDeleteNoteFolder() {
   });
 }
 
+export function useReorderNoteFolders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: Array<{ id: number; parent_id: number | null; sort_order: number }>) =>
+      fetchJson<{ ok: true }>("/api/notes/reorder/folders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: FOLDERS_KEY }),
+  });
+}
+
 export function useCreateNote() {
   const qc = useQueryClient();
   return useMutation({

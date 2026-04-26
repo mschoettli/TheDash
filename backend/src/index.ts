@@ -14,6 +14,7 @@ import dashboardRouter from "./routes/dashboard";
 import tagsRouter from "./routes/tags";
 import dockerRouter from "./routes/docker";
 import widgetsRouter from "./routes/widgets";
+import logosRouter from "./routes/logos";
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
@@ -28,6 +29,7 @@ app.use("/api/image", imageRouter);
 app.use("/api/tags", tagsRouter);
 app.use("/api/docker", dockerRouter);
 app.use("/api/widgets", widgetsRouter);
+app.use("/api/logos", logosRouter);
 app.use("/api", exportRouter);
 app.use("/api/dashboard", dashboardRouter);
 

@@ -9,6 +9,7 @@ import {
   useCreateNoteFolder,
   useDeleteNote,
   useDeleteNoteFolder,
+  useReorderNoteFolders,
   useUpdateNote,
   useUpdateNoteFolder,
 } from "../../hooks/useNotes";
@@ -42,6 +43,7 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
   const createFolder = useCreateNoteFolder();
   const updateFolder = useUpdateNoteFolder();
   const deleteFolder = useDeleteNoteFolder();
+  const reorderFolders = useReorderNoteFolders();
 
   const [openFolders, setOpenFolders] = useState<Set<number>>(() => new Set(folders.map((folder) => folder.id)));
   const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
@@ -129,8 +131,15 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
       setDragFolderId(null);
       return;
     }
+    const moved = folders.find((folder) => folder.id === dragFolderId);
     const siblings = (childFolders.get(parentId) ?? []).filter((folder) => folder.id !== dragFolderId);
-    updateFolder.mutate({ id: dragFolderId, parent_id: parentId, sort_order: siblings.length });
+    if (moved) {
+      reorderFolders.mutate([...siblings, { ...moved, parent_id: parentId }].map((folder, index) => ({
+        id: folder.id,
+        parent_id: folder.parent_id ?? null,
+        sort_order: index,
+      })));
+    }
     setOpenFolders((current) => {
       const next = new Set(current);
       if (parentId !== null) next.add(parentId);

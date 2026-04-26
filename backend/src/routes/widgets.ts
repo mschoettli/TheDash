@@ -1,5 +1,8 @@
 import { Router } from "express";
 import db from "../db/client";
+import fetch from "node-fetch";
+import si from "systeminformation";
+import { listContainers } from "../lib/docker";
 
 const router = Router();
 
@@ -43,6 +46,69 @@ router.get("/catalog", (_req, res) => res.json(CATALOG));
 router.get("/", (_req, res) => {
   const rows = db.prepare("SELECT * FROM widgets ORDER BY sort_order ASC, id ASC").all();
   res.json((rows as any[]).map(mapWidget));
+});
+
+router.get("/:id/metrics", async (req, res) => {
+  const widget = db.prepare("SELECT * FROM widgets WHERE id = ?").get(req.params.id) as any;
+  if (!widget) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  const mapped = mapWidget(widget);
+  const endpoint = String(mapped.config.endpoint ?? "").trim();
+
+  try {
+    if (mapped.type === "system") {
+      const [load, mem, fs] = await Promise.all([si.currentLoad(), si.mem(), si.fsSize()]);
+      res.json({
+        status: "ok",
+        cards: [
+          { label: "CPU", value: `${Math.round(load.currentLoad)}%` },
+          { label: "RAM", value: `${Math.round((mem.active / mem.total) * 100)}%` },
+          { label: "Disk", value: fs[0] ? `${Math.round(fs[0].use)}%` : "-" },
+        ],
+      });
+      return;
+    }
+
+    if (mapped.type === "docker") {
+      const containers = await listContainers();
+      res.json({
+        status: "ok",
+        cards: [
+          { label: "Containers", value: String(containers.length) },
+          { label: "Running", value: String(containers.filter((container) => container.state === "running").length) },
+        ],
+      });
+      return;
+    }
+
+    if (mapped.type === "rss" && endpoint) {
+      const response = await fetch(endpoint, { timeout: 7000 } as any);
+      const text = await response.text();
+      const itemCount = (text.match(/<item\b|<entry\b/gi) ?? []).length;
+      res.json({ status: response.ok ? "ok" : "error", cards: [{ label: "Items", value: String(itemCount) }] });
+      return;
+    }
+
+    if (mapped.type === "weather" && endpoint) {
+      const response = await fetch(`https://wttr.in/${encodeURIComponent(endpoint)}?format=j1`, { timeout: 7000 } as any);
+      const data = await response.json() as any;
+      const current = data?.current_condition?.[0];
+      res.json({
+        status: "ok",
+        cards: [
+          { label: "Temp", value: `${current?.temp_C ?? "-"}°C` },
+          { label: "Wind", value: `${current?.windspeedKmph ?? "-"} km/h` },
+        ],
+      });
+      return;
+    }
+
+    res.json({ status: endpoint ? "configured" : "unconfigured", cards: [] });
+  } catch (error: any) {
+    res.json({ status: "error", error: error?.message ?? "Widget metrics unavailable", cards: [] });
+  }
 });
 
 router.post("/", (req, res) => {

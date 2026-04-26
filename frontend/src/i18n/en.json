@@ -235,7 +235,8 @@
     "recent": "Recent",
     "severity": "Severity",
     "all": "All",
-    "configured": "Configured"
+    "configured": "Configured",
+    "unavailable": "Unavailable"
   },
   "metrics": {
     "cpu": "CPU",

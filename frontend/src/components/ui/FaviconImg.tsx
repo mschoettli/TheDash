@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { isRegistryIcon } from "../../lib/iconRegistry";
+import { detectIconKey, findIconOption, iconValue, isRegistryIcon } from "../../lib/iconRegistry";
 import IconBadge from "./IconBadge";
 
 interface FaviconImgProps {
@@ -46,6 +46,10 @@ export default function FaviconImg({
 
   if (isRegistryIcon(explicitIconUrl)) {
     return <IconBadge value={explicitIconUrl} name={name} size={size} className={className} />;
+  }
+  const detected = findIconOption(detectIconKey(`${name} ${url}`));
+  if (!explicitIconUrl && detected?.logoSlug) {
+    return <IconBadge value={iconValue(detected.key)} name={name} size={size} className={className} />;
   }
 
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { detectIconKey, findIconOption, iconKeyFromValue } from "../../lib/iconRegistry";
 
 interface IconBadgeProps {
@@ -11,6 +12,7 @@ export default function IconBadge({ value, name, size = 32, className = "" }: Ic
   const key = iconKeyFromValue(value) ?? detectIconKey(name);
   const option = findIconOption(key);
   const Icon = option?.icon;
+  const [logoFailed, setLogoFailed] = useState(false);
 
   if (!Icon) return null;
 
@@ -28,7 +30,14 @@ export default function IconBadge({ value, name, size = 32, className = "" }: Ic
     >
       <span className="absolute -right-1 -top-1 h-1/2 w-1/2 rounded-full bg-white/20 blur-[1px]" />
       <span className="relative inline-flex items-center gap-0.5">
-        {option?.shortLabel ? option.shortLabel : <Icon size={Math.max(14, size * 0.52)} />}
+        {option?.logoSlug && !logoFailed ? (
+          <img
+            src={`/api/logos/${option.logoSlug}`}
+            alt=""
+            className="h-[62%] w-[62%] object-contain brightness-0 invert"
+            onError={() => setLogoFailed(true)}
+          />
+        ) : option?.shortLabel ? option.shortLabel : <Icon size={Math.max(14, size * 0.52)} />}
       </span>
     </span>
   );

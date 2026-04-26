@@ -235,7 +235,8 @@
     "recent": "Aktuell",
     "severity": "Schweregrad",
     "all": "Alle",
-    "configured": "Konfiguriert"
+    "configured": "Konfiguriert",
+    "unavailable": "Nicht verfügbar"
   },
   "metrics": {
     "cpu": "CPU",

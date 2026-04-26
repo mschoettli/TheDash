@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Columns3, LayoutGrid, Plus, Search, Send, Rows3 } from "lucide-react";
 import { useSections, useCreateSection } from "../hooks/useSections";
-import { Link, suggestAutoTags, useUpdateLink } from "../hooks/useLinks";
+import { Link, suggestAutoTags, useReorderLinks } from "../hooks/useLinks";
 import { useTags } from "../hooks/useTags";
 import LinkSection from "../components/links/LinkSection";
 import LinkItem from "../components/links/LinkItem";
@@ -24,7 +24,7 @@ export default function BookmarksPage() {
   const { data: sections, isLoading } = useSections();
   const { data: tags } = useTags();
   const createSection = useCreateSection();
-  const updateLink = useUpdateLink();
+  const reorderLinks = useReorderLinks();
 
   const [newTitle, setNewTitle] = useState("");
   const [adding, setAdding] = useState(false);
@@ -87,9 +87,7 @@ export default function BookmarksPage() {
     const targetIndex = beforeLinkId ? ordered.findIndex((link) => link.id === beforeLinkId) : -1;
     const insertAt = targetIndex >= 0 ? targetIndex : ordered.length;
     ordered.splice(insertAt, 0, dragged);
-    ordered.forEach((link, index) => {
-      updateLink.mutate({ id: link.id, section_id: sectionId, sort_order: index });
-    });
+    reorderLinks.mutate(ordered.map((link, index) => ({ id: link.id, section_id: sectionId, sort_order: index })));
     setDragLinkId(null);
     setDragOverLinkId(null);
   };

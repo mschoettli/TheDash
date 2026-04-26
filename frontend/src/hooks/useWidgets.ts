@@ -26,6 +26,17 @@ export interface WidgetInstance {
   updated_at: string;
 }
 
+export interface WidgetMetricCard {
+  label: string;
+  value: string;
+}
+
+export interface WidgetMetrics {
+  status: "ok" | "configured" | "unconfigured" | "error";
+  cards: WidgetMetricCard[];
+  error?: string;
+}
+
 const KEY = ["widgets"];
 
 export function useWidgetCatalog() {
@@ -39,6 +50,15 @@ export function useWidgets() {
   return useQuery<WidgetInstance[]>({
     queryKey: KEY,
     queryFn: () => fetchJson<WidgetInstance[]>("/api/widgets"),
+  });
+}
+
+export function useWidgetMetrics(widgetId: number, enabled: boolean) {
+  return useQuery<WidgetMetrics>({
+    queryKey: ["widget-metrics", widgetId],
+    queryFn: () => fetchJson<WidgetMetrics>(`/api/widgets/${widgetId}/metrics`),
+    enabled,
+    refetchInterval: 30000,
   });
 }
 

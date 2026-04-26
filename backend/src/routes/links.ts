@@ -1,6 +1,7 @@
 import { Router } from "express";
 import db from "../db/client";
 import { fetchLinkMetadata } from "../lib/metadata";
+import { suggestAiTags } from "../lib/tagging";
 
 const router = Router();
 
@@ -49,13 +50,6 @@ function suggestTags(input: { url: string; title?: string; description?: string 
     .filter((word) => word.length > 4 && !isIpLike(word))
     .slice(0, 8)
     .forEach((word) => values.set(word, "auto"));
-
-  const aiProvider = process.env.AI_TAGGING_PROVIDER ?? "";
-  if (aiProvider) {
-    Array.from(values.keys())
-      .slice(0, 5)
-      .forEach((tag) => values.set(tag, "ai"));
-  }
 
   return Array.from(values.entries()).slice(0, 10).map(([name, source]) => ({ name, source }));
 }
@@ -226,10 +220,35 @@ router.post("/tag-suggestions", async (req, res) => {
     return;
   }
 
+  const autoSuggestions = suggestTags({ url, title, description });
+  const aiSuggestions = await suggestAiTags({ kind: "bookmark", url, title, description });
   res.json({
-    provider: process.env.AI_TAGGING_PROVIDER ? "ai" : "auto",
-    suggestions: suggestTags({ url, title, description }),
+    provider: aiSuggestions ? "ai" : "auto",
+    suggestions: aiSuggestions ?? autoSuggestions,
+    fallback: aiSuggestions ? autoSuggestions : undefined,
   });
+});
+
+router.put("/reorder/batch", (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  if (!items.length) {
+    res.status(400).json({ error: "items required" });
+    return;
+  }
+
+  db.transaction(() => {
+    const update = db.prepare("UPDATE links SET section_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?");
+    items.forEach((item: any) => {
+      const id = Number(item.id);
+      const sectionId = Number(item.section_id);
+      const sortOrder = Number(item.sort_order);
+      if (Number.isFinite(id) && Number.isFinite(sectionId) && Number.isFinite(sortOrder)) {
+        update.run(sectionId, sortOrder, id);
+      }
+    });
+  })();
+
+  res.json({ ok: true });
 });
 
 router.put("/:id", (req, res) => {

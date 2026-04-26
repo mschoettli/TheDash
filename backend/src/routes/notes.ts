@@ -1,5 +1,6 @@
 import { Router } from "express";
 import db from "../db/client";
+import { suggestAiTags } from "../lib/tagging";
 
 const router = Router();
 
@@ -127,13 +128,38 @@ router.get("/", (_req, res) => {
   res.json(notes.map(mapNote));
 });
 
-router.post("/tag-suggestions", (req, res) => {
+router.post("/tag-suggestions", async (req, res) => {
   const title = String(req.body?.title ?? "");
   const content = String(req.body?.content ?? "");
+  const autoSuggestions = suggestNoteTags(title, content);
+  const aiSuggestions = await suggestAiTags({ kind: "note", title, content });
   res.json({
-    provider: process.env.AI_TAGGING_PROVIDER ? "ai" : "auto",
-    suggestions: suggestNoteTags(title, content),
+    provider: aiSuggestions ? "ai" : "auto",
+    suggestions: aiSuggestions ?? autoSuggestions,
+    fallback: aiSuggestions ? autoSuggestions : undefined,
   });
+});
+
+router.put("/reorder/folders", (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  if (!items.length) {
+    res.status(400).json({ error: "items required" });
+    return;
+  }
+
+  db.transaction(() => {
+    const update = db.prepare("UPDATE note_folders SET parent_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?");
+    items.forEach((item: any) => {
+      const id = Number(item.id);
+      const parentId = item.parent_id === null || item.parent_id === undefined ? null : Number(item.parent_id);
+      const sortOrder = Number(item.sort_order);
+      if (Number.isFinite(id) && Number.isFinite(sortOrder) && (parentId === null || Number.isFinite(parentId))) {
+        update.run(parentId, sortOrder, id);
+      }
+    });
+  })();
+
+  res.json({ ok: true });
 });
 
 router.post("/", (req, res) => {
