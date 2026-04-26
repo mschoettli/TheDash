@@ -30,6 +30,7 @@ export default function BookmarksPage() {
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<"feed" | "sections" | "kanban">("feed");
   const [dragLinkId, setDragLinkId] = useState<number | null>(null);
+  const [dragOverLinkId, setDragOverLinkId] = useState<number | null>(null);
   const [captureUrl, setCaptureUrl] = useState("");
   const [captureDraft, setCaptureDraft] = useState<Partial<Link> | null>(null);
   const [query, setQuery] = useState("");
@@ -75,6 +76,19 @@ export default function BookmarksPage() {
     } as Partial<Link>);
   };
 
+  const moveLinkToSection = (sectionId: number, targetSortOrder?: number) => {
+    if (!dragLinkId) return;
+    const section = sections?.find((item) => item.id === sectionId);
+    const maxOrder = Math.max(0, ...(section?.links.map((link) => link.sort_order) ?? [0]));
+    updateLink.mutate({
+      id: dragLinkId,
+      section_id: sectionId,
+      sort_order: targetSortOrder !== undefined ? targetSortOrder - 1 : maxOrder + 1,
+    });
+    setDragLinkId(null);
+    setDragOverLinkId(null);
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -117,12 +131,14 @@ export default function BookmarksPage() {
               ))}
             </div>
 
-            <button
-              onClick={() => setAdding(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
-            >
-              <Plus size={13} /> {t("bookmarks.add_section")}
-            </button>
+            {view === "sections" && (
+              <button
+                onClick={() => setAdding(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
+              >
+                <Plus size={13} /> {t("bookmarks.add_section")}
+              </button>
+            )}
           </div>
         </div>
 
@@ -159,7 +175,7 @@ export default function BookmarksPage() {
       </div>
 
       {/* ── Add section form ─────────────────────────────── */}
-      {adding && (
+      {adding && view === "sections" && (
         <div className="flex max-w-sm gap-2">
           <input
             autoFocus
@@ -243,19 +259,29 @@ export default function BookmarksPage() {
               className="w-[280px] shrink-0 rounded-xl bg-card border border-line/60"
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => {
-                if (!dragLinkId) return;
-                updateLink.mutate({ id: dragLinkId, section_id: section.id });
-                setDragLinkId(null);
+                moveLinkToSection(section.id);
               }}
             >
               <div className="border-b border-line/40 px-3 py-2 text-[13px] font-semibold text-t1">
                 {section.title}
               </div>
               <div className="min-h-[100px] space-y-1 p-2">
-                {section.links
+                {[...section.links]
                   .filter((link) => filteredLinks.some((f) => f.id === link.id))
+                  .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
                   .map((link) => (
-                    <div key={link.id} draggable onDragStart={() => setDragLinkId(link.id)}>
+                    <div
+                      key={link.id}
+                      draggable
+                      onDragStart={() => setDragLinkId(link.id)}
+                      onDragEnter={() => setDragOverLinkId(link.id)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.stopPropagation();
+                        moveLinkToSection(section.id, link.sort_order);
+                      }}
+                      className={dragOverLinkId === link.id ? "rounded-lg ring-2 ring-accent/40" : ""}
+                    >
                       <LinkItem link={link} onPreview={setSelectedLink} />
                     </div>
                   ))}

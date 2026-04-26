@@ -16,6 +16,7 @@ interface TileRow {
   api_url: string | null;
   api_key: string | null;
   provider: MediaProvider;
+  show_address: boolean;
   sort_order: number;
   created_at: string;
 }
@@ -26,6 +27,7 @@ function mapTile(row: any): TileRow {
     api_url: row.api_url ?? row.api_endpoint ?? null,
     provider: (row.provider ?? "none") as MediaProvider,
     api_key: row.api_key ?? null,
+    show_address: Boolean(row.show_address ?? 1),
   };
 }
 
@@ -66,6 +68,7 @@ router.post("/", (req, res) => {
     api_endpoint,
     api_key,
     provider,
+    show_address,
     sort_order,
   } = req.body;
 
@@ -76,7 +79,7 @@ router.post("/", (req, res) => {
 
   const result = db
     .prepare(
-      "INSERT INTO tiles (name, url, icon_url, style, api_url, api_key, provider, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO tiles (name, url, icon_url, style, api_url, api_key, provider, show_address, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .run(
       name,
@@ -86,6 +89,7 @@ router.post("/", (req, res) => {
       api_url ?? api_endpoint ?? null,
       api_key ?? null,
       provider ?? "none",
+      show_address === false ? 0 : 1,
       sort_order ?? 0
     );
 
@@ -111,11 +115,12 @@ router.put("/:id", (req, res) => {
     api_endpoint,
     api_key,
     provider,
+    show_address,
     sort_order,
   } = req.body;
 
   db.prepare(
-    "UPDATE tiles SET name=?, url=?, icon_url=?, style=?, api_url=?, api_key=?, provider=?, sort_order=? WHERE id=?"
+    "UPDATE tiles SET name=?, url=?, icon_url=?, style=?, api_url=?, api_key=?, provider=?, show_address=?, sort_order=? WHERE id=?"
   ).run(
     name ?? existing.name,
     url ?? existing.url,
@@ -128,6 +133,7 @@ router.put("/:id", (req, res) => {
       : existing.api_url ?? existing.api_endpoint,
     api_key !== undefined ? api_key : existing.api_key,
     provider ?? existing.provider ?? "none",
+    show_address !== undefined ? (show_address ? 1 : 0) : existing.show_address ?? 1,
     sort_order ?? existing.sort_order,
     req.params.id
   );

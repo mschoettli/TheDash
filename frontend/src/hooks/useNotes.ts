@@ -22,6 +22,11 @@ export interface Note {
   updated_at: string;
 }
 
+export interface NoteTagSuggestion {
+  name: string;
+  source: "auto" | "ai";
+}
+
 const KEY = ["notes"];
 const FOLDERS_KEY = ["note-folders"];
 
@@ -117,4 +122,13 @@ export function useDeleteNote() {
       fetchJson<{ ok: true }>(`/api/notes/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
+}
+
+export async function fetchNoteTagSuggestions(data: { title: string; content: string }): Promise<NoteTagSuggestion[]> {
+  const response = await fetchJson<{ provider: "auto" | "ai"; suggestions: NoteTagSuggestion[] }>("/api/notes/tag-suggestions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return response.suggestions;
 }

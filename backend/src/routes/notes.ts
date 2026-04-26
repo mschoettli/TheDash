@@ -55,6 +55,19 @@ function mapNote(row: NoteRow) {
   };
 }
 
+function suggestNoteTags(title: string, content: string): Array<{ name: string; source: "auto" | "ai" }> {
+  const blocked = new Set(["diese", "eine", "oder", "aber", "nicht", "with", "this", "that", "from"]);
+  const values = new Set<string>();
+  `${title} ${content}`
+    .toLowerCase()
+    .split(/[^a-z0-9äöüß]+/i)
+    .filter((word) => word.length > 4 && !/^\d+$/.test(word) && !blocked.has(word))
+    .slice(0, 20)
+    .forEach((word) => values.add(word));
+  const source = process.env.AI_TAGGING_PROVIDER ? "ai" : "auto";
+  return Array.from(values).slice(0, 8).map((name) => ({ name, source }));
+}
+
 router.get("/folders", (_req, res) => {
   const folders = db
     .prepare("SELECT * FROM note_folders ORDER BY sort_order ASC, title ASC")
@@ -110,6 +123,15 @@ router.get("/", (_req, res) => {
     .prepare("SELECT * FROM notes ORDER BY is_pinned DESC, updated_at DESC")
     .all() as NoteRow[];
   res.json(notes.map(mapNote));
+});
+
+router.post("/tag-suggestions", (req, res) => {
+  const title = String(req.body?.title ?? "");
+  const content = String(req.body?.content ?? "");
+  res.json({
+    provider: process.env.AI_TAGGING_PROVIDER ? "ai" : "auto",
+    suggestions: suggestNoteTags(title, content),
+  });
 });
 
 router.post("/", (req, res) => {

@@ -12,15 +12,17 @@ export default function TileCard({ tile, online, apiData }: Props) {
   const hostname = new URL(tile.url.startsWith("http") ? tile.url : `http://${tile.url}`).hostname;
 
   return (
-    <div className="group flex flex-col gap-3 p-4 rounded-xl bg-card border border-line/60 hover:border-accent/30 hover:bg-card/80 transition-all duration-200 h-full">
+    <div className="group flex h-full min-h-[168px] flex-col gap-3 rounded-2xl border border-line/60 bg-card p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/5">
       <div className="flex items-start justify-between">
-        <FaviconImg url={tile.url} name={tile.name} size={34} explicitIconUrl={tile.icon_url} />
+        <div className="rounded-2xl border border-line/50 bg-surface p-2">
+          <FaviconImg url={tile.url} name={tile.name} size={34} explicitIconUrl={tile.icon_url} />
+        </div>
         <StatusDot online={online === true} />
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-[13px] text-t1 truncate">{tile.name}</div>
-        <div className="text-[11px] text-t3 truncate mt-0.5">{hostname}</div>
+        {tile.show_address && <div className="text-[11px] text-t3 truncate mt-0.5">{hostname}</div>}
       </div>
 
       {apiData?.status === "ok" && (

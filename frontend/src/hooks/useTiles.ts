@@ -12,6 +12,7 @@ export interface Tile {
   api_url: string | null;
   api_key: string | null;
   provider: TileProvider;
+  show_address: boolean;
   sort_order: number;
   created_at: string;
 }

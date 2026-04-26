@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import MDEditor from "@uiw/react-md-editor";
-import { AlertCircle, Archive, CheckCircle2, Code, Eye, Heading2, ListChecks, Loader2, Pin, RotateCcw, Table2 } from "lucide-react";
-import { Note, NoteFolder, useUpdateNote } from "../../hooks/useNotes";
+import { AlertCircle, Archive, CheckCircle2, Code, Eye, Heading2, ListChecks, Loader2, Pin, RotateCcw, Sparkles, Table2, Tags } from "lucide-react";
+import { fetchNoteTagSuggestions, Note, NoteFolder, useUpdateNote } from "../../hooks/useNotes";
 import { useSettingsStore } from "../../store/useSettingsStore";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -19,19 +19,22 @@ export default function NoteEditor({ note, folder }: Props) {
 
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
+  const [tagInput, setTagInput] = useState(note.tags.join(", "));
+  const [tagLoading, setTagLoading] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
-  const [lastPayload, setLastPayload] = useState<{ title: string; content: string } | null>(null);
+  const [lastPayload, setLastPayload] = useState<{ title: string; content: string; tags?: string[] } | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setTitle(note.title);
     setContent(note.content);
+    setTagInput(note.tags.join(", "));
     setSaveState("idle");
     setLastPayload(null);
   }, [note.id, note.title, note.content]);
 
-  async function persist(target: { title: string; content: string }) {
+  async function persist(target: { title: string; content: string; tags?: string[] }) {
     setSaveState("saving");
     setLastPayload(target);
     try {
@@ -53,6 +56,22 @@ export default function NoteEditor({ note, folder }: Props) {
     const newContent = val ?? "";
     setContent(newContent);
     scheduleUpdate(title, newContent);
+  };
+
+  const saveTags = () => {
+    const tags = tagInput.split(",").map((tag) => tag.trim()).filter(Boolean);
+    void persist({ title, content, tags });
+  };
+
+  const suggestTags = async () => {
+    setTagLoading(true);
+    try {
+      const suggestions = await fetchNoteTagSuggestions({ title, content });
+      const current = tagInput.split(",").map((tag) => tag.trim()).filter(Boolean);
+      setTagInput(Array.from(new Set([...current, ...suggestions.map((tag) => tag.name)]).values()).join(", "));
+    } finally {
+      setTagLoading(false);
+    }
   };
 
   const insertMarkdown = (snippet: string) => {
@@ -81,6 +100,27 @@ export default function NoteEditor({ note, folder }: Props) {
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder={t("notes.untitled")}
         />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-[260px] flex-1 items-center gap-2 rounded-lg border border-line/60 bg-card px-3 py-2">
+            <Tags size={14} className="text-t3" />
+            <input
+              value={tagInput}
+              onChange={(event) => setTagInput(event.target.value)}
+              onBlur={saveTags}
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); saveTags(); } }}
+              placeholder={t("notes.tags_placeholder")}
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3"
+            />
+          </div>
+          <button
+            onClick={suggestTags}
+            disabled={tagLoading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-[12px] font-medium text-accent disabled:opacity-50"
+          >
+            <Sparkles size={13} /> {tagLoading ? t("notes.suggesting_tags") : t("notes.ai_tags")}
+          </button>
+        </div>
 
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-t3">
           {saveState === "saving" && <Loader2 size={12} className="animate-spin" />}

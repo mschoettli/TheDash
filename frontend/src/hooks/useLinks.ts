@@ -76,19 +76,22 @@ export function useCaptureLink() {
 
 export function suggestAutoTags(url: string, title?: string, description?: string): string[] {
   const values = new Set<string>();
+  const isIpLike = (value: string) => /^\d+$/.test(value) || /^\d{1,3}(\.\d{1,3}){3}$/.test(value);
   try {
     const host = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, "");
-    host
-      .split(".")
-      .filter((part) => part.length > 2 && !["com", "net", "org", "local"].includes(part))
-      .forEach((part) => values.add(part.toLowerCase()));
+    if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+      host
+        .split(".")
+        .filter((part) => part.length > 2 && !isIpLike(part) && !["com", "net", "org", "local", "lan"].includes(part))
+        .forEach((part) => values.add(part.toLowerCase()));
+    }
   } catch {
     // ignore invalid URL while typing
   }
   `${title ?? ""} ${description ?? ""}`
     .toLowerCase()
     .split(/[^a-z0-9äöüß]+/i)
-    .filter((word) => word.length > 4)
+    .filter((word) => word.length > 4 && !isIpLike(word))
     .slice(0, 5)
     .forEach((word) => values.add(word));
   return Array.from(values).slice(0, 8);

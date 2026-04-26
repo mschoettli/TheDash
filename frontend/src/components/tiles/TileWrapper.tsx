@@ -13,7 +13,7 @@ interface Props {
 
 export default function TileWrapper({ tile }: Props) {
   const globalStyle = useSettingsStore((s) => s.widgetStyle);
-  const effectiveStyle = tile.style !== "card" ? tile.style : globalStyle;
+  const effectiveStyle = tile.style ?? globalStyle;
 
   const [online, setOnline] = useState<boolean | null>(null);
   const [apiData, setApiData] = useState<TileMetrics | null>(null);

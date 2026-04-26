@@ -24,14 +24,21 @@ function fallbackTitle(url: string): string {
   }
 }
 
+function isIpLike(value: string): boolean {
+  return /^\d+$/.test(value) || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(value) || /^\d{2,5}$/.test(value);
+}
+
+function isTagWord(value: string): boolean {
+  return value.length > 2 && !isIpLike(value) && !["com", "net", "org", "local", "lan"].includes(value);
+}
+
 function suggestTags(input: { url: string; title?: string; description?: string }) {
   const values = new Map<string, "auto" | "ai">();
   try {
     const host = new URL(normalizeUrl(input.url)).hostname.replace(/^www\./, "");
-    host
-      .split(".")
-      .filter((part) => part.length > 2 && !["com", "net", "org", "local"].includes(part))
-      .forEach((part) => values.set(part.toLowerCase(), "auto"));
+    if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) {
+      host.split(".").filter(isTagWord).forEach((part) => values.set(part.toLowerCase(), "auto"));
+    }
   } catch {
     // Invalid URLs can still produce title/description based suggestions.
   }
@@ -39,7 +46,7 @@ function suggestTags(input: { url: string; title?: string; description?: string 
   `${input.title ?? ""} ${input.description ?? ""}`
     .toLowerCase()
     .split(/[^a-z0-9äöüß]+/i)
-    .filter((word) => word.length > 4)
+    .filter((word) => word.length > 4 && !isIpLike(word))
     .slice(0, 8)
     .forEach((word) => values.set(word, "auto"));
 
@@ -102,7 +109,7 @@ function syncLinkTags(linkId: number, tags: unknown): void {
       ? (value.source as "manual" | "auto" | "ai")
       : "manual";
     const cleanName = name.trim();
-    if (cleanName) cleanTags.set(cleanName, source);
+    if (cleanName && !isIpLike(cleanName)) cleanTags.set(cleanName, source);
   });
 
   db.prepare("DELETE FROM link_tags WHERE link_id = ?").run(linkId);

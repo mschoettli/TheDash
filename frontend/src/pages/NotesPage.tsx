@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Archive, BarChart3, Clock, FileText, Folder, Inbox, Pin, Plus, Tags } from "lucide-react";
+import { Archive, BarChart3, Clock, FileText, Folder, Inbox, Pin, Plus, Search, Tags } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Note, useCreateNote, useNoteFolders, useNotes } from "../hooks/useNotes";
 import NoteList, { NoteScope } from "../components/notes/NoteList";
@@ -43,6 +43,8 @@ export default function NotesPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedScope, setSelectedScope] = useState<NoteScope>("all");
   const [quickNote, setQuickNote] = useState("");
+  const [query, setQuery] = useState("");
+  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedId !== null && !notes.some((note) => note.id === selectedId)) setSelectedId(null);
@@ -59,6 +61,12 @@ export default function NotesPage() {
     [notes]
   );
   const allTags = new Set(notes.flatMap((note) => note.tags));
+  const feedNotes = recent.filter((note) => {
+    const tagMatch = activeTag ? note.tags.includes(activeTag) : true;
+    const q = query.trim().toLowerCase();
+    const searchMatch = !q || [note.title, note.content, ...note.tags].join(" ").toLowerCase().includes(q);
+    return tagMatch && searchMatch && !note.is_archived;
+  });
 
   const createQuickNote = () => {
     const content = quickNote.trim();
@@ -92,6 +100,28 @@ export default function NotesPage() {
               <h1 className="text-xl font-semibold text-t1">{t("notes.title")}</h1>
             </div>
 
+            <div className="grid gap-2 lg:grid-cols-[1fr_320px]">
+              <div className="flex items-center gap-2 rounded-xl border border-line/60 bg-card px-3 py-2">
+                <Search size={15} className="text-t3" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={t("notes.search")}
+                  className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3"
+                />
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto">
+                <button onClick={() => setActiveTag(null)} className={`shrink-0 rounded-lg px-3 py-2 text-[12px] font-medium ${activeTag === null ? "bg-accent text-bg" : "border border-line bg-card text-t2"}`}>
+                  {t("bookmarks.all_tags")} {notes.length}
+                </button>
+                {Array.from(allTags).map((tag) => (
+                  <button key={tag} onClick={() => setActiveTag(tag)} className={`shrink-0 rounded-lg px-3 py-2 text-[12px] font-medium ${activeTag === tag ? "bg-accent text-bg" : "border border-line bg-card text-t2"}`}>
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <DashboardTile icon={FileText} label={t("notes.stat_notes")} value={notes.length} description={t("notes.tile_all_desc")} onClick={() => setSelectedScope("all")} />
               <DashboardTile icon={Folder} label={t("notes.folders")} value={folders.length} description={t("notes.tile_folders_desc")} />
@@ -122,6 +152,40 @@ export default function NotesPage() {
                 </button>
               </div>
             </div>
+
+            <section className="rounded-xl border border-line/60 bg-card p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="label-xs flex items-center gap-1.5"><FileText size={10} /> {t("notes.feed")}</div>
+                <span className="text-[11px] text-t3">{feedNotes.length}</span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {feedNotes.map((note) => {
+                  const folder = note.folder_id ? folders.find((item) => item.id === note.folder_id) : null;
+                  return (
+                    <button
+                      key={note.id}
+                      onClick={() => setSelectedId(note.id)}
+                      className="group min-h-[150px] rounded-2xl border border-line/60 bg-surface p-4 text-left transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/5"
+                    >
+                      <div className="mb-2 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-[14px] font-semibold text-t1">{note.title || t("notes.untitled")}</div>
+                          <div className="mt-1 text-[11px] text-t3">{folder?.title ?? t("notes.unfiled")} · {new Date(note.updated_at).toLocaleDateString()}</div>
+                        </div>
+                        {note.is_pinned && <Pin size={14} className="shrink-0 text-accent" />}
+                      </div>
+                      <p className="line-clamp-3 text-[12px] leading-5 text-t2">{note.content || t("notes.empty_preview")}</p>
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {note.tags.slice(0, 4).map((tag) => (
+                          <span key={tag} className="rounded-md border border-line/50 bg-card px-1.5 py-0.5 text-[10px] text-t3">{tag}</span>
+                        ))}
+                      </div>
+                    </button>
+                  );
+                })}
+                {!feedNotes.length && <div className="col-span-full py-8 text-center text-[13px] text-t3">{t("notes.no_notes")}</div>}
+              </div>
+            </section>
 
             <div className="grid gap-4 xl:grid-cols-2">
               <section className="rounded-xl border border-line/60 bg-card p-4">

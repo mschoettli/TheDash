@@ -62,9 +62,22 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
   const activeNotes = notes.filter((note) => !note.is_archived);
   const pinned = activeNotes.filter((note) => note.is_pinned);
   const archived = notes.filter((note) => note.is_archived);
+  const childFolders = useMemo(() => {
+    const groups = new Map<number | null, NoteFolder[]>();
+    folders.forEach((folder) => {
+      const key = folder.parent_id ?? null;
+      groups.set(key, [...(groups.get(key) ?? []), folder]);
+    });
+    groups.forEach((items) => items.sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title)));
+    return groups;
+  }, [folders]);
 
   const createInFolder = (folderId: number | null) => {
     createNote.mutate({ folder_id: folderId, title: t("notes.new_note") }, { onSuccess: (note) => onSelect(note.id) });
+  };
+
+  const createSubFolder = (parentId: number | null) => {
+    createFolder.mutate({ title: t("notes.new_folder"), parent_id: parentId });
   };
 
   const toggleFolder = (folderId: number) => {
@@ -160,6 +173,70 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
     </div>
   );
 
+  const renderFolder = (folder: NoteFolder, depth = 0): React.ReactNode => {
+    const notesInFolder = folderNotes(notes, folder.id);
+    const children = childFolders.get(folder.id) ?? [];
+    const isOpen = openFolders.has(folder.id);
+    const isActive = selectedScope === folder.id;
+    return (
+      <div key={folder.id}>
+        <div
+          className="group flex items-center gap-1 rounded-lg px-1 py-1"
+          style={{ paddingLeft: depth * 12 + 4 }}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={() => moveDraggedNote(folder.id)}
+        >
+          <button onClick={() => toggleFolder(folder.id)} className="rounded p-1 text-t3 hover:bg-line/30 hover:text-t1">
+            {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          </button>
+          <button
+            onClick={() => onSelectScope(folder.id)}
+            className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors ${
+              isActive ? "bg-accent/10 text-accent" : "text-t2 hover:bg-line/20 hover:text-t1"
+            }`}
+          >
+            <Folder size={13} />
+            {editingFolderId === folder.id ? (
+              <input
+                autoFocus
+                value={folderTitle}
+                onChange={(event) => setFolderTitle(event.target.value)}
+                onClick={(event) => event.stopPropagation()}
+                onBlur={saveFolderTitle}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") saveFolderTitle();
+                  if (event.key === "Escape") setEditingFolderId(null);
+                }}
+                className="min-w-0 flex-1 rounded border border-line/60 bg-card px-1 text-[13px] text-t1 outline-none"
+              />
+            ) : (
+              <span className="min-w-0 flex-1 truncate">{folder.title}</span>
+            )}
+            <span className="text-[11px] text-t3">{notesInFolder.length}</span>
+          </button>
+          <button onClick={() => createInFolder(folder.id)} className="rounded p-1 text-t3 opacity-0 hover:bg-line/30 hover:text-accent group-hover:opacity-100">
+            <Plus size={12} />
+          </button>
+          <button onClick={() => createSubFolder(folder.id)} className="rounded p-1 text-t3 opacity-0 hover:bg-line/30 hover:text-accent group-hover:opacity-100" title={t("notes.create_subfolder")}>
+            <FolderPlus size={12} />
+          </button>
+          <button onClick={() => startRenameFolder(folder)} className="rounded p-1 text-t3 opacity-0 hover:bg-line/30 hover:text-accent group-hover:opacity-100">
+            <Edit3 size={12} />
+          </button>
+          <button onClick={() => setDeleteFolderTarget(folder)} className="rounded p-1 text-t3 opacity-0 hover:bg-rose-500/10 hover:text-rose-500 group-hover:opacity-100">
+            <Trash2 size={12} />
+          </button>
+        </div>
+        {isOpen && (
+          <div className="space-y-0.5">
+            {notesInFolder.map(renderNote)}
+            {children.map((child) => renderFolder(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <aside className="flex w-80 shrink-0 flex-col border-r border-line/60 bg-surface">
       <div className="border-b border-line/40 p-4">
@@ -195,62 +272,7 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
         {unfiled.length > 0 && <div className="mb-3 space-y-0.5">{unfiled.map(renderNote)}</div>}
 
         <div className="space-y-1">
-          {folders.map((folder) => {
-            const notesInFolder = folderNotes(notes, folder.id);
-            const isOpen = openFolders.has(folder.id);
-            const isActive = selectedScope === folder.id;
-            return (
-              <div key={folder.id}>
-                <div
-                  className="group flex items-center gap-1 rounded-lg px-1 py-1"
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => moveDraggedNote(folder.id)}
-                >
-                  <button onClick={() => toggleFolder(folder.id)} className="rounded p-1 text-t3 hover:bg-line/30 hover:text-t1">
-                    {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                  </button>
-                  <button
-                    onClick={() => onSelectScope(folder.id)}
-                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors ${
-                      isActive ? "bg-accent/10 text-accent" : "text-t2 hover:bg-line/20 hover:text-t1"
-                    }`}
-                  >
-                    <Folder size={13} />
-                    {editingFolderId === folder.id ? (
-                      <input
-                        autoFocus
-                        value={folderTitle}
-                        onChange={(event) => setFolderTitle(event.target.value)}
-                        onClick={(event) => event.stopPropagation()}
-                        onBlur={saveFolderTitle}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") saveFolderTitle();
-                          if (event.key === "Escape") setEditingFolderId(null);
-                        }}
-                        className="min-w-0 flex-1 rounded border border-line/60 bg-card px-1 text-[13px] text-t1 outline-none"
-                      />
-                    ) : (
-                      <span className="min-w-0 flex-1 truncate">{folder.title}</span>
-                    )}
-                    <span className="text-[11px] text-t3">{notesInFolder.length}</span>
-                  </button>
-                  <button onClick={() => createInFolder(folder.id)} className="rounded p-1 text-t3 opacity-0 hover:bg-line/30 hover:text-accent group-hover:opacity-100">
-                    <Plus size={12} />
-                  </button>
-                  <button onClick={() => startRenameFolder(folder)} className="rounded p-1 text-t3 opacity-0 hover:bg-line/30 hover:text-accent group-hover:opacity-100">
-                    <Edit3 size={12} />
-                  </button>
-                  <button
-                    onClick={() => setDeleteFolderTarget(folder)}
-                    className="rounded p-1 text-t3 opacity-0 hover:bg-rose-500/10 hover:text-rose-500 group-hover:opacity-100"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-                {isOpen && <div className="space-y-0.5">{notesInFolder.map(renderNote)}</div>}
-              </div>
-            );
-          })}
+          {(childFolders.get(null) ?? []).map((folder) => renderFolder(folder))}
         </div>
       </div>
       <ConfirmDialog

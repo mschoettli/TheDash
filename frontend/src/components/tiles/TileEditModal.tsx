@@ -51,6 +51,7 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
   const [apiUrl, setApiUrl] = useState(tile?.api_url ?? initial?.api_url ?? "");
   const [apiKey, setApiKey] = useState(tile?.api_key ?? initial?.api_key ?? "");
   const [provider, setProvider] = useState<TileProvider>(tile?.provider ?? initial?.provider ?? "none");
+  const [showAddress, setShowAddress] = useState(tile?.show_address ?? initial?.show_address ?? true);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
       setApiUrl(tile?.api_url ?? initial?.api_url ?? "");
       setApiKey(tile?.api_key ?? initial?.api_key ?? "");
       setProvider(tile?.provider ?? initial?.provider ?? "none");
+      setShowAddress(tile?.show_address ?? initial?.show_address ?? true);
       setDeleteOpen(false);
     }
   }, [open, tile, initial]);
@@ -81,7 +83,7 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
   const del = useDeleteTile();
 
   const handleSave = () => {
-    const data = { name, url, icon_url: iconUrl || null, style, api_url: apiUrl ? normalizeServiceUrl(apiUrl) : null, api_key: apiKey || null, provider, sort_order: tile?.sort_order ?? 0 };
+    const data = { name, url, icon_url: iconUrl || null, style, api_url: apiUrl ? normalizeServiceUrl(apiUrl) : null, api_key: apiKey || null, provider, show_address: showAddress, sort_order: tile?.sort_order ?? 0 };
     if (isEdit && tile) update.mutate({ id: tile.id, ...data }, { onSuccess: onClose });
     else create.mutate(data, { onSuccess: onClose });
   };
@@ -122,12 +124,13 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
         <IconPicker value={isRegistryIcon(iconUrl) ? iconUrl : null} name={name} onChange={setIconUrl} />
 
         <Field label={t("tile.style")}>
-          <div className="inline-flex overflow-hidden rounded-lg border border-line/60">
+          <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-line/60">
             {styleOptions.map(({ value, label }) => (
               <button
                 key={value}
+                type="button"
                 onClick={() => setStyle(value)}
-                className={`flex-1 py-1.5 px-3 text-[13px] font-medium transition-colors ${
+                className={`py-1.5 px-3 text-[13px] font-medium transition-colors ${
                   style === value ? "bg-accent text-bg" : "text-t2 hover:bg-line/30 hover:text-t1"
                 }`}
               >
@@ -136,6 +139,11 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
             ))}
           </div>
         </Field>
+
+        <label className="flex items-center justify-between rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t2">
+          <span>{t("tile.show_address")}</span>
+          <input type="checkbox" checked={showAddress} onChange={(event) => setShowAddress(event.target.checked)} />
+        </label>
 
         <Field label={t("tile.provider")}>
           <select value={provider} onChange={(e) => setProvider(e.target.value as TileProvider)} className={selectCls}>

@@ -38,6 +38,26 @@ import {
 
 const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
 
+const WIDGET_CONFIG: Record<string, { field?: string; placeholder?: string; required?: boolean }> = {
+  docker: {},
+  system: {},
+  media: { field: "API URL", placeholder: "http://jellyfin:8096", required: false },
+  downloads: { field: "Client URL", placeholder: "http://qbittorrent:8080", required: false },
+  network: { field: "Service URL", placeholder: "http://adguard:3000", required: false },
+  rss: { field: "Feed URL", placeholder: "https://example.com/feed.xml", required: true },
+  weather: { field: "Location", placeholder: "Zurich, CH", required: true },
+  notebook: {},
+  calendar: { field: "Calendar URL", placeholder: "https://calendar.example/ics", required: false },
+  iframe: { field: "Embed URL", placeholder: "https://example.com", required: true },
+  releases: { field: "Repository", placeholder: "owner/repository", required: true },
+  video: { field: "Stream URL", placeholder: "rtsp:// or https://", required: true },
+  automation: { field: "Webhook URL", placeholder: "https://...", required: true },
+  entity: { field: "Entity ID", placeholder: "sensor.status", required: true },
+  stocks: { field: "Symbol", placeholder: "AAPL", required: true },
+  minecraft: { field: "Server", placeholder: "host:25565", required: true },
+  notifications: {},
+};
+
 function hostFromUrl(url: string | null): string {
   if (!url) return "";
   try {
@@ -67,6 +87,8 @@ function WidgetEditModal({
   const [icon, setIcon] = useState(String(widget?.config?.icon ?? iconValue(detectIconKey(widget?.title ?? selected?.title ?? ""))));
   const [endpoint, setEndpoint] = useState(String(widget?.config?.endpoint ?? ""));
   const [notes, setNotes] = useState(String(widget?.config?.notes ?? ""));
+  const [showAddress, setShowAddress] = useState(Boolean(widget?.config?.showAddress ?? true));
+  const config = WIDGET_CONFIG[type] ?? {};
 
   useEffect(() => {
     if (!open) return;
@@ -76,6 +98,7 @@ function WidgetEditModal({
     setIcon(String(widget?.config?.icon ?? iconValue(detectIconKey(widget?.title ?? current?.title ?? ""))));
     setEndpoint(String(widget?.config?.endpoint ?? ""));
     setNotes(String(widget?.config?.notes ?? ""));
+    setShowAddress(Boolean(widget?.config?.showAddress ?? true));
   }, [open, widget, catalog, selected]);
 
   useEffect(() => {
@@ -84,11 +107,11 @@ function WidgetEditModal({
   }, [open, title, widget]);
 
   const save = () => {
-    if (!title.trim() || !type) return;
+    if (!title.trim() || !type || (config.required && !endpoint.trim())) return;
     const payload = {
       type,
       title: title.trim(),
-      config: { endpoint: endpoint.trim(), notes: notes.trim(), icon },
+      config: { endpoint: endpoint.trim(), notes: notes.trim(), icon, showAddress },
       layout: widget?.layout ?? {},
       section_id: widget?.section_id ?? null,
       sort_order: widget?.sort_order ?? 0,
@@ -118,15 +141,21 @@ function WidgetEditModal({
           <input className={input} value={title} onChange={(event) => setTitle(event.target.value)} />
         </div>
         <IconPicker value={icon} name={title} onChange={setIcon} />
-        <div>
-          <div className="label-xs mb-1.5">{t("dashboard.widget_endpoint")}</div>
-          <input className={input} value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="http://service:port or API URL" />
-        </div>
+        {config.field && (
+          <div>
+            <div className="label-xs mb-1.5">{config.field}{config.required ? " *" : ""}</div>
+            <input className={input} value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder={config.placeholder} />
+          </div>
+        )}
+        <label className="flex items-center justify-between rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t2">
+          <span>{t("tile.show_address")}</span>
+          <input type="checkbox" checked={showAddress} onChange={(event) => setShowAddress(event.target.checked)} />
+        </label>
         <div>
           <div className="label-xs mb-1.5">{t("dashboard.widget_notes")}</div>
           <textarea className={`${input} resize-none`} rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} />
         </div>
-        <button onClick={save} disabled={!title.trim()} className="w-full rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
+        <button onClick={save} disabled={!title.trim() || (config.required && !endpoint.trim())} className="w-full rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
           {t("common.save")}
         </button>
       </div>
@@ -188,14 +217,16 @@ export default function DashboardPage() {
   };
 
   const adoptContainer = (container: DiscoveredContainer) => {
+    const detectedLogo = iconValue(detectIconKey(`${container.app.name} ${container.image} ${container.app.href ?? ""}`));
     openAppModal({
       name: container.app.name,
       url: container.app.href ?? "",
-      icon_url: container.app.icon,
+      icon_url: container.app.icon ?? detectedLogo,
       style: "card",
       provider: "none",
       api_url: null,
       api_key: null,
+      show_address: true,
       sort_order: 0,
     });
   };
@@ -258,14 +289,14 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-1.5">
               {widgets?.map((widget) => (
-                <div key={widget.id} className="rounded-lg border border-line/50 bg-surface px-3 py-2">
+                <div key={widget.id} className="rounded-2xl border border-line/60 bg-surface p-3 shadow-sm transition-all hover:border-accent/35 hover:shadow-lg hover:shadow-accent/5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={28} />
                         <div className="min-w-0">
                           <div className="truncate text-[13px] font-medium text-t1">{widget.title}</div>
-                          <div className="label-xs mt-0.5">{widget.type}{widget.config.endpoint ? ` · ${hostFromUrl(String(widget.config.endpoint))}` : ""}</div>
+                          <div className="label-xs mt-0.5">{widget.type}{widget.config.endpoint && widget.config.showAddress !== false ? ` · ${hostFromUrl(String(widget.config.endpoint))}` : ""}</div>
                         </div>
                       </div>
                     </div>

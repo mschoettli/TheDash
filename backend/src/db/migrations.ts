@@ -86,6 +86,7 @@ export function runMigrations(): void {
         api_url      TEXT,
         api_key      TEXT,
         provider     TEXT    NOT NULL DEFAULT 'none',
+        show_address INTEGER NOT NULL DEFAULT 1,
         sort_order   INTEGER NOT NULL DEFAULT 0,
         created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
       );
@@ -196,6 +197,10 @@ export function runMigrations(): void {
 
   if (!columnExists("tiles", "provider")) {
     db.exec("ALTER TABLE tiles ADD COLUMN provider TEXT NOT NULL DEFAULT 'none'");
+  }
+
+  if (!columnExists("tiles", "show_address")) {
+    db.exec("ALTER TABLE tiles ADD COLUMN show_address INTEGER NOT NULL DEFAULT 1");
   }
 
   db.exec("UPDATE tiles SET provider = 'none' WHERE provider IS NULL OR provider = ''");
