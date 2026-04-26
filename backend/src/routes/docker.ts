@@ -60,7 +60,12 @@ router.get("/discovery", async (_req, res) => {
     const containers = await listContainers();
     res.json({ status: "ok", containers: containers.map(mapDiscovery) });
   } catch (err: any) {
-    res.status(200).json({ status: "disabled", containers: [], error: err.message });
+    res.status(200).json({
+      status: "disabled",
+      containers: [],
+      error: err.message,
+      hint: "Start TheDash with the docker-monitoring profile and ensure the Docker socket proxy can access /var/run/docker.sock.",
+    });
   }
 });
 

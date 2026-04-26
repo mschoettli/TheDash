@@ -19,6 +19,7 @@ import {
 import Modal from "../components/ui/Modal";
 import IconBadge from "../components/ui/IconBadge";
 import IconPicker from "../components/ui/IconPicker";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 import TileGrid from "../components/tiles/TileGrid";
 import TileEditModal from "../components/tiles/TileEditModal";
 import { detectIconKey, iconValue } from "../lib/iconRegistry";
@@ -169,6 +170,7 @@ export default function DashboardPage() {
   const [draftApp, setDraftApp] = useState<Partial<Tile> | null>(null);
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
+  const [deleteWidgetTarget, setDeleteWidgetTarget] = useState<WidgetInstance | null>(null);
   const { data: tiles } = useTiles();
   const { data: discovery } = useDockerDiscovery();
   const { data: widgets } = useWidgets();
@@ -270,7 +272,7 @@ export default function DashboardPage() {
                     {editMode && (
                       <div className="flex gap-1">
                         <button onClick={() => { setEditingWidget(widget); setWidgetModalOpen(true); }} className="rounded p-1 text-t3 hover:text-accent"><Pencil size={13} /></button>
-                        <button onClick={() => deleteWidget.mutate(widget.id)} className="rounded p-1 text-t3 hover:text-rose-500"><Trash2 size={13} /></button>
+                        <button onClick={() => setDeleteWidgetTarget(widget)} className="rounded p-1 text-t3 hover:text-rose-500"><Trash2 size={13} /></button>
                       </div>
                     )}
                   </div>
@@ -297,6 +299,17 @@ export default function DashboardPage() {
 
       <TileEditModal open={appModalOpen} onClose={() => setAppModalOpen(false)} initial={draftApp ?? undefined} />
       <WidgetEditModal open={widgetModalOpen} onClose={() => setWidgetModalOpen(false)} widget={editingWidget} catalog={catalog} />
+      <ConfirmDialog
+        open={Boolean(deleteWidgetTarget)}
+        title={t("dashboard.delete_widget_title")}
+        description={t("dashboard.delete_widget_description", { title: deleteWidgetTarget?.title ?? "" })}
+        onCancel={() => setDeleteWidgetTarget(null)}
+        onConfirm={() => {
+          if (!deleteWidgetTarget) return;
+          deleteWidget.mutate(deleteWidgetTarget.id, { onSuccess: () => setDeleteWidgetTarget(null) });
+        }}
+        isPending={deleteWidget.isPending}
+      />
     </div>
   );
 }

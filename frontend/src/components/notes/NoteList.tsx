@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Archive, ChevronDown, ChevronRight, Copy, Edit3, FileText, Folder, FolderPlus, Inbox, Pin, Plus, Star, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import ConfirmDialog from "../ui/ConfirmDialog";
 import {
   Note,
   NoteFolder,
@@ -46,6 +47,8 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
   const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
   const [folderTitle, setFolderTitle] = useState("");
   const [dragNoteId, setDragNoteId] = useState<number | null>(null);
+  const [deleteNoteTarget, setDeleteNoteTarget] = useState<Note | null>(null);
+  const [deleteFolderTarget, setDeleteFolderTarget] = useState<NoteFolder | null>(null);
 
   useEffect(() => {
     setOpenFolders((current) => {
@@ -146,7 +149,7 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
           <button
             onClick={(event) => {
               event.stopPropagation();
-              if (window.confirm(t("notes.confirm_delete_note"))) deleteNote.mutate(note.id, { onSuccess: () => selectedId === note.id && onSelect(null) });
+              setDeleteNoteTarget(note);
             }}
             className="rounded p-0.5 text-t3 hover:text-rose-500"
           >
@@ -238,9 +241,7 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
                     <Edit3 size={12} />
                   </button>
                   <button
-                    onClick={() => {
-                      if (window.confirm(t("notes.confirm_delete_folder", { title: folder.title }))) deleteFolder.mutate(folder.id);
-                    }}
+                    onClick={() => setDeleteFolderTarget(folder)}
                     className="rounded p-1 text-t3 opacity-0 hover:bg-rose-500/10 hover:text-rose-500 group-hover:opacity-100"
                   >
                     <Trash2 size={12} />
@@ -252,6 +253,33 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
           })}
         </div>
       </div>
+      <ConfirmDialog
+        open={Boolean(deleteNoteTarget)}
+        title={t("notes.delete_note_title")}
+        description={t("notes.delete_note_description", { title: deleteNoteTarget?.title || t("notes.untitled") })}
+        onCancel={() => setDeleteNoteTarget(null)}
+        onConfirm={() => {
+          if (!deleteNoteTarget) return;
+          deleteNote.mutate(deleteNoteTarget.id, {
+            onSuccess: () => {
+              if (selectedId === deleteNoteTarget.id) onSelect(null);
+              setDeleteNoteTarget(null);
+            },
+          });
+        }}
+        isPending={deleteNote.isPending}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteFolderTarget)}
+        title={t("notes.delete_folder_title")}
+        description={t("notes.delete_folder_description", { title: deleteFolderTarget?.title ?? "" })}
+        onCancel={() => setDeleteFolderTarget(null)}
+        onConfirm={() => {
+          if (!deleteFolderTarget) return;
+          deleteFolder.mutate(deleteFolderTarget.id, { onSuccess: () => setDeleteFolderTarget(null) });
+        }}
+        isPending={deleteFolder.isPending}
+      />
     </aside>
   );
 }

@@ -49,13 +49,7 @@ export default function FaviconImg({
   }
 
   useEffect(() => {
-    if (explicitIconUrl) {
-      setIconUrl(explicitIconUrl);
-      setFailed(false);
-      return;
-    }
-
-    const cacheKey = url;
+    const cacheKey = `${url}|${explicitIconUrl ?? ""}`;
     if (iconCache.has(cacheKey)) {
       const cached = iconCache.get(cacheKey) ?? null;
       setIconUrl(cached);
@@ -69,8 +63,12 @@ export default function FaviconImg({
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
+    const params = new URLSearchParams({ url });
+    if (explicitIconUrl && /^https?:\/\//i.test(explicitIconUrl)) {
+      params.set("candidate", explicitIconUrl);
+    }
 
-    fetch(`/api/favicon?url=${encodeURIComponent(url)}`, { signal: controller.signal })
+    fetch(`/api/favicon?${params.toString()}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;

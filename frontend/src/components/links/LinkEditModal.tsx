@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import Modal from "../ui/Modal";
+import ConfirmDialog from "../ui/ConfirmDialog";
 import { fetchTagSuggestions, useCreateLink, useUpdateLink, useDeleteLink, Link, suggestAutoTags } from "../../hooks/useLinks";
 import { useSections, useCreateSection } from "../../hooks/useSections";
 
@@ -42,7 +43,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
   const [isArchived, setIsArchived] = useState(Boolean(link?.is_archived ?? initial?.is_archived));
   const [sectionId, setSectionId] = useState<number | "new">(link?.section_id ?? initial?.section_id ?? defaultSectionId ?? "new");
   const [newSectionTitle, setNewSectionTitle] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -59,7 +60,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
       setIsArchived(Boolean(link?.is_archived ?? initial?.is_archived));
       setSectionId(link?.section_id ?? initial?.section_id ?? defaultSectionId ?? (sections?.[0]?.id ?? "new"));
       setNewSectionTitle("");
-      setConfirmDelete(false);
+      setDeleteOpen(false);
     }
   }, [open, link, initial, defaultSectionId, sections]);
 
@@ -121,7 +122,6 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
 
   const handleDelete = () => {
     if (!link) return;
-    if (!confirmDelete) { setConfirmDelete(true); return; }
     deleteLink.mutate(link.id, { onSuccess: onClose });
   };
 
@@ -194,16 +194,24 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
           </button>
           {isEdit && (
             <button
-              onClick={handleDelete}
-              className={`rounded-lg px-4 py-2 text-[13px] font-medium transition-colors ${
-                confirmDelete ? "bg-rose-500 text-white" : "border border-line text-t2 hover:border-rose-400/40 hover:text-rose-400"
-              }`}
+              onClick={() => setDeleteOpen(true)}
+              className="rounded-lg border border-line px-4 py-2 text-[13px] font-medium text-t2 transition-colors hover:border-rose-400/40 hover:text-rose-400"
             >
-              {confirmDelete ? t("common.yes") : t("link.delete")}
+              {t("link.delete")}
             </button>
           )}
         </div>
       </div>
+      {link && (
+        <ConfirmDialog
+          open={deleteOpen}
+          title={t("link.delete_title")}
+          description={t("link.delete_description", { name: link.name })}
+          onCancel={() => setDeleteOpen(false)}
+          onConfirm={handleDelete}
+          isPending={deleteLink.isPending}
+        />
+      )}
     </Modal>
   );
 }

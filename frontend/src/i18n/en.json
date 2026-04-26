@@ -40,6 +40,8 @@
     "widget": "Widget",
     "empty_widgets": "No widgets configured yet.",
     "edit_widget": "Edit widget",
+    "delete_widget_title": "Delete widget",
+    "delete_widget_description": "Delete widget \"{{title}}\"? This action cannot be undone.",
     "widget_type": "Widget type",
     "widget_title": "Widget title",
     "widget_endpoint": "API or URL",
@@ -76,7 +78,9 @@
     "online": "Online",
     "offline": "Offline",
     "add_title": "Add app",
-    "edit_title": "Edit app"
+    "edit_title": "Edit app",
+    "delete_title": "Delete app",
+    "delete_description": "Delete app \"{{name}}\"? This action cannot be undone."
   },
   "link": {
     "open": "Open",
@@ -98,6 +102,8 @@
     "archive": "Archive",
     "archive_short": "Archive",
     "confirm_delete": "Delete bookmark?",
+    "delete_title": "Delete bookmark",
+    "delete_description": "Delete bookmark \"{{name}}\"? This action cannot be undone.",
     "note": "Note",
     "section": "Section",
     "new_section": "New Section",
@@ -120,7 +126,9 @@
     "capture_placeholder": "Paste a link, review the preview and save...",
     "search": "Search bookmarks...",
     "all_tags": "All",
-    "library": "Resource library"
+    "library": "Resource library",
+    "delete_section": "Delete section",
+    "delete_section_description": "Delete section \"{{title}}\" and all links inside it? This action cannot be undone."
   },
   "notes": {
     "title": "Notes",
@@ -133,6 +141,10 @@
     "copy_suffix": "copy",
     "confirm_delete_note": "Delete note?",
     "confirm_delete_folder": "Delete folder \"{{title}}\"? Notes will be moved to Unfiled.",
+    "delete_note_title": "Delete note",
+    "delete_note_description": "Delete note \"{{title}}\"? This action cannot be undone.",
+    "delete_folder_title": "Delete folder",
+    "delete_folder_description": "Delete folder \"{{title}}\"? Notes inside it will be moved to Unfiled.",
     "untitled": "Untitled",
     "unfiled": "Unfiled",
     "placeholder": "Enter Markdown here...",
@@ -175,6 +187,7 @@
   },
   "common": {
     "save": "Save",
+    "delete": "Delete",
     "cancel": "Cancel",
     "done": "Done",
     "confirm_delete": "Really delete?",

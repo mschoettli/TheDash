@@ -4,6 +4,17 @@ import fetch from "node-fetch";
 const router = Router();
 const cache = new Map<string, string | null>();
 
+async function isReachableImage(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: "HEAD", timeout: 3000 } as any);
+    if (!res.ok) return false;
+    const contentType = res.headers.get("content-type") ?? "";
+    return contentType.startsWith("image/") || contentType.includes("icon") || contentType === "";
+  } catch {
+    return false;
+  }
+}
+
 async function findFavicon(urlStr: string): Promise<string | null> {
   let origin: string;
   try {
@@ -16,14 +27,9 @@ async function findFavicon(urlStr: string): Promise<string | null> {
 
   // Try /favicon.ico directly
   const directUrl = `${origin}/favicon.ico`;
-  try {
-    const res = await fetch(directUrl, { method: "HEAD", timeout: 3000 } as any);
-    if (res.ok) {
-      cache.set(origin, directUrl);
-      return directUrl;
-    }
-  } catch {
-    // continue
+  if (await isReachableImage(directUrl)) {
+    cache.set(origin, directUrl);
+    return directUrl;
   }
 
   // Parse HTML for <link rel="icon">
@@ -37,8 +43,10 @@ async function findFavicon(urlStr: string): Promise<string | null> {
       if (match) {
         const href = match[1];
         const iconUrl = href.startsWith("http") ? href : `${origin}${href.startsWith("/") ? "" : "/"}${href}`;
-        cache.set(origin, iconUrl);
-        return iconUrl;
+        if (await isReachableImage(iconUrl)) {
+          cache.set(origin, iconUrl);
+          return iconUrl;
+        }
       }
     }
   } catch {
@@ -51,10 +59,17 @@ async function findFavicon(urlStr: string): Promise<string | null> {
 
 router.get("/", async (req, res) => {
   const url = req.query.url as string;
+  const candidate = req.query.candidate as string | undefined;
   if (!url) {
     res.status(400).json({ error: "url required" });
     return;
   }
+
+  if (candidate && /^https?:\/\//i.test(candidate) && await isReachableImage(candidate)) {
+    res.json({ faviconUrl: candidate });
+    return;
+  }
+
   const faviconUrl = await findFavicon(url);
   res.json({ faviconUrl });
 });

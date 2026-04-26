@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useDeleteLink, useUpdateLink } from "../../hooks/useLinks";
 import FaviconImg from "../ui/FaviconImg";
+import RemoteImage from "../ui/RemoteImage";
+import ConfirmDialog from "../ui/ConfirmDialog";
 import LinkEditModal from "./LinkEditModal";
 
 interface BookmarkPreviewDrawerProps {
@@ -25,6 +27,7 @@ export default function BookmarkPreviewDrawer({ link, onClose }: BookmarkPreview
   const [note, setNote] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     setNote(link?.note ?? "");
@@ -56,13 +59,15 @@ export default function BookmarkPreviewDrawer({ link, onClose }: BookmarkPreview
           </button>
         </div>
 
-        {link.image_url ? (
-          <img src={link.image_url} alt="" className="h-52 w-full object-cover bg-card" />
-        ) : (
-          <div className="h-36 flex items-center justify-center bg-card border-b border-line/40">
-            <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={52} />
-          </div>
-        )}
+        <RemoteImage
+          src={link.image_url}
+          className="h-52 w-full object-cover bg-card"
+          fallback={(
+            <div className="h-36 flex items-center justify-center bg-card border-b border-line/40">
+              <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={52} />
+            </div>
+          )}
+        />
 
         <div className="space-y-5 p-5">
           <div>
@@ -103,7 +108,7 @@ export default function BookmarkPreviewDrawer({ link, onClose }: BookmarkPreview
 
           <div className="grid grid-cols-1 gap-2">
             <button
-              onClick={() => deleteLink.mutate(link.id, { onSuccess: onClose })}
+              onClick={() => setDeleteOpen(true)}
               className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-400/20 px-3 py-2 text-[13px] text-rose-400 hover:bg-rose-500/10 transition-colors"
             >
               <Trash2 size={13} /> {t("link.delete")}
@@ -135,6 +140,14 @@ export default function BookmarkPreviewDrawer({ link, onClose }: BookmarkPreview
         </div>
       </aside>
       <LinkEditModal open={editOpen} onClose={() => setEditOpen(false)} link={link} />
+      <ConfirmDialog
+        open={deleteOpen}
+        title={t("link.delete_title")}
+        description={t("link.delete_description", { name: link.name })}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => deleteLink.mutate(link.id, { onSuccess: onClose })}
+        isPending={deleteLink.isPending}
+      />
     </div>
   );
 }

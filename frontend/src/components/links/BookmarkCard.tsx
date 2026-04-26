@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useDeleteLink, useUpdateLink } from "../../hooks/useLinks";
 import FaviconImg from "../ui/FaviconImg";
+import RemoteImage from "../ui/RemoteImage";
+import ConfirmDialog from "../ui/ConfirmDialog";
 import LinkEditModal from "./LinkEditModal";
 
 interface BookmarkCardProps {
@@ -22,6 +24,7 @@ export default function BookmarkCard({ link, onOpen }: BookmarkCardProps) {
   const { t } = useTranslation();
   const [editOpen, setEditOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const updateLink = useUpdateLink();
   const deleteLink = useDeleteLink();
 
@@ -30,11 +33,11 @@ export default function BookmarkCard({ link, onOpen }: BookmarkCardProps) {
       <button onClick={() => onOpen(link)} className="block w-full text-left">
         <div className="flex gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line/50 bg-surface">
-            {link.image_url ? (
-              <img src={link.image_url} alt="" className="h-full w-full object-cover" loading="lazy" />
-            ) : (
-              <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={26} />
-            )}
+            <RemoteImage
+              src={link.image_url}
+              className="h-full w-full object-cover"
+              fallback={<FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={26} />}
+            />
           </div>
 
           <div className="min-w-0 flex-1">
@@ -101,9 +104,7 @@ export default function BookmarkCard({ link, onOpen }: BookmarkCardProps) {
                 <Archive size={13} />
               </button>
               <button
-                onClick={() => {
-                  if (window.confirm(t("link.confirm_delete"))) deleteLink.mutate(link.id);
-                }}
+                onClick={() => setDeleteOpen(true)}
                 className="rounded-md p-1.5 text-t3 hover:bg-rose-500/10 hover:text-rose-500"
                 aria-label={t("link.delete")}
               >
@@ -121,6 +122,14 @@ export default function BookmarkCard({ link, onOpen }: BookmarkCardProps) {
         </div>
       </div>
       <LinkEditModal open={editOpen} onClose={() => setEditOpen(false)} link={link} />
+      <ConfirmDialog
+        open={deleteOpen}
+        title={t("link.delete_title")}
+        description={t("link.delete_description", { name: link.name })}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => deleteLink.mutate(link.id, { onSuccess: () => setDeleteOpen(false) })}
+        isPending={deleteLink.isPending}
+      />
     </article>
   );
 }

@@ -3,11 +3,10 @@
 TheDash is a self-hosted Homelab Command Center for any Docker host. It provides:
 
 - Docker app discovery from container labels and running containers
-- App tiles and dashboard sections
-- Live host metrics
+- App tiles with status and media KPIs
 - Optional Docker container monitoring and control
-- Bookmarks with tags, preview drawer, favorites, archive state, and quick capture
-- Markdown notes with folders, pins, archive state, autosave, and a notes dashboard
+- Bookmarks with tags, preview drawer, favorites, archive state, quick capture, and tag suggestions
+- Markdown notes with folders, pins, archive state, autosave, drag-and-drop moves, and a notes dashboard
 - Prebuilt GHCR images for simple Docker Compose installs
 
 ## Requirements
@@ -22,9 +21,9 @@ docker --version
 docker compose version
 ```
 
-## Install With Prebuilt Images
+## Install
 
-This is the recommended installation path for servers and homelabs. It does not require Node.js or a local build context.
+TheDash is installed with one compose file. It pulls prebuilt images from GHCR and does not build locally.
 
 1. Create an application directory:
 
@@ -36,7 +35,7 @@ cd thedash
 2. Download the compose and environment files:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/mschoettli/TheDash/main/docker-compose.image.yml
+curl -fsSLO https://raw.githubusercontent.com/mschoettli/TheDash/main/docker-compose.yml
 curl -fsSLo .env https://raw.githubusercontent.com/mschoettli/TheDash/main/.env.example
 ```
 
@@ -47,14 +46,14 @@ THEDASH_PORT=8080
 GHCR_OWNER=mschoettli
 THEDASH_IMAGE_TAG=latest
 DB_PATH=/data/thedash.db
-DOCKER_HOST_URL=
+DOCKER_HOST_URL=http://dockerproxy:2375
 ```
 
 4. Start TheDash:
 
 ```bash
-docker compose -f docker-compose.image.yml pull
-docker compose -f docker-compose.image.yml up -d
+docker compose pull
+docker compose up -d
 ```
 
 5. Open TheDash:
@@ -64,7 +63,7 @@ http://localhost:8080
 http://<docker-host-ip>:8080
 ```
 
-The image compose uses these containers:
+The compose stack uses these containers:
 
 - `thedash-backend`
 - `thedash-frontend`
@@ -72,62 +71,28 @@ The image compose uses these containers:
 
 It pulls:
 
-- `ghcr.io/<owner>/thedash-backend:latest`
-- `ghcr.io/<owner>/thedash-frontend:latest`
+- `ghcr.io/<owner>/thedash-backend:<tag>`
+- `ghcr.io/<owner>/thedash-frontend:<tag>`
 
-## Install From Git Clone
+## Docker Monitoring And Control
 
-Use this mode when you want to build the images locally from the repository.
+Docker monitoring is optional. TheDash runs without it, but container discovery and container actions require the `docker-monitoring` profile.
+
+Start with Docker monitoring:
 
 ```bash
-git clone https://github.com/mschoettli/TheDash.git
-cd TheDash
-cp .env.example .env
-docker compose up -d --build
+COMPOSE_PROFILES=docker-monitoring docker compose up -d
 ```
 
 PowerShell:
 
 ```powershell
-git clone https://github.com/mschoettli/TheDash.git
-cd TheDash
-Copy-Item .env.example .env
-docker compose up -d --build
-```
-
-The local build compose uses the same container names:
-
-- `thedash-backend`
-- `thedash-frontend`
-- `thedash-dockerproxy` when Docker monitoring is enabled
-
-## Docker Monitoring And Control
-
-The default installation does not expose the Docker socket. TheDash still runs without Docker monitoring.
-
-To enable Docker discovery, container status, and controlled actions, start with the `docker-monitoring` profile:
-
-```bash
-DOCKER_HOST_URL=http://dockerproxy:2375 COMPOSE_PROFILES=docker-monitoring docker compose -f docker-compose.image.yml up -d
-```
-
-For local builds:
-
-```bash
-DOCKER_HOST_URL=http://dockerproxy:2375 COMPOSE_PROFILES=docker-monitoring docker compose up -d --build
-```
-
-PowerShell example:
-
-```powershell
-$env:DOCKER_HOST_URL = "http://dockerproxy:2375"
 $env:COMPOSE_PROFILES = "docker-monitoring"
-docker compose -f docker-compose.image.yml up -d
-Remove-Item Env:DOCKER_HOST_URL
+docker compose up -d
 Remove-Item Env:COMPOSE_PROFILES
 ```
 
-The Docker proxy is optional and only starts when the profile is enabled.
+The profile starts `thedash-dockerproxy`, which mounts `/var/run/docker.sock` read-only and exposes only the Docker API permissions required by TheDash.
 
 ## Docker App Labels
 
@@ -157,83 +122,68 @@ labels:
 
 ## Operations
 
-Start prebuilt images:
-
-```bash
-docker compose -f docker-compose.image.yml up -d
-```
-
-Stop prebuilt images:
-
-```bash
-docker compose -f docker-compose.image.yml down
-```
-
-Update prebuilt images:
-
-```bash
-docker compose -f docker-compose.image.yml pull
-docker compose -f docker-compose.image.yml up -d --remove-orphans
-```
-
-Start local build:
+Start:
 
 ```bash
 docker compose up -d
 ```
 
-Update local build after pulling repository changes:
+Stop:
 
 ```bash
-git pull
-docker compose build --no-cache
-docker compose up -d
+docker compose down
+```
+
+Update:
+
+```bash
+docker compose pull
+docker compose up -d --remove-orphans
 ```
 
 Logs:
 
 ```bash
-docker compose -f docker-compose.image.yml logs -f
+docker compose logs -f
 ```
 
-Local build logs:
+Container state:
 
 ```bash
-docker compose logs -f
+docker ps --filter name=thedash
 ```
 
 ## Data And Backup
 
 Runtime data is stored in `./data` on the host and mounted to `/data` in the backend container.
 
-Recommended backup:
+Backup:
 
 ```bash
-docker compose -f docker-compose.image.yml down
+docker compose down
 cp -a data data.backup
 ```
 
 Restore:
 
 ```bash
-docker compose -f docker-compose.image.yml down
+docker compose down
 rm -rf data
 cp -a data.backup data
-docker compose -f docker-compose.image.yml up -d
+docker compose up -d
 ```
 
 The app also provides JSON export/import in Settings.
 
 ## Health Checks
 
-- Backend: `http://<host>:<port>/api/health`
-- Frontend and backend include Docker health checks in both compose files.
+Backend health endpoint:
 
-Check container state:
-
-```bash
-docker ps --filter name=thedash
+```text
+http://<host>:<port>/api/health
 ```
+
+Frontend and backend include Docker health checks.
 
 ## GHCR Images
 
@@ -256,16 +206,16 @@ Port already in use:
 
 - Change `THEDASH_PORT` in `.env` and restart the stack.
 
-Prebuilt image pull fails:
+Image pull fails:
 
 - Verify `GHCR_OWNER` and `THEDASH_IMAGE_TAG` in `.env`.
 - Ensure the GHCR packages are public or authenticate Docker with an account that can pull them.
 
 Docker monitoring shows no containers:
 
-- Start with `COMPOSE_PROFILES=docker-monitoring`.
-- Set `DOCKER_HOST_URL=http://dockerproxy:2375`.
+- Start with `COMPOSE_PROFILES=docker-monitoring docker compose up -d`.
 - Check that `thedash-dockerproxy` is running.
+- Check that the host has `/var/run/docker.sock` and Docker permission for the compose user.
 
 Compose command not found:
 
@@ -274,7 +224,7 @@ Compose command not found:
 Reset application data:
 
 ```bash
-docker compose -f docker-compose.image.yml down
+docker compose down
 rm -rf data
-docker compose -f docker-compose.image.yml up -d
+docker compose up -d
 ```

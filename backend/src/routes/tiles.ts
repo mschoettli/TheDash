@@ -49,7 +49,7 @@ router.get("/:id/metrics", async (req, res) => {
   const tile = mapTile(row);
   const metrics = await fetchProviderMetrics({
     provider: tile.provider,
-    apiUrl: tile.api_url,
+    apiUrl: tile.api_url ?? tile.url,
     apiKey: tile.api_key,
   });
 

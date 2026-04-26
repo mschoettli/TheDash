@@ -1,12 +1,28 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import Modal from "../ui/Modal";
+import ConfirmDialog from "../ui/ConfirmDialog";
 import { useCreateTile, useUpdateTile, useDeleteTile, Tile, TileProvider } from "../../hooks/useTiles";
 import IconPicker from "../ui/IconPicker";
 import { detectIconKey, iconValue, isRegistryIcon } from "../../lib/iconRegistry";
 
 const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
 const selectCls = `${input} appearance-none`;
+
+function normalizeServiceUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  try {
+    const parsed = new URL(withScheme);
+    parsed.pathname = parsed.pathname.replace(/\/web\/?$/i, "");
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return withScheme;
+  }
+}
 
 interface Props {
   open: boolean;
@@ -35,7 +51,7 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
   const [apiUrl, setApiUrl] = useState(tile?.api_url ?? initial?.api_url ?? "");
   const [apiKey, setApiKey] = useState(tile?.api_key ?? initial?.api_key ?? "");
   const [provider, setProvider] = useState<TileProvider>(tile?.provider ?? initial?.provider ?? "none");
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -46,7 +62,7 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
       setApiUrl(tile?.api_url ?? initial?.api_url ?? "");
       setApiKey(tile?.api_key ?? initial?.api_key ?? "");
       setProvider(tile?.provider ?? initial?.provider ?? "none");
-      setConfirmDelete(false);
+      setDeleteOpen(false);
     }
   }, [open, tile, initial]);
 
@@ -55,19 +71,23 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
     if (name.trim()) setIconUrl(iconValue(detectIconKey(name)));
   }, [open, tile, initial, iconUrl, name]);
 
+  useEffect(() => {
+    if (provider === "none" || apiUrl.trim()) return;
+    setApiUrl(normalizeServiceUrl(url));
+  }, [provider, apiUrl, url]);
+
   const create = useCreateTile();
   const update = useUpdateTile();
   const del = useDeleteTile();
 
   const handleSave = () => {
-    const data = { name, url, icon_url: iconUrl || null, style, api_url: apiUrl || null, api_key: apiKey || null, provider, sort_order: tile?.sort_order ?? 0 };
+    const data = { name, url, icon_url: iconUrl || null, style, api_url: apiUrl ? normalizeServiceUrl(apiUrl) : null, api_key: apiKey || null, provider, sort_order: tile?.sort_order ?? 0 };
     if (isEdit && tile) update.mutate({ id: tile.id, ...data }, { onSuccess: onClose });
     else create.mutate(data, { onSuccess: onClose });
   };
 
   const handleDelete = () => {
     if (!tile) return;
-    if (!confirmDelete) { setConfirmDelete(true); return; }
     del.mutate(tile.id, { onSuccess: onClose });
   };
 
@@ -141,18 +161,24 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
           </button>
           {isEdit && (
             <button
-              onClick={handleDelete}
-              className={`rounded-lg px-4 py-2 text-[13px] font-medium transition-colors ${
-                confirmDelete
-                  ? "bg-rose-500 text-white"
-                  : "border border-line text-t2 hover:border-rose-400/40 hover:text-rose-400"
-              }`}
+              onClick={() => setDeleteOpen(true)}
+              className="rounded-lg border border-line px-4 py-2 text-[13px] font-medium text-t2 transition-colors hover:border-rose-400/40 hover:text-rose-400"
             >
-              {confirmDelete ? t("common.yes") : t("tile.delete")}
+              {t("tile.delete")}
             </button>
           )}
         </div>
       </div>
+      {tile && (
+        <ConfirmDialog
+          open={deleteOpen}
+          title={t("tile.delete_title")}
+          description={t("tile.delete_description", { name: tile.name })}
+          onCancel={() => setDeleteOpen(false)}
+          onConfirm={handleDelete}
+          isPending={del.isPending}
+        />
+      )}
     </Modal>
   );
 }

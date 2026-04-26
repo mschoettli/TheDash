@@ -13,7 +13,12 @@ export interface TileMetrics {
 }
 
 function normalizeBaseUrl(url: string): string {
-  return url.endsWith("/") ? url.slice(0, -1) : url;
+  const withScheme = /^https?:\/\//i.test(url) ? url : `http://${url}`;
+  const parsed = new URL(withScheme);
+  parsed.pathname = parsed.pathname.replace(/\/web\/?$/i, "");
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString().replace(/\/$/, "");
 }
 
 function parseMediaContainerTotalSize(xml: string): number | null {

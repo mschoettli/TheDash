@@ -40,6 +40,8 @@
     "widget": "Widget",
     "empty_widgets": "Noch keine Widgets konfiguriert.",
     "edit_widget": "Widget bearbeiten",
+    "delete_widget_title": "Widget löschen",
+    "delete_widget_description": "Widget \"{{title}}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
     "widget_type": "Widget-Typ",
     "widget_title": "Widget-Titel",
     "widget_endpoint": "API oder URL",
@@ -76,7 +78,9 @@
     "online": "Online",
     "offline": "Offline",
     "add_title": "App hinzufügen",
-    "edit_title": "App bearbeiten"
+    "edit_title": "App bearbeiten",
+    "delete_title": "App löschen",
+    "delete_description": "App \"{{name}}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
   },
   "link": {
     "open": "Öffnen",
@@ -98,6 +102,8 @@
     "archive": "Archivieren",
     "archive_short": "Archiv",
     "confirm_delete": "Lesezeichen löschen?",
+    "delete_title": "Lesezeichen löschen",
+    "delete_description": "Lesezeichen \"{{name}}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
     "note": "Notiz",
     "section": "Sektion",
     "new_section": "Neue Sektion",
@@ -120,7 +126,9 @@
     "capture_placeholder": "Link einfügen, Vorschau prüfen und speichern...",
     "search": "Lesezeichen suchen...",
     "all_tags": "Alle",
-    "library": "Ressourcenbibliothek"
+    "library": "Ressourcenbibliothek",
+    "delete_section": "Sektion löschen",
+    "delete_section_description": "Sektion \"{{title}}\" und alle enthaltenen Links wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
   },
   "notes": {
     "title": "Notizen",
@@ -133,6 +141,10 @@
     "copy_suffix": "Kopie",
     "confirm_delete_note": "Notiz löschen?",
     "confirm_delete_folder": "Ordner \"{{title}}\" löschen? Notizen werden nach Ohne Ordner verschoben.",
+    "delete_note_title": "Notiz löschen",
+    "delete_note_description": "Notiz \"{{title}}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "delete_folder_title": "Ordner löschen",
+    "delete_folder_description": "Ordner \"{{title}}\" wirklich löschen? Enthaltene Notizen werden nach Ohne Ordner verschoben.",
     "untitled": "Ohne Titel",
     "unfiled": "Ohne Ordner",
     "placeholder": "Markdown hier eingeben...",
@@ -175,6 +187,7 @@
   },
   "common": {
     "save": "Speichern",
+    "delete": "Löschen",
     "cancel": "Abbrechen",
     "done": "Fertig",
     "confirm_delete": "Wirklich löschen?",

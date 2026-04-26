@@ -1,16 +1,14 @@
 services:
   backend:
     container_name: thedash-backend
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: "ghcr.io/${GHCR_OWNER:-mschoettli}/thedash-backend:${THEDASH_IMAGE_TAG:-latest}"
     restart: unless-stopped
     env_file: .env
     environment:
       NODE_ENV: production
       PORT: 3001
       DB_PATH: /data/thedash.db
-      DOCKER_HOST_URL: "${DOCKER_HOST_URL:-}"
+      DOCKER_HOST_URL: "${DOCKER_HOST_URL:-http://dockerproxy:2375}"
     volumes:
       - ./data:/data
     healthcheck:
@@ -28,9 +26,7 @@ services:
 
   frontend:
     container_name: thedash-frontend
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: "ghcr.io/${GHCR_OWNER:-mschoettli}/thedash-frontend:${THEDASH_IMAGE_TAG:-latest}"
     restart: unless-stopped
     ports:
       - "${THEDASH_PORT:-8080}:80"
@@ -58,6 +54,7 @@ services:
       CONTAINERS: 1
       INFO: 1
       PING: 1
+      POST: 1
       VERSION: 1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro

@@ -36,7 +36,7 @@ export default function TileWrapper({ tile }: Props) {
     }
 
     async function fetchMetrics() {
-      if (tile.provider === "none" || !tile.api_url) {
+      if (tile.provider === "none") {
         setApiData(null);
         return;
       }
@@ -70,7 +70,7 @@ export default function TileWrapper({ tile }: Props) {
       abortRef.current?.abort();
       clearInterval(id);
     };
-  }, [tile.id, tile.url, tile.api_url, tile.provider]);
+  }, [tile.id, tile.url, tile.provider]);
 
   const tileProps = { tile, online, apiData };
 
