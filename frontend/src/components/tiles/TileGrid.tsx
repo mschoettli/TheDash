@@ -33,10 +33,10 @@ export default function TileGrid({ editMode = false, tilesOverride, onReorder }:
 
   const gridCols =
     widgetStyle === "compact"
-      ? "grid-cols-1 sm:grid-cols-2"
-      : widgetStyle === "minimal"
+      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+    : widgetStyle === "minimal"
       ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8"
-      : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+      : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
 
   const moveTileBefore = (target: Tile) => {
     if (!dragTileId || dragTileId === target.id || !effectiveTiles) return;

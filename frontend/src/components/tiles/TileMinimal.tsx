@@ -18,9 +18,10 @@ export default function TileMinimal({ tile, online, apiData }: Props) {
   })();
 
   return (
-    <div className="relative flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-[1.15rem] border border-line/45 bg-card/65 p-4 text-center shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-accent/30 hover:bg-card hover:shadow-xl hover:shadow-accent/5">
-      <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-line/50 bg-surface">
-        <FaviconImg url={tile.url} name={tile.name} size={30} explicitIconUrl={tile.icon_url} />
+    <div className="relative flex min-h-[98px] flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-line/45 bg-card/80 p-3 text-center shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-accent/30 hover:bg-card hover:shadow-lg hover:shadow-accent/5">
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-accent/70" />
+      <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-line/50 bg-surface">
+        <FaviconImg url={tile.url} name={tile.name} size={27} explicitIconUrl={tile.icon_url} />
       </span>
       <span className="w-full truncate text-[12px] font-semibold text-t1">{tile.name}</span>
       {tile.show_address && <span className="w-full truncate text-[9px] font-medium text-t3">{hostname}</span>}
