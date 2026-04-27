@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-export type TileStyle = "card" | "compact" | "minimal";
+export type TileStyle = "card" | "compact" | "minimal" | "banner" | "metric";
 export type TileProvider = "none" | "jellyfin" | "plex" | "emby";
 
 export interface Tile {

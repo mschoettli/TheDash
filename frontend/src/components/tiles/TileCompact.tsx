@@ -1,14 +1,14 @@
 import { Tile, TileMetrics } from "../../hooks/useTiles";
 import FaviconImg from "../ui/FaviconImg";
-import StatusDot from "../ui/StatusDot";
+import StatusDot, { OnlineStatus } from "../ui/StatusDot";
 
 interface Props {
   tile: Tile;
-  online: boolean | null;
+  status: OnlineStatus;
   apiData: TileMetrics | null;
 }
 
-export default function TileCompact({ tile, online, apiData }: Props) {
+export default function TileCompact({ tile, status, apiData }: Props) {
   const hostname = (() => {
     try {
       return new URL(tile.url.startsWith("http") ? tile.url : `http://${tile.url}`).hostname;
@@ -18,7 +18,7 @@ export default function TileCompact({ tile, online, apiData }: Props) {
   })();
 
   return (
-    <div className="relative flex min-h-[58px] items-center gap-2.5 overflow-hidden rounded-xl border border-line/60 bg-card px-3 py-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-lg hover:shadow-accent/5">
+    <div className="tile-glass relative flex min-h-[56px] items-center gap-2.5 overflow-hidden rounded-xl border border-line/60 px-3 py-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-lg hover:shadow-accent/5">
       <div className="absolute inset-y-0 left-0 w-0.5 bg-accent/70" />
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/50 bg-surface">
         <FaviconImg url={tile.url} name={tile.name} size={22} explicitIconUrl={tile.icon_url} />
@@ -33,7 +33,7 @@ export default function TileCompact({ tile, online, apiData }: Props) {
             {apiData.activeStreams ?? 0}
           </span>
         )}
-        <StatusDot online={online === true} size="sm" />
+        <StatusDot status={status} size="sm" />
       </span>
     </div>
   );

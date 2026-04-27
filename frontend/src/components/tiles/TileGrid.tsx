@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
 import { Tile, useTiles } from "../../hooks/useTiles";
 import { useSettingsStore } from "../../store/useSettingsStore";
 import TileWrapper from "./TileWrapper";
@@ -13,7 +12,6 @@ interface Props {
 export default function TileGrid({ editMode = false, tilesOverride, onReorder }: Props) {
   const { data: tiles, isLoading } = useTiles();
   const widgetStyle = useSettingsStore((s) => s.widgetStyle);
-  const [dragTileId, setDragTileId] = useState<number | null>(null);
   const effectiveTiles = tilesOverride ?? tiles;
 
   if (isLoading) {
@@ -38,15 +36,9 @@ export default function TileGrid({ editMode = false, tilesOverride, onReorder }:
       ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8"
       : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
 
-  const moveTileBefore = (target: Tile) => {
-    if (!dragTileId || dragTileId === target.id || !effectiveTiles) return;
-    const dragged = effectiveTiles.find((tile) => tile.id === dragTileId);
-    if (!dragged) return;
-    const ordered = effectiveTiles.filter((tile) => tile.id !== dragTileId);
-    const targetIndex = ordered.findIndex((tile) => tile.id === target.id);
-    ordered.splice(targetIndex >= 0 ? targetIndex : ordered.length, 0, dragged);
-    onReorder?.(ordered);
-    setDragTileId(null);
+  const moveTileBefore = (_target: Tile) => {
+    // Legacy HTML5 drag — kept for compatibility but replaced by dnd-kit in DashboardPage
+    void onReorder;
   };
 
   return (
@@ -62,10 +54,6 @@ export default function TileGrid({ editMode = false, tilesOverride, onReorder }:
           <TileWrapper
             tile={tile}
             editMode={editMode}
-            draggable={editMode}
-            onDragStart={() => setDragTileId(tile.id)}
-            onDragOver={(event) => editMode && event.preventDefault()}
-            onDrop={() => moveTileBefore(tile)}
           />
         </motion.div>
       ))}

@@ -28,4 +28,9 @@ export default {
     },
   },
   plugins: [],
+  safelist: [
+    // Baustein 1 – span system (dynamic class names that must survive JIT purge)
+    "col-span-1", "col-span-2", "col-span-3", "col-span-4",
+    "row-span-1", "row-span-2", "row-span-3",
+  ],
 } satisfies Config;

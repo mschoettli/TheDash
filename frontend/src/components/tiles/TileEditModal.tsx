@@ -97,6 +97,8 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
     { value: "card" as const, label: t("settings.style_card") },
     { value: "compact" as const, label: t("settings.style_compact") },
     { value: "minimal" as const, label: t("settings.style_minimal") },
+    { value: "banner" as const, label: "Banner" },
+    { value: "metric" as const, label: "Metric" },
   ];
 
   const providerOptions = [
@@ -124,7 +126,7 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
         <IconPicker value={isRegistryIcon(iconUrl) ? iconUrl : null} name={name} onChange={setIconUrl} />
 
         <Field label={t("tile.style")}>
-          <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-line/60">
+          <div className="grid grid-cols-5 overflow-hidden rounded-lg border border-line/60">
             {styleOptions.map(({ value, label }) => (
               <button
                 key={value}
