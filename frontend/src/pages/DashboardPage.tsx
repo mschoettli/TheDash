@@ -158,13 +158,13 @@ function WidgetContent({ widget }: { widget: WidgetInstance }) {
   const values = metrics?.cards?.length ? metrics.cards : rows[widget.type] ?? [{ label: "Status", value: t("widgets.configured") }];
 
   return (
-    <div className="mt-3 space-y-3">
-      {label && <div className="truncate rounded-lg border border-line/40 bg-card px-2 py-1 text-[11px] text-t3">{label}</div>}
-      <div className="grid grid-cols-2 gap-1.5">
+    <div className="mt-4 space-y-3">
+      {label && <div className="truncate rounded-xl border border-line/45 bg-card px-3 py-1.5 text-[11px] font-medium text-t3">{label}</div>}
+      <div className="grid grid-cols-2 gap-2">
         {values.slice(0, 4).map((item) => (
-          <div key={`${item.label}-${item.value}`} className="rounded-xl border border-line/40 bg-card px-2 py-2">
-            <div className="label-xs mb-1">{item.label}</div>
-            <div className="truncate text-[12px] font-semibold text-t1">{item.value}</div>
+          <div key={`${item.label}-${item.value}`} className="min-h-[64px] rounded-2xl border border-line/45 bg-card px-3 py-2.5">
+            <div className="mb-1 truncate text-[9px] font-semibold uppercase tracking-[0.16em] text-t3">{item.label}</div>
+            <div className="truncate text-[13px] font-semibold tabular-nums text-t1">{item.value}</div>
           </div>
         ))}
       </div>
@@ -501,15 +501,18 @@ export default function DashboardPage() {
                   onDragStart={() => setDragWidgetId(widget.id)}
                   onDragOver={(event) => editMode && event.preventDefault()}
                   onDrop={() => moveWidgetBefore(widget)}
-                  className={`rounded-2xl border bg-surface p-3 shadow-sm transition-all hover:border-accent/35 hover:shadow-lg hover:shadow-accent/5 ${editMode ? "cursor-grab border-accent/20 ring-1 ring-accent/10" : "border-line/60"}`}
+                  className={`relative overflow-hidden rounded-[1.35rem] border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-2xl hover:shadow-accent/10 ${editMode ? "cursor-grab border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-accent/10 to-transparent opacity-60" />
+                  <div className="relative flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={28} />
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-line/55 bg-card">
+                          <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={30} />
+                        </span>
                         <div className="min-w-0">
-                          <div className="truncate text-[13px] font-medium text-t1">{widget.title}</div>
-                          <div className="label-xs mt-0.5">{widget.type}</div>
+                          <div className="truncate text-[14px] font-semibold text-t1">{widget.title}</div>
+                          <div className="label-xs mt-1">{widget.type}</div>
                         </div>
                       </div>
                     </div>

@@ -101,7 +101,7 @@ export default function TileWrapper({ tile, editMode = false, draggable = false,
           e.preventDefault();
           setEditOpen(true);
         }}
-        className={`absolute top-2 right-2 p-1.5 rounded-lg bg-surface/90 border border-line/50 text-t3 hover:text-accent transition-all ${editMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+        className={`absolute bottom-2 right-2 rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 shadow-sm transition-all hover:text-accent ${editMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
         title="Bearbeiten"
       >
         <Pencil size={13} />

@@ -9,19 +9,31 @@ interface Props {
 }
 
 export default function TileCompact({ tile, online, apiData }: Props) {
+  const hostname = (() => {
+    try {
+      return new URL(tile.url.startsWith("http") ? tile.url : `http://${tile.url}`).hostname;
+    } catch {
+      return tile.url;
+    }
+  })();
+
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-line/60 bg-card px-3 py-2.5 shadow-sm transition-all duration-200 hover:border-accent/35 hover:shadow-lg hover:shadow-accent/5">
-      <FaviconImg url={tile.url} name={tile.name} size={22} explicitIconUrl={tile.icon_url} />
-      <span className="flex-1 min-w-0">
-        <span className="block truncate text-[13px] font-medium text-t1">{tile.name}</span>
-        {tile.show_address && <span className="block truncate text-[10px] text-t3">{new URL(tile.url.startsWith("http") ? tile.url : `http://${tile.url}`).hostname}</span>}
+    <div className="flex min-h-[72px] items-center gap-3 rounded-[1.15rem] border border-line/60 bg-card px-3.5 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/5">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line/50 bg-surface">
+        <FaviconImg url={tile.url} name={tile.name} size={25} explicitIconUrl={tile.icon_url} />
       </span>
-      {apiData?.status === "ok" && (
-        <span className="text-[11px] text-t3 whitespace-nowrap tabular-nums">
-          ▶ {apiData.activeStreams ?? 0}
-        </span>
-      )}
-      <StatusDot online={online === true} size="sm" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-semibold leading-5 text-t1">{tile.name}</span>
+        {tile.show_address && <span className="block truncate text-[10px] font-medium text-t3">{hostname}</span>}
+      </span>
+      <span className="flex shrink-0 items-center gap-2">
+        {apiData?.status === "ok" && (
+          <span className="rounded-lg border border-line/45 bg-surface px-2 py-1 text-[11px] font-semibold tabular-nums text-t2">
+            {apiData.activeStreams ?? 0}
+          </span>
+        )}
+        <StatusDot online={online === true} size="sm" />
+      </span>
     </div>
   );
 }
