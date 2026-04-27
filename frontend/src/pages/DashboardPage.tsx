@@ -21,14 +21,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  AlertCircle,
   Boxes,
   Check,
   ChevronDown,
   ChevronRight,
+  Container,
   Eye,
   FolderPlus,
   GripVertical,
-  LayoutDashboard,
   LayoutGrid,
   List,
   Maximize2,
@@ -37,7 +38,6 @@ import {
   Play,
   Plus,
   RefreshCw,
-  Server,
   SlidersHorizontal,
   Trash2,
   X,
@@ -50,7 +50,13 @@ import FaviconImg from "../components/ui/FaviconImg";
 import TileWrapper from "../components/tiles/TileWrapper";
 import TileEditModal from "../components/tiles/TileEditModal";
 import { detectIconKey, iconValue } from "../lib/iconRegistry";
-import { DashboardItem, DashboardSection, useCreateDashboardSection, useDashboard, useReorderDashboard } from "../hooks/useDashboard";
+import {
+  DashboardItem,
+  DashboardSection,
+  useCreateDashboardSection,
+  useDashboard,
+  useReorderDashboard,
+} from "../hooks/useDashboard";
 import { Tile, useTiles } from "../hooks/useTiles";
 import { DiscoveredContainer, useDockerAction, useDockerDiscovery } from "../hooks/useDockerDiscovery";
 import {
@@ -66,8 +72,13 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
-const ACTIVE_WIDGET_TYPES = new Set(["docker", "system", "media", "downloads", "network", "rss", "weather", "calendar", "releases", "stocks"]);
+const input =
+  "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
+
+const ACTIVE_WIDGET_TYPES = new Set([
+  "docker", "system", "media", "downloads", "network",
+  "rss", "weather", "calendar", "releases", "stocks",
+]);
 
 const WIDGET_CONFIG: Record<string, { field?: string; placeholder?: string; required?: boolean }> = {
   docker: {}, system: {},
@@ -81,7 +92,7 @@ const WIDGET_CONFIG: Record<string, { field?: string; placeholder?: string; requ
   stocks: { field: "Symbol", placeholder: "AAPL", required: true },
 };
 
-// Baustein 1 – span system
+// Span system
 const SPAN_PRESETS = [
   { label: "1×1", col: 1, row: 1 },
   { label: "2×1", col: 2, row: 1 },
@@ -102,7 +113,7 @@ function rowSpanClass(n: number) {
   return "row-span-1";
 }
 
-// Baustein 4 – section colors palette
+// Section accent colors
 const SECTION_COLORS: { label: string; value: string | null; dot: string }[] = [
   { label: "Default", value: null, dot: "bg-accent" },
   { label: "Violet", value: "139 92 246", dot: "bg-violet-400" },
@@ -156,7 +167,8 @@ function WidgetContent({ widget }: { widget: WidgetInstance }) {
   const needsSetup = requiresEndpoint(widget.type) && !endpoint;
   const { data: metrics, isLoading } = useWidgetMetrics(
     widget.id,
-    !needsSetup && ["docker", "system", "rss", "weather", "media", "downloads", "network", "calendar", "releases", "stocks"].includes(widget.type)
+    !needsSetup &&
+      ["docker", "system", "rss", "weather", "media", "downloads", "network", "calendar", "releases", "stocks"].includes(widget.type)
   );
   const notes = String(widget.config.notes ?? "").trim();
   const label = widgetEndpointLabel(widget);
@@ -166,13 +178,11 @@ function WidgetContent({ widget }: { widget: WidgetInstance }) {
       {t("widgets.setup_required")}
     </div>
   );
-
   if (metrics?.status === "error") return (
     <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[12px] font-medium text-rose-500">
       {metrics.error ?? t("widgets.unavailable")}
     </div>
   );
-
   if (isLoading && !metrics) return (
     <div className="mt-4 rounded-xl border border-line/40 bg-card px-3 py-2 text-[12px] text-t3">{t("widgets.loading")}</div>
   );
@@ -230,39 +240,32 @@ function WidgetTile({ widget, editMode, onEdit, onDelete }: {
   );
 }
 
-// ─── Baustein 3: Drag Preview ──────────────────────────────────────────────────
+// ─── Drag Preview ──────────────────────────────────────────────────────────────
 
 function DragPreviewTile({ tile, widget, section }: {
   tile?: Tile; widget?: WidgetInstance; section?: DashboardSection;
 }) {
-  if (section) {
-    return (
-      <div className="glass-panel flex items-center gap-3 rounded-xl border border-accent/50 px-4 py-3 shadow-2xl shadow-accent/20">
-        <LayoutDashboard size={15} className="text-accent" />
-        <span className="text-[13px] font-semibold text-t1">{section.title}</span>
-      </div>
-    );
-  }
-  if (tile) {
-    return (
-      <div className="tile-glass flex items-center gap-3 rounded-xl border border-accent/50 px-3 py-2.5 shadow-2xl shadow-accent/20">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/55 bg-surface">
-          <FaviconImg url={tile.url} name={tile.name} size={22} explicitIconUrl={tile.icon_url} />
-        </span>
-        <span className="text-[13px] font-semibold text-t1">{tile.name}</span>
-      </div>
-    );
-  }
-  if (widget) {
-    return (
-      <div className="glass-panel flex items-center gap-3 rounded-xl border border-accent/50 px-3 py-2.5 shadow-2xl shadow-accent/20">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/55 bg-surface">
-          <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={22} />
-        </span>
-        <span className="text-[13px] font-semibold text-t1">{widget.title}</span>
-      </div>
-    );
-  }
+  if (section) return (
+    <div className="glass-panel flex items-center gap-3 rounded-xl border border-accent/50 px-4 py-3 shadow-2xl shadow-accent/20">
+      <span className="text-[11px] font-bold uppercase tracking-wider text-accent">{section.title}</span>
+    </div>
+  );
+  if (tile) return (
+    <div className="tile-glass flex items-center gap-3 rounded-xl border border-accent/50 px-3 py-2.5 shadow-2xl shadow-accent/20">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/55 bg-surface">
+        <FaviconImg url={tile.url} name={tile.name} size={22} explicitIconUrl={tile.icon_url} />
+      </span>
+      <span className="text-[13px] font-semibold text-t1">{tile.name}</span>
+    </div>
+  );
+  if (widget) return (
+    <div className="glass-panel flex items-center gap-3 rounded-xl border border-accent/50 px-3 py-2.5 shadow-2xl shadow-accent/20">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/55 bg-surface">
+        <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={22} />
+      </span>
+      <span className="text-[13px] font-semibold text-t1">{widget.title}</span>
+    </div>
+  );
   return null;
 }
 
@@ -285,7 +288,6 @@ function SortableDashboardItem({
     data: { type: "item", sectionId: item.section_id },
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
-
   const spanCol = Number(item.layout?.spanCol ?? 1);
   const spanRow = Number(item.layout?.spanRow ?? 1);
 
@@ -298,7 +300,7 @@ function SortableDashboardItem({
       style={style}
       className={`relative ${colSpanClass(spanCol)} ${rowSpanClass(spanRow)} ${isDragging ? "opacity-40" : ""}`}
     >
-      {/* Baustein 1: Span picker overlay */}
+      {/* Span picker */}
       {editMode && (
         <div className="absolute bottom-2 left-10 z-20 flex gap-0.5 rounded-lg border border-line/50 bg-surface/95 p-1 shadow-sm backdrop-blur-sm">
           {SPAN_PRESETS.map(({ label, col, row }) => (
@@ -306,9 +308,7 @@ function SortableDashboardItem({
               key={label}
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSpanChange(item.id, col, row); }}
               className={`rounded px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
-                spanCol === col && spanRow === row
-                  ? "bg-accent text-bg"
-                  : "text-t3 hover:bg-line/40 hover:text-t1"
+                spanCol === col && spanRow === row ? "bg-accent text-bg" : "text-t3 hover:bg-line/40 hover:text-t1"
               }`}
             >
               {label}
@@ -316,38 +316,34 @@ function SortableDashboardItem({
           ))}
         </div>
       )}
-
       {/* Drag handle */}
       {editMode && (
         <button
           className="absolute left-2 top-2 z-20 rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 shadow-sm hover:text-accent"
           {...attributes} {...listeners}
-          aria-label="Drag item"
+          aria-label="Drag"
         >
           <GripVertical size={13} />
         </button>
       )}
-
       {item.item_type === "tile" && tile ? (
         <TileWrapper tile={tile} editMode={editMode} />
       ) : widget ? (
-        <WidgetTile
-          widget={widget} editMode={editMode}
-          onEdit={() => onEditWidget(widget)}
-          onDelete={() => onDeleteWidget(widget)}
-        />
+        <WidgetTile widget={widget} editMode={editMode} onEdit={() => onEditWidget(widget)} onDelete={() => onDeleteWidget(widget)} />
       ) : null}
     </div>
   );
 }
 
 // ─── Sortable Section ──────────────────────────────────────────────────────────
+// Visually transparent — no background box. Tiles float directly on the page.
 
 function SortableSection({
   section, tilesById, widgetsById, editMode,
   isCollapsed, onToggleCollapse,
   onEditWidget, onDeleteWidget, onSpanChange,
   onUpdateLayout, onRename, onDelete,
+  isLast,
 }: {
   section: DashboardSection;
   tilesById: Map<number, Tile>;
@@ -361,6 +357,7 @@ function SortableSection({
   onUpdateLayout: (patch: Record<string, unknown>) => void;
   onRename: (title: string) => void;
   onDelete: () => void;
+  isLast: boolean;
 }) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -385,22 +382,24 @@ function SortableSection({
     <section
       ref={setNodeRef}
       style={{ ...style, ...accentStyle }}
-      className={`glass-panel rounded-2xl border p-4 transition-colors ${
-        isDragging ? "opacity-50" : ""
-      } ${isOver ? "border-accent/60 bg-accent/5" : "border-line/60"}`}
+      className={`${isDragging ? "opacity-50" : ""}`}
     >
-      {/* Section header */}
-      <div className="mb-3 flex items-center gap-2">
+      {/* Minimal section header — just a label row */}
+      <div className="mb-3 flex items-center gap-2 px-1">
         {editMode && (
-          <button className="shrink-0 rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 hover:text-accent" {...attributes} {...listeners} aria-label="Drag section">
+          <button
+            className="shrink-0 rounded-md p-1 text-t3 hover:text-accent transition-colors"
+            {...attributes} {...listeners}
+            aria-label="Drag section"
+          >
             <GripVertical size={13} />
           </button>
         )}
 
-        {/* Color accent stripe */}
-        {color && <div className="h-4 w-1 shrink-0 rounded-full bg-accent/80" />}
+        {/* Color accent pip */}
+        {color && <div className="h-3 w-1.5 shrink-0 rounded-full bg-accent/80" />}
 
-        {/* Title – editable in edit mode */}
+        {/* Title */}
         {editMode ? (
           <input
             className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold uppercase tracking-wider text-t2 outline-none border-b border-transparent focus:border-accent/50 transition-colors"
@@ -410,21 +409,26 @@ function SortableSection({
             onKeyDown={(e) => e.key === "Enter" && onRename(localTitle)}
           />
         ) : (
-          <div className="label-xs min-w-0 flex-1 truncate">{section.title}</div>
+          <button
+            onClick={onToggleCollapse}
+            className="label-xs flex items-center gap-1.5 min-w-0 truncate text-left hover:text-t1 transition-colors"
+          >
+            {section.title}
+            <span className="text-t3">{isCollapsed ? <ChevronRight size={11} /> : <ChevronDown size={11} />}</span>
+          </button>
         )}
 
-        {/* Item count */}
         <span className="shrink-0 text-[11px] text-t3">{section.items.length}</span>
 
-        {/* Edit mode controls */}
+        {/* Edit-mode section controls */}
         {editMode && (
-          <div className="flex shrink-0 items-center gap-1 ml-1">
-            {/* Layout mode toggle */}
+          <div className="flex shrink-0 items-center gap-1">
+            {/* Layout mode */}
             <div className="flex overflow-hidden rounded-lg border border-line/50">
               {([
-                { mode: "grid" as LayoutMode, icon: <LayoutGrid size={11} /> },
-                { mode: "list" as LayoutMode, icon: <List size={11} /> },
-                { mode: "wide" as LayoutMode, icon: <Maximize2 size={11} /> },
+                { mode: "grid" as LayoutMode, icon: <LayoutGrid size={10} /> },
+                { mode: "list" as LayoutMode, icon: <List size={10} /> },
+                { mode: "wide" as LayoutMode, icon: <Maximize2 size={10} /> },
               ] as const).map(({ mode, icon }) => (
                 <button
                   key={mode}
@@ -437,11 +441,11 @@ function SortableSection({
               ))}
             </div>
 
-            {/* Color picker toggle */}
+            {/* Color picker */}
             <div className="relative">
               <button
                 onClick={() => setShowColorPicker((v) => !v)}
-                className="rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 hover:text-t1"
+                className="rounded-lg border border-line/50 p-1.5 text-t3 hover:text-t1 transition-colors"
               >
                 <span className="block h-3 w-3 rounded-full bg-accent/80" />
               </button>
@@ -459,26 +463,26 @@ function SortableSection({
               )}
             </div>
 
-            {/* Delete section */}
-            <button onClick={onDelete} className="rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 hover:text-rose-500">
+            {/* Collapse toggle */}
+            <button onClick={onToggleCollapse} className="rounded-md p-1 text-t3 hover:text-t1 transition-colors">
+              {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+            </button>
+
+            {/* Delete */}
+            <button onClick={onDelete} className="rounded-md p-1 text-t3 hover:text-rose-500 transition-colors">
               <Trash2 size={13} />
             </button>
           </div>
         )}
-
-        {/* Collapse toggle */}
-        <button onClick={onToggleCollapse} className="shrink-0 rounded-lg p-1 text-t3 hover:text-t1 transition-colors">
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-        </button>
       </div>
 
-      {/* Section body */}
+      {/* Items grid — NO background, NO border box. Items float on the page. */}
       {!isCollapsed && (
         <SortableContext items={section.items.map((item) => sortableItemId(item.id))} strategy={rectSortingStrategy}>
           <div
             ref={setDropRef}
-            className={`grid min-h-[120px] gap-3 rounded-xl border border-dashed p-1 transition-colors ${gridClassForMode(layoutMode)} ${
-              isOver ? "border-accent/60 bg-accent/5" : "border-line/30"
+            className={`grid min-h-[80px] gap-3 rounded-2xl transition-all duration-150 ${gridClassForMode(layoutMode)} ${
+              isOver ? "bg-accent/5 ring-1 ring-inset ring-accent/25" : ""
             }`}
           >
             {section.items.map((item) => (
@@ -494,13 +498,16 @@ function SortableSection({
               />
             ))}
             {!section.items.length && (
-              <div className="col-span-full flex min-h-[90px] items-center justify-center rounded-xl text-[13px] text-t3">
+              <div className="col-span-full flex min-h-[80px] items-center justify-center rounded-xl text-[13px] text-t3">
                 {editMode ? t("dashboard.drop_here") : t("dashboard.empty_section")}
               </div>
             )}
           </div>
         </SortableContext>
       )}
+
+      {/* Thin separator between sections (not after the last one) */}
+      {!isLast && <div className="mt-6 mb-2 border-t border-line/20" />}
     </section>
   );
 }
@@ -526,7 +533,9 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
   const [apiKey, setApiKey] = useState(String(widget?.config?.apiKey ?? ""));
   const [notes, setNotes] = useState(String(widget?.config?.notes ?? ""));
   const [showAddress, setShowAddress] = useState(Boolean(widget?.config?.showAddress ?? true));
+  const [saveError, setSaveError] = useState<string | null>(null);
   const config = WIDGET_CONFIG[type] ?? {};
+  const isSaving = createWidget.isPending || updateWidget.isPending;
 
   useEffect(() => {
     if (!open) return;
@@ -542,6 +551,7 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
     setApiKey("");
     setNotes(String(widget?.config?.notes ?? ""));
     setShowAddress(Boolean(widget?.config?.showAddress ?? true));
+    setSaveError(null);
   }, [open, widget, catalog, selected]);
 
   useEffect(() => {
@@ -551,6 +561,7 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
 
   const save = () => {
     if (!title.trim() || !type || (config.required && !endpoint.trim())) return;
+    setSaveError(null);
     const payload = {
       type, title: title.trim(),
       config: { endpoint: endpoint.trim(), provider, client, username: username.trim(), password: password.trim(), apiKey: apiKey.trim(), notes: notes.trim(), icon, showAddress },
@@ -559,8 +570,20 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
       sort_order: widget?.sort_order ?? 0,
       is_enabled: true,
     };
-    if (widget) updateWidget.mutate({ id: widget.id, ...payload }, { onSuccess: onClose });
-    else createWidget.mutate(payload, { onSuccess: onClose });
+    if (widget) {
+      updateWidget.mutate(
+        { id: widget.id, ...payload },
+        {
+          onSuccess: onClose,
+          onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Speichern"),
+        }
+      );
+    } else {
+      createWidget.mutate(payload, {
+        onSuccess: onClose,
+        onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Erstellen"),
+      });
+    }
   };
 
   return (
@@ -630,43 +653,95 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
           <div className="label-xs mb-1.5">{t("dashboard.widget_notes")}</div>
           <textarea className={`${input} resize-none`} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
-        <button onClick={save} disabled={!title.trim() || (config.required && !endpoint.trim())} className="w-full rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
-          {t("common.save")}
+
+        {saveError && (
+          <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500">
+            <AlertCircle size={13} className="shrink-0" />
+            {saveError}
+          </div>
+        )}
+
+        <button onClick={save} disabled={!title.trim() || (config.required && !endpoint.trim()) || isSaving} className="w-full rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
+          {isSaving ? "Speichern..." : t("common.save")}
         </button>
       </div>
     </Modal>
   );
 }
 
-// ─── Container Row ─────────────────────────────────────────────────────────────
+// ─── Docker Modal ──────────────────────────────────────────────────────────────
 
-function ContainerRow({ container, onAdopt, onAction }: {
-  container: DiscoveredContainer;
+function DockerModal({ open, onClose, containers, suggestions, onAdopt, onAction }: {
+  open: boolean;
+  onClose: () => void;
+  containers: DiscoveredContainer[];
+  suggestions: DiscoveredContainer[];
   onAdopt: (c: DiscoveredContainer) => void;
   onAction: (c: DiscoveredContainer, a: "start" | "stop" | "restart") => void;
 }) {
   const { t } = useTranslation();
-  const isRunning = container.state === "running";
+  const labeled = suggestions.filter((c) => c.app.is_labeled);
+  const discovered = suggestions.filter((c) => !c.app.is_labeled);
+
   return (
-    <div className="glass-panel flex items-center gap-3 rounded-xl border border-line/50 px-3 py-2.5 transition-all hover:border-accent/30">
-      <span className={`h-2 w-2 shrink-0 rounded-full ${isRunning ? "bg-emerald-400" : "bg-t3"}`} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <div className="truncate text-[13px] font-semibold text-t1">{container.app.name}</div>
-          <span className="rounded-full border border-line/50 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-t3">{container.app.confidence}</span>
+    <Modal open={open} onClose={onClose} title="Docker" maxWidth="max-w-2xl">
+      <div className="space-y-4">
+        {/* Running containers */}
+        <div>
+          <div className="label-xs mb-2 flex items-center gap-1.5">
+            <Container size={10} /> {t("dashboard.docker")} ({containers.length})
+          </div>
+          <div className="space-y-1.5">
+            {containers.slice(0, 12).map((c) => {
+              const isRunning = c.state === "running";
+              return (
+                <div key={c.id} className="glass-panel flex items-center gap-3 rounded-xl border border-line/50 px-3 py-2.5">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${isRunning ? "bg-emerald-400" : "bg-t3"}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px] font-semibold text-t1">{c.app.name}</div>
+                    <div className="truncate text-[11px] text-t3">{c.status}{c.ports.length ? ` · ${c.ports.join(", ")}` : ""}</div>
+                  </div>
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={() => onAction(c, "start")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-emerald-500"><Play size={12} /></button>
+                    <button onClick={() => onAction(c, "stop")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-amber-500"><Pause size={12} /></button>
+                    <button onClick={() => onAction(c, "restart")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-accent"><RefreshCw size={12} /></button>
+                  </div>
+                </div>
+              );
+            })}
+            {!containers.length && <div className="text-[13px] text-t3">{t("dashboard.no_containers")}</div>}
+          </div>
         </div>
-        <div className="truncate text-[11px] text-t3">{container.app.href ?? container.image}</div>
-        <div className="mt-0.5 truncate text-[10px] text-t3">{container.status}{container.ports.length ? ` · ${container.ports.join(", ")}` : ""}</div>
+
+        {/* Discovered / Labeled */}
+        {suggestions.length > 0 && (
+          <div className="border-t border-line/30 pt-4">
+            <div className="label-xs mb-2 flex items-center gap-1.5"><Eye size={10} /> {t("dashboard.discovered_apps")} ({suggestions.length})</div>
+            <div className="space-y-1.5">
+              {[...labeled, ...discovered].map((c) => (
+                <div key={c.id} className="glass-panel flex items-center gap-3 rounded-xl border border-line/50 px-3 py-2.5">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${c.state === "running" ? "bg-emerald-400" : "bg-t3"}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <div className="truncate text-[13px] font-semibold text-t1">{c.app.name}</div>
+                      {c.app.is_labeled && <span className="rounded-full border border-accent/30 bg-accent/10 px-1.5 text-[9px] font-semibold text-accent">label</span>}
+                    </div>
+                    <div className="truncate text-[11px] text-t3">{c.app.href ?? c.image}</div>
+                  </div>
+                  <button
+                    onClick={() => { onAdopt(c); onClose(); }}
+                    disabled={!c.app.href}
+                    className="rounded-lg border border-line px-2 py-1 text-[12px] text-t2 hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Plus size={11} className="inline" /> App
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-      <button onClick={() => onAdopt(container)} disabled={!container.app.href} className="rounded-lg border border-line px-2 py-1 text-[12px] text-t2 hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
-        <Plus size={12} className="inline" /> {t("dashboard.app")}
-      </button>
-      <div className="flex items-center gap-0.5">
-        <button onClick={() => onAction(container, "start")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-emerald-500"><Play size={13} /></button>
-        <button onClick={() => onAction(container, "stop")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-amber-500"><Pause size={13} /></button>
-        <button onClick={() => onAction(container, "restart")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-accent"><RefreshCw size={13} /></button>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -700,7 +775,7 @@ function AddSectionModal({ open, onClose, onCreate }: {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            placeholder="z.B. Medien, Netzwerk, ..."
+            placeholder="z.B. Medien, Netzwerk, Smart Home..."
           />
         </div>
         <button onClick={submit} disabled={!title.trim()} className="w-full rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
@@ -718,14 +793,15 @@ export default function DashboardPage() {
   const [editMode, setEditMode] = useState(false);
   const [appModalOpen, setAppModalOpen] = useState(false);
   const [draftApp, setDraftApp] = useState<Partial<Tile> | null>(null);
+  const [defaultSectionId, setDefaultSectionId] = useState<number | null>(null);
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
   const [deleteWidgetTarget, setDeleteWidgetTarget] = useState<WidgetInstance | null>(null);
   const [dockerActionTarget, setDockerActionTarget] = useState<{ container: DiscoveredContainer; action: "start" | "stop" | "restart" } | null>(null);
+  const [dockerModalOpen, setDockerModalOpen] = useState(false);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [sectionsDraft, setSectionsDraft] = useState<DashboardSection[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  // Baustein 4: local collapse state (not persisted to DB)
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
 
   const { data: dashboard } = useDashboard();
@@ -752,12 +828,12 @@ export default function DashboardPage() {
   const suggestions = containers.filter(
     (c) => !tiles.some((t) => t.url === c.app.href || t.name === c.app.name)
   );
-  const labeledContainers = suggestions.filter((c) => c.app.is_labeled);
-  const discoveredContainers = suggestions.filter((c) => !c.app.is_labeled);
 
-  // ─ Edit mode helpers ────────────────────────────────────────────────────────
-
-  const openAppModal = (initial?: Partial<Tile>) => { setDraftApp(initial ?? null); setAppModalOpen(true); };
+  const openAppModal = (initial?: Partial<Tile>, sectionId?: number | null) => {
+    setDraftApp(initial ?? null);
+    setDefaultSectionId(sectionId ?? sections[0]?.id ?? null);
+    setAppModalOpen(true);
+  };
 
   const enterEditMode = () => {
     setSectionsDraft(JSON.parse(JSON.stringify(dashboard?.sections ?? [])));
@@ -771,40 +847,27 @@ export default function DashboardPage() {
     reorderDashboard.mutate({
       sections: draft.map((s, i) => ({ id: s.id, sort_order: i })),
       items: draft.flatMap((s) =>
-        s.items.map((item, i) => ({
-          id: item.id, section_id: s.id, sort_order: i, layout: item.layout,
-        }))
+        s.items.map((item, i) => ({ id: item.id, section_id: s.id, sort_order: i, layout: item.layout }))
       ),
     });
     setSectionsDraft(null);
     setEditMode(false);
   };
 
-  // Baustein 1: span change
   const updateItemLayout = (itemId: number, patch: Record<string, unknown>) => {
     setSectionsDraft((prev) =>
-      prev?.map((s) => ({
-        ...s,
-        items: s.items.map((it) =>
-          it.id === itemId ? { ...it, layout: { ...it.layout, ...patch } } : it
-        ),
-      })) ?? null
+      prev?.map((s) => ({ ...s, items: s.items.map((it) => it.id === itemId ? { ...it, layout: { ...it.layout, ...patch } } : it) })) ?? null
     );
   };
 
-  // Baustein 4: section layout / color
   const updateSectionLayout = (sectionId: number, patch: Record<string, unknown>) => {
     setSectionsDraft((prev) =>
-      prev?.map((s) =>
-        s.id === sectionId ? { ...s, layout: { ...s.layout, ...patch } } : s
-      ) ?? null
+      prev?.map((s) => s.id === sectionId ? { ...s, layout: { ...s.layout, ...patch } } : s) ?? null
     );
   };
 
   const renameSectionInDraft = (sectionId: number, title: string) => {
-    setSectionsDraft((prev) =>
-      prev?.map((s) => s.id === sectionId ? { ...s, title } : s) ?? null
-    );
+    setSectionsDraft((prev) => prev?.map((s) => s.id === sectionId ? { ...s, title } : s) ?? null);
   };
 
   const deleteSectionFromDraft = (sectionId: number) => {
@@ -817,10 +880,6 @@ export default function DashboardPage() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-  };
-
-  const handleAddSection = (title: string) => {
-    createSection.mutate({ title, icon: iconValue("dashboard") });
   };
 
   const adoptContainer = (container: DiscoveredContainer) => {
@@ -879,45 +938,64 @@ export default function DashboardPage() {
       const cur = [...sections];
       const oi = cur.findIndex((s) => s.id === numericId(ak));
       const ni = cur.findIndex((s) => s.id === numericId(ok));
-      if (oi >= 0 && ni >= 0) {
-        setSectionsDraft(arrayMove(cur, oi, ni).map((s, i) => ({ ...s, sort_order: i })));
-      }
+      if (oi >= 0 && ni >= 0) setSectionsDraft(arrayMove(cur, oi, ni).map((s, i) => ({ ...s, sort_order: i })));
       return;
     }
     if (ak.startsWith("item:")) moveItem(numericId(ak), ok);
   };
 
-  // Active drag preview data
-  const activeSection = activeId?.startsWith("section:")
-    ? sections.find((s) => s.id === numericId(activeId))
-    : undefined;
-  const activeItem = activeId?.startsWith("item:")
-    ? sections.flatMap((s) => s.items).find((it) => it.id === numericId(activeId))
-    : undefined;
+  const activeSection = activeId?.startsWith("section:") ? sections.find((s) => s.id === numericId(activeId)) : undefined;
+  const activeItem = activeId?.startsWith("item:") ? sections.flatMap((s) => s.items).find((it) => it.id === numericId(activeId)) : undefined;
   const activeTile = activeItem?.item_type === "tile" ? tilesById.get(activeItem.item_id) : undefined;
   const activeWidget = activeItem?.item_type === "widget" ? widgetsById.get(activeItem.item_id) : undefined;
+
+  const hasDocker = discovery?.status !== "disabled";
+  const totalContainers = containers.length;
 
   // ─ Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-5 text-t1">
-      {/* Page title + non-edit controls */}
+      {/* Page header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="label-xs mb-1">{t("dashboard.overview")}</div>
           <h1 className="text-xl font-semibold text-t1">{t("dashboard.title")}</h1>
         </div>
-        {!editMode && (
-          <button onClick={enterEditMode} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40">
-            <SlidersHorizontal size={14} /> {t("dashboard.edit")}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Docker indicator button */}
+          {hasDocker && (
+            <button
+              onClick={() => setDockerModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
+            >
+              <Container size={13} />
+              <span className="hidden sm:inline">Docker</span>
+              {totalContainers > 0 && (
+                <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
+                  {totalContainers}
+                </span>
+              )}
+              {suggestions.length > 0 && (
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title={`${suggestions.length} suggested`} />
+              )}
+            </button>
+          )}
+          {!editMode && (
+            <button
+              onClick={enterEditMode}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
+            >
+              <SlidersHorizontal size={14} /> {t("dashboard.edit")}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Baustein 6: Edit-Mode Toolbar */}
+      {/* Edit-Mode Toolbar — sticky below the header */}
       {editMode && (
         <div className="sticky top-0 z-40 -mx-6 flex flex-wrap items-center gap-2 border-b border-line/40 bg-bg/90 px-6 py-2.5 backdrop-blur-md">
-          <span className="label-xs mr-1 text-accent">EDIT MODE</span>
+          <span className="label-xs text-accent mr-1">EDIT MODE</span>
           <button
             onClick={() => openAppModal()}
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg hover:opacity-90 transition-opacity"
@@ -926,129 +1004,95 @@ export default function DashboardPage() {
           </button>
           <button
             onClick={() => { setEditingWidget(null); setWidgetModalOpen(true); }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 hover:border-accent/40"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
           >
             <Boxes size={13} /> Widget
           </button>
           <button
             onClick={() => setAddSectionOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 hover:border-accent/40"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
           >
             <FolderPlus size={13} /> Sektion
           </button>
           <div className="flex-1" />
           <button
             onClick={saveEditMode}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-[13px] font-semibold text-emerald-500 hover:bg-emerald-500/20"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-[13px] font-semibold text-emerald-500 hover:bg-emerald-500/20 transition-colors"
           >
             <Check size={13} /> Fertig
           </button>
           <button
             onClick={cancelEditMode}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 transition-colors"
           >
             <X size={13} /> Abbrechen
           </button>
         </div>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={(e) => setActiveId(String(e.active.id))}
-          onDragEnd={handleDragEnd}
-          onDragCancel={() => setActiveId(null)}
-        >
-          <div className="space-y-4">
-            <SortableContext items={sections.map((s) => sortableSectionId(s.id))} strategy={verticalListSortingStrategy}>
-              {sections.map((section) => (
-                <SortableSection
-                  key={section.id}
-                  section={section}
-                  tilesById={tilesById}
-                  widgetsById={widgetsById}
-                  editMode={editMode}
-                  isCollapsed={collapsedSections.has(section.id)}
-                  onToggleCollapse={() => toggleCollapse(section.id)}
-                  onEditWidget={(w) => { setEditingWidget(w); setWidgetModalOpen(true); }}
-                  onDeleteWidget={setDeleteWidgetTarget}
-                  onSpanChange={(itemId, col, row) => updateItemLayout(itemId, { spanCol: col, spanRow: row })}
-                  onUpdateLayout={(patch) => updateSectionLayout(section.id, patch)}
-                  onRename={(title) => renameSectionInDraft(section.id, title)}
-                  onDelete={() => deleteSectionFromDraft(section.id)}
-                />
-              ))}
-            </SortableContext>
-            {!sections.length && (
-              <div className="glass-panel rounded-xl border border-dashed border-line py-10 text-center text-[13px] text-t3">
-                {t("dashboard.empty_workspace")}
-              </div>
-            )}
+      {/* Full-width seamless grid — no sidebar split */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={(e) => setActiveId(String(e.active.id))}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => setActiveId(null)}
+      >
+        <SortableContext items={sections.map((s) => sortableSectionId(s.id))} strategy={verticalListSortingStrategy}>
+          {sections.map((section, index) => (
+            <SortableSection
+              key={section.id}
+              section={section}
+              tilesById={tilesById}
+              widgetsById={widgetsById}
+              editMode={editMode}
+              isCollapsed={collapsedSections.has(section.id)}
+              onToggleCollapse={() => toggleCollapse(section.id)}
+              onEditWidget={(w) => { setEditingWidget(w); setWidgetModalOpen(true); }}
+              onDeleteWidget={setDeleteWidgetTarget}
+              onSpanChange={(itemId, col, row) => updateItemLayout(itemId, { spanCol: col, spanRow: row })}
+              onUpdateLayout={(patch) => updateSectionLayout(section.id, patch)}
+              onRename={(title) => renameSectionInDraft(section.id, title)}
+              onDelete={() => deleteSectionFromDraft(section.id)}
+              isLast={index === sections.length - 1}
+            />
+          ))}
+        </SortableContext>
+
+        {!sections.length && (
+          <div className="rounded-2xl border border-dashed border-line/40 py-16 text-center text-[13px] text-t3">
+            {editMode
+              ? "Klicke auf + Sektion um zu beginnen"
+              : t("dashboard.empty_workspace")}
           </div>
+        )}
 
-          {/* Baustein 3: DragOverlay with tile preview */}
-          <DragOverlay dropAnimation={{ duration: 150, easing: "ease-out" }}>
-            {(activeSection || activeTile || activeWidget) && (
-              <div className="cursor-grabbing rotate-1 scale-[1.03]">
-                <DragPreviewTile
-                  section={activeSection}
-                  tile={activeTile}
-                  widget={activeWidget}
-                />
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
-
-        {/* Docker sidebar */}
-        <aside className="space-y-4">
-          <section className="glass-panel rounded-xl border border-line/60 p-4">
-            <div className="label-xs mb-3 flex items-center gap-1.5"><Server size={11} /> {t("dashboard.docker")}</div>
-            {discovery?.status === "disabled" ? (
-              <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-[12px] text-amber-700 dark:text-amber-300">
-                {t("dashboard.docker_disabled")}
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {containers.slice(0, 8).map((c) => (
-                  <ContainerRow key={c.id} container={c} onAdopt={adoptContainer} onAction={(item, action) => setDockerActionTarget({ container: item, action })} />
-                ))}
-                {!containers.length && <div className="text-[13px] text-t3">{t("dashboard.no_containers")}</div>}
-              </div>
-            )}
-          </section>
-        </aside>
-      </div>
-
-      {/* Discovered apps */}
-      {suggestions.length > 0 && (
-        <section className="glass-panel rounded-xl border border-line/60 p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="label-xs flex items-center gap-1.5"><Eye size={11} /> {t("dashboard.discovered_apps")}</div>
-            <span className="text-[11px] text-t3">{suggestions.length}</span>
-          </div>
-          {labeledContainers.length > 0 && (
-            <div className="mb-4">
-              <div className="label-xs mb-2">{t("dashboard.labeled_containers")}</div>
-              <div className="grid gap-2 lg:grid-cols-2">
-                {labeledContainers.map((c) => <ContainerRow key={c.id} container={c} onAdopt={adoptContainer} onAction={(item, action) => setDockerActionTarget({ container: item, action })} />)}
-              </div>
+        <DragOverlay dropAnimation={{ duration: 150, easing: "ease-out" }}>
+          {(activeSection || activeTile || activeWidget) && (
+            <div className="cursor-grabbing rotate-1 scale-[1.03]">
+              <DragPreviewTile section={activeSection} tile={activeTile} widget={activeWidget} />
             </div>
           )}
-          <div>
-            <div className="label-xs mb-2">{t("dashboard.suggested_containers")}</div>
-            <div className="grid gap-2 lg:grid-cols-2">
-              {discoveredContainers.map((c) => <ContainerRow key={c.id} container={c} onAdopt={adoptContainer} onAction={(item, action) => setDockerActionTarget({ container: item, action })} />)}
-            </div>
-          </div>
-        </section>
-      )}
+        </DragOverlay>
+      </DndContext>
 
       {/* Modals */}
-      <TileEditModal open={appModalOpen} onClose={() => setAppModalOpen(false)} initial={draftApp ?? undefined} />
+      <TileEditModal
+        open={appModalOpen}
+        onClose={() => setAppModalOpen(false)}
+        initial={draftApp ?? undefined}
+        defaultSectionId={defaultSectionId}
+      />
       <WidgetEditModal open={widgetModalOpen} onClose={() => setWidgetModalOpen(false)} widget={editingWidget} catalog={activeCatalog} />
-      <AddSectionModal open={addSectionOpen} onClose={() => setAddSectionOpen(false)} onCreate={handleAddSection} />
+      <AddSectionModal open={addSectionOpen} onClose={() => setAddSectionOpen(false)} onCreate={(title) => createSection.mutate({ title, icon: iconValue("dashboard") })} />
+      <DockerModal
+        open={dockerModalOpen}
+        onClose={() => setDockerModalOpen(false)}
+        containers={containers}
+        suggestions={suggestions}
+        onAdopt={adoptContainer}
+        onAction={(c, a) => setDockerActionTarget({ container: c, action: a })}
+      />
 
       <ConfirmDialog
         open={Boolean(deleteWidgetTarget)}

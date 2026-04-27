@@ -37,6 +37,19 @@ export function useDashboard() {
   });
 }
 
+export function useCreateDashboardItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { section_id: number; item_type: "tile" | "widget"; item_id: number; sort_order: number; layout?: Record<string, unknown> }) =>
+      fetchJson<DashboardItem>("/api/dashboard/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
+}
+
 export function useCreateDashboardSection() {
   const qc = useQueryClient();
   return useMutation({

@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { AlertCircle } from "lucide-react";
 import Modal from "../ui/Modal";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import { useCreateTile, useUpdateTile, useDeleteTile, Tile, TileProvider } from "../../hooks/useTiles";
+import { useDashboard, useCreateDashboardItem } from "../../hooks/useDashboard";
 import IconPicker from "../ui/IconPicker";
 import { detectIconKey, iconValue, isRegistryIcon } from "../../lib/iconRegistry";
 
@@ -29,6 +31,8 @@ interface Props {
   onClose: () => void;
   tile?: Tile;
   initial?: Partial<Tile>;
+  /** Pre-select section when creating a new tile */
+  defaultSectionId?: number | null;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -40,9 +44,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export default function TileEditModal({ open, onClose, tile, initial }: Props) {
+export default function TileEditModal({ open, onClose, tile, initial, defaultSectionId }: Props) {
   const { t } = useTranslation();
   const isEdit = Boolean(tile);
+  const { data: dashboard } = useDashboard();
+  const sections = dashboard?.sections ?? [];
 
   const [name, setName] = useState(tile?.name ?? initial?.name ?? "");
   const [url, setUrl] = useState(tile?.url ?? initial?.url ?? "");
@@ -52,7 +58,9 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
   const [apiKey, setApiKey] = useState(tile?.api_key ?? initial?.api_key ?? "");
   const [provider, setProvider] = useState<TileProvider>(tile?.provider ?? initial?.provider ?? "none");
   const [showAddress, setShowAddress] = useState(tile?.show_address ?? initial?.show_address ?? true);
+  const [sectionId, setSectionId] = useState<number | null>(defaultSectionId ?? sections[0]?.id ?? null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -64,9 +72,11 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
       setApiKey(tile?.api_key ?? initial?.api_key ?? "");
       setProvider(tile?.provider ?? initial?.provider ?? "none");
       setShowAddress(tile?.show_address ?? initial?.show_address ?? true);
+      setSectionId(defaultSectionId ?? sections[0]?.id ?? null);
       setDeleteOpen(false);
+      setSaveError(null);
     }
-  }, [open, tile, initial]);
+  }, [open, tile, initial, defaultSectionId, sections]);
 
   useEffect(() => {
     if (!open || tile || initial?.icon_url || iconUrl) return;
@@ -81,16 +91,58 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
   const create = useCreateTile();
   const update = useUpdateTile();
   const del = useDeleteTile();
+  const createDashboardItem = useCreateDashboardItem();
+
+  const isSaving = create.isPending || update.isPending;
 
   const handleSave = () => {
-    const data = { name, url, icon_url: iconUrl || null, style, api_url: apiUrl ? normalizeServiceUrl(apiUrl) : null, api_key: apiKey || null, provider, show_address: showAddress, sort_order: tile?.sort_order ?? 0 };
-    if (isEdit && tile) update.mutate({ id: tile.id, ...data }, { onSuccess: onClose });
-    else create.mutate(data, { onSuccess: onClose });
+    setSaveError(null);
+    const data = {
+      name: name.trim(),
+      url: url.trim(),
+      icon_url: iconUrl || null,
+      style,
+      api_url: apiUrl ? normalizeServiceUrl(apiUrl) : null,
+      api_key: apiKey || null,
+      provider,
+      show_address: showAddress,
+      sort_order: tile?.sort_order ?? 0,
+    };
+
+    if (isEdit && tile) {
+      update.mutate(
+        { id: tile.id, ...data },
+        {
+          onSuccess: onClose,
+          onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Speichern"),
+        }
+      );
+    } else {
+      create.mutate(data, {
+        onSuccess: (newTile) => {
+          // After creating the tile, add it to the selected section as a dashboard item
+          if (sectionId != null) {
+            const section = sections.find((s) => s.id === sectionId);
+            const nextOrder = section?.items.length ?? 0;
+            createDashboardItem.mutate(
+              { section_id: sectionId, item_type: "tile", item_id: newTile.id, sort_order: nextOrder },
+              { onSuccess: onClose, onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Hinzufügen zur Sektion") }
+            );
+          } else {
+            onClose();
+          }
+        },
+        onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Erstellen"),
+      });
+    }
   };
 
   const handleDelete = () => {
     if (!tile) return;
-    del.mutate(tile.id, { onSuccess: onClose });
+    del.mutate(tile.id, {
+      onSuccess: onClose,
+      onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Löschen"),
+    });
   };
 
   const styleOptions = [
@@ -144,8 +196,23 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
 
         <label className="flex items-center justify-between rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t2">
           <span>{t("tile.show_address")}</span>
-          <input type="checkbox" checked={showAddress} onChange={(event) => setShowAddress(event.target.checked)} />
+          <input type="checkbox" checked={showAddress} onChange={(e) => setShowAddress(e.target.checked)} />
         </label>
+
+        {/* Section selector — only for new tiles when sections exist */}
+        {!isEdit && sections.length > 0 && (
+          <Field label="Sektion">
+            <select
+              className={selectCls}
+              value={sectionId ?? ""}
+              onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : null)}
+            >
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>{s.title}</option>
+              ))}
+            </select>
+          </Field>
+        )}
 
         <Field label={t("tile.provider")}>
           <select value={provider} onChange={(e) => setProvider(e.target.value as TileProvider)} className={selectCls}>
@@ -161,13 +228,20 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
           <input className={input} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Optional token" />
         </Field>
 
+        {saveError && (
+          <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500">
+            <AlertCircle size={13} className="shrink-0" />
+            {saveError}
+          </div>
+        )}
+
         <div className="flex gap-2 pt-1">
           <button
             onClick={handleSave}
-            disabled={!name || !url}
+            disabled={!name.trim() || !url.trim() || isSaving}
             className="flex-1 rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40 hover:opacity-90 transition-opacity"
           >
-            {t("tile.save")}
+            {isSaving ? "Speichern..." : t("tile.save")}
           </button>
           {isEdit && (
             <button
@@ -179,6 +253,7 @@ export default function TileEditModal({ open, onClose, tile, initial }: Props) {
           )}
         </div>
       </div>
+
       {tile && (
         <ConfirmDialog
           open={deleteOpen}

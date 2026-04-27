@@ -94,7 +94,12 @@ export default function TileWrapper({ tile, editMode = false }: Props) {
 
   return (
     <div className={`relative group ${editMode ? "rounded-2xl ring-1 ring-accent/20" : ""}`}>
-      <a href={tile.url} target="_blank" rel="noopener noreferrer" className="block">
+      <a
+        href={tile.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`block ${editMode ? "pointer-events-none" : ""}`}
+      >
         {effectiveStyle === "compact" ? (
           <TileCompact {...tileProps} />
         ) : effectiveStyle === "minimal" ? (

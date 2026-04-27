@@ -168,6 +168,46 @@ router.delete("/sections/:id", (req, res) => {
   res.json({ ok: true });
 });
 
+router.post("/items", (req, res) => {
+  const sectionId = Number(req.body?.section_id);
+  const itemType = String(req.body?.item_type ?? "");
+  const itemId = Number(req.body?.item_id);
+  const sortOrder = Number(req.body?.sort_order ?? 0);
+  const layout = req.body?.layout && typeof req.body.layout === "object" ? req.body.layout : {};
+
+  if (!Number.isFinite(sectionId) || !["tile", "widget"].includes(itemType) || !Number.isFinite(itemId)) {
+    res.status(400).json({ error: "section_id, item_type, item_id required" });
+    return;
+  }
+
+  const section = db.prepare("SELECT id FROM dashboard_sections WHERE id = ?").get(sectionId) as { id: number } | undefined;
+  if (!section) {
+    res.status(404).json({ error: "section not found" });
+    return;
+  }
+
+  try {
+    const result = db
+      .prepare(
+        "INSERT INTO dashboard_items (section_id, item_type, item_id, sort_order, layout) VALUES (?, ?, ?, ?, ?)"
+      )
+      .run(sectionId, itemType, itemId, sortOrder, JSON.stringify(layout));
+
+    const item = db
+      .prepare("SELECT * FROM dashboard_items WHERE id = ?")
+      .get(result.lastInsertRowid) as DashboardItemRow;
+
+    res.status(201).json({ ...item, layout: parseJson(item.layout) });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("UNIQUE")) {
+      res.status(409).json({ error: "item already exists in dashboard" });
+    } else {
+      res.status(500).json({ error: msg });
+    }
+  }
+});
+
 router.put("/reorder", (req, res) => {
   const sections = Array.isArray(req.body?.sections) ? req.body.sections : [];
   const items = Array.isArray(req.body?.items) ? req.body.items : [];
