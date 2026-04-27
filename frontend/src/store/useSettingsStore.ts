@@ -5,14 +5,19 @@ import i18n from "../i18n/index";
 type Theme = "light" | "dark";
 type Language = "de" | "en";
 type WidgetStyle = "card" | "compact" | "minimal";
+type BackgroundMode = "default" | "custom";
 
 interface SettingsState {
   theme: Theme;
   language: Language;
   widgetStyle: WidgetStyle;
+  backgroundMode: BackgroundMode;
+  backgroundImage: string;
   setTheme: (t: Theme) => void;
   setLanguage: (l: Language) => void;
   setWidgetStyle: (s: WidgetStyle) => void;
+  setBackgroundMode: (m: BackgroundMode) => void;
+  setBackgroundImage: (url: string) => void;
 }
 
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
@@ -35,12 +40,19 @@ function applyTheme(theme: Theme) {
   }
 }
 
+function applyBackground(mode: BackgroundMode, image: string) {
+  document.documentElement.dataset.background = mode;
+  document.documentElement.style.setProperty("--custom-background-image", image.trim() ? `url("${image.trim()}")` : "none");
+}
+
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       theme: "dark",
       language: "de",
       widgetStyle: "card",
+      backgroundMode: "default",
+      backgroundImage: "",
 
       setTheme: (theme) => {
         applyTheme(theme);
@@ -58,12 +70,27 @@ export const useSettingsStore = create<SettingsState>()(
         syncToBackend({ widgetStyle });
         set({ widgetStyle });
       },
+
+      setBackgroundMode: (backgroundMode) => {
+        const image = useSettingsStore.getState().backgroundImage;
+        applyBackground(backgroundMode, image);
+        syncToBackend({ backgroundMode });
+        set({ backgroundMode });
+      },
+
+      setBackgroundImage: (backgroundImage) => {
+        const mode = backgroundImage.trim() ? "custom" : useSettingsStore.getState().backgroundMode;
+        applyBackground(mode, backgroundImage);
+        syncToBackend({ backgroundImage, backgroundMode: mode });
+        set({ backgroundImage, backgroundMode: mode });
+      },
     }),
     {
       name: "thedash-settings",
       onRehydrateStorage: () => (state) => {
         if (state) {
           applyTheme(state.theme);
+          applyBackground(state.backgroundMode ?? "default", state.backgroundImage ?? "");
           i18n.changeLanguage(state.language);
         }
       },

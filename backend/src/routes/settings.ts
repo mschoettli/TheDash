@@ -28,7 +28,7 @@ router.get("/runtime", (_req, res) => {
 });
 
 router.put("/", (req, res) => {
-  const allowed = ["theme", "language", "widgetStyle"];
+  const allowed = ["theme", "language", "widgetStyle", "backgroundMode", "backgroundImage"];
   const upsert = db.prepare(
     "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)"
   );

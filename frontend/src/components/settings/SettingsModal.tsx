@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Sun, Moon, Download, Upload } from "lucide-react";
+import { Download, Image, RotateCcw, Upload } from "lucide-react";
 import Modal from "../ui/Modal";
 import { useSettingsStore } from "../../store/useSettingsStore";
 
@@ -44,7 +44,18 @@ function ToggleGroup<T extends string>({
 
 export default function SettingsModal({ open, onClose }: Props) {
   const { t } = useTranslation();
-  const { theme, language, widgetStyle, setTheme, setLanguage, setWidgetStyle } = useSettingsStore();
+  const {
+    theme,
+    language,
+    widgetStyle,
+    backgroundMode,
+    backgroundImage,
+    setTheme,
+    setLanguage,
+    setWidgetStyle,
+    setBackgroundMode,
+    setBackgroundImage,
+  } = useSettingsStore();
   const importRef = useRef<HTMLInputElement>(null);
   const [runtime, setRuntime] = useState<{ aiTagging: { enabled: boolean; provider: string; model: string | null }; logos: { provider: string } } | null>(null);
 
@@ -120,6 +131,45 @@ export default function SettingsModal({ open, onClose }: Props) {
             { value: "minimal" as const, label: t("settings.style_minimal") },
           ]}
         />
+
+        <div className="space-y-3 rounded-xl border border-line/60 bg-surface p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="label-xs mb-1">{t("settings.background")}</div>
+              <div className="text-[12px] text-t3">{t("settings.background_hint")}</div>
+            </div>
+            <Image size={18} className="text-accent" />
+          </div>
+          <ToggleGroup
+            label={t("settings.background_mode")}
+            value={backgroundMode}
+            onChange={setBackgroundMode}
+            options={[
+              { value: "default" as const, label: t("settings.background_default") },
+              { value: "custom" as const, label: t("settings.background_custom") },
+            ]}
+          />
+          <div>
+            <div className="label-xs mb-1.5">{t("settings.background_url")}</div>
+            <div className="flex gap-2">
+              <input
+                value={backgroundImage}
+                onChange={(event) => setBackgroundImage(event.target.value)}
+                placeholder="https://example.com/background.jpg"
+                className="min-w-0 flex-1 rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none placeholder:text-t3 focus:border-accent/50"
+              />
+              <button
+                onClick={() => {
+                  setBackgroundImage("");
+                  setBackgroundMode("default");
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-[13px] text-t2 transition-colors hover:border-accent/40 hover:text-t1"
+              >
+                <RotateCcw size={13} /> {t("settings.reset")}
+              </button>
+            </div>
+          </div>
+        </div>
 
         <div className="grid gap-3 border-t border-line/40 pt-4 sm:grid-cols-2">
           <div className="rounded-xl border border-line/60 bg-surface p-3">

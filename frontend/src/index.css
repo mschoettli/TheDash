@@ -4,7 +4,7 @@
 
 :root {
   color-scheme: light;
-  --bg: 246 248 252;
+  --bg: 232 238 248;
   --surface: 255 255 255;
   --card: 255 255 255;
   --line: 209 217 230;
@@ -12,14 +12,15 @@
   --t2: 71 85 105;
   --t3: 125 140 160;
   --accent: 8 145 178;
+  --custom-background-image: none;
 }
 
 .dark {
   color-scheme: dark;
-  --bg: 6 9 18;
-  --surface: 10 15 28;
-  --card: 14 20 38;
-  --line: 28 38 64;
+  --bg: 4 8 20;
+  --surface: 13 22 43;
+  --card: 16 28 54;
+  --line: 69 88 128;
   --t1: 218 228 244;
   --t2: 148 163 184;
   --t3: 94 113 148;
@@ -29,9 +30,41 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
+  min-height: 100vh;
   background-color: rgb(var(--bg));
+  background-image:
+    radial-gradient(circle at 12% 8%, rgb(var(--accent) / 0.26), transparent 34rem),
+    radial-gradient(circle at 82% 18%, rgb(59 130 246 / 0.18), transparent 32rem),
+    linear-gradient(135deg, rgb(3 7 18), rgb(10 17 36) 45%, rgb(8 24 42));
+  background-attachment: fixed;
+  background-size: cover;
   color: rgb(var(--t1));
   @apply font-sans antialiased;
+}
+
+:root:not(.dark) body {
+  background-image:
+    radial-gradient(circle at 12% 8%, rgb(var(--accent) / 0.16), transparent 34rem),
+    radial-gradient(circle at 84% 18%, rgb(59 130 246 / 0.12), transparent 32rem),
+    linear-gradient(135deg, rgb(238 244 252), rgb(226 235 248) 48%, rgb(214 228 244));
+}
+
+:root[data-background="custom"] body {
+  background-image:
+    linear-gradient(135deg, rgb(3 7 18 / 0.76), rgb(10 17 36 / 0.66)),
+    var(--custom-background-image);
+}
+
+:root[data-background="custom"]:not(.dark) body {
+  background-image:
+    linear-gradient(135deg, rgb(238 244 252 / 0.82), rgb(226 235 248 / 0.72)),
+    var(--custom-background-image);
+}
+
+.app-shell {
+  background:
+    linear-gradient(180deg, rgb(var(--bg) / 0.16), rgb(var(--bg) / 0.32)),
+    radial-gradient(circle at 50% 0%, rgb(255 255 255 / 0.05), transparent 34rem);
 }
 
 ::-webkit-scrollbar          { width: 5px; height: 5px; }
@@ -40,14 +73,34 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: rgb(var(--t3)); }
 
 .card {
-  background-color: rgb(var(--card));
+  background-color: rgb(var(--card) / 0.72);
   border: 1px solid rgb(var(--line) / 0.6);
   border-radius: 1rem;
+  backdrop-filter: blur(18px) saturate(1.25);
 }
 
 .surface {
-  background-color: rgb(var(--surface));
+  background-color: rgb(var(--surface) / 0.62);
   border: 1px solid rgb(var(--line) / 0.5);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.bg-card {
+  background-color: rgb(var(--card) / 0.64);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.bg-surface {
+  background-color: rgb(var(--surface) / 0.58);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.dark .bg-card {
+  background-color: rgb(var(--card) / 0.54);
+}
+
+.dark .bg-surface {
+  background-color: rgb(var(--surface) / 0.48);
 }
 
 .label-xs {

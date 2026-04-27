@@ -20,7 +20,7 @@ import Modal from "../components/ui/Modal";
 import IconBadge from "../components/ui/IconBadge";
 import IconPicker from "../components/ui/IconPicker";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
-import TileGrid from "../components/tiles/TileGrid";
+import TileWrapper from "../components/tiles/TileWrapper";
 import TileEditModal from "../components/tiles/TileEditModal";
 import { detectIconKey, iconValue } from "../lib/iconRegistry";
 import { Tile, useReorderTiles, useTiles } from "../hooks/useTiles";
@@ -60,6 +60,10 @@ const WIDGET_CONFIG: Record<string, { field?: string; placeholder?: string; requ
 };
 
 const ACTIVE_WIDGET_TYPES = new Set(["docker", "system", "media", "downloads", "network", "rss", "weather", "calendar", "releases", "stocks"]);
+
+type DashboardItem =
+  | { id: string; kind: "app"; sort_order: number; value: Tile }
+  | { id: string; kind: "widget"; sort_order: number; value: WidgetInstance };
 
 function hostFromUrl(url: string | null): string {
   if (!url) return "";
@@ -170,6 +174,63 @@ function WidgetContent({ widget }: { widget: WidgetInstance }) {
       </div>
       {metrics?.status === "error" && <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-400">{metrics.error ?? t("widgets.unavailable")}</div>}
       {notes && <p className="text-[12px] leading-relaxed text-t3 line-clamp-2">{notes}</p>}
+    </div>
+  );
+}
+
+function WidgetTile({
+  widget,
+  editMode,
+  draggable,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onEdit,
+  onDelete,
+}: {
+  widget: WidgetInstance;
+  editMode: boolean;
+  draggable: boolean;
+  onDragStart: () => void;
+  onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDrop: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className={`relative min-h-[176px] overflow-hidden rounded-xl border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10 ${editMode ? "cursor-grab border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}
+    >
+      <div className="absolute inset-y-0 left-0 w-1 bg-accent/70 opacity-70" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent opacity-70" />
+      <div className="relative flex items-start justify-between gap-3 pl-1">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line/55 bg-surface shadow-inner shadow-white/5">
+            <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={30} />
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-[14px] font-semibold leading-5 text-t1">{widget.title}</div>
+            <div className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-t3">{widget.type}</div>
+          </div>
+        </div>
+        {editMode && (
+          <div className="flex shrink-0 gap-1">
+            <button onClick={onEdit} className="rounded-lg border border-line/45 bg-surface/90 p-1.5 text-t3 hover:text-accent">
+              <Pencil size={13} />
+            </button>
+            <button onClick={onDelete} className="rounded-lg border border-line/45 bg-surface/90 p-1.5 text-t3 hover:text-rose-500">
+              <Trash2 size={13} />
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="relative pl-1">
+        <WidgetContent widget={widget} />
+      </div>
     </div>
   );
 }
@@ -362,7 +423,7 @@ export default function DashboardPage() {
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
   const [deleteWidgetTarget, setDeleteWidgetTarget] = useState<WidgetInstance | null>(null);
-  const [dragWidgetId, setDragWidgetId] = useState<number | null>(null);
+  const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [dockerActionTarget, setDockerActionTarget] = useState<{ container: DiscoveredContainer; action: "start" | "stop" | "restart" } | null>(null);
   const [tileDraft, setTileDraft] = useState<Tile[] | null>(null);
   const [widgetDraft, setWidgetDraft] = useState<WidgetInstance[] | null>(null);
@@ -375,7 +436,12 @@ export default function DashboardPage() {
   const reorderTiles = useReorderTiles();
   const dockerAction = useDockerAction();
   const activeCatalog = catalog.filter((item) => ACTIVE_WIDGET_TYPES.has(item.type));
+  const visibleTiles = tileDraft ?? tiles ?? [];
   const visibleWidgets = widgetDraft ?? widgets ?? [];
+  const dashboardItems: DashboardItem[] = [
+    ...visibleTiles.map((tile) => ({ id: `app:${tile.id}`, kind: "app" as const, sort_order: tile.sort_order, value: tile })),
+    ...visibleWidgets.map((widget) => ({ id: `widget:${widget.id}`, kind: "widget" as const, sort_order: widget.sort_order, value: widget })),
+  ].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
 
   const containers = discovery?.containers ?? [];
   const suggestions = containers.filter(
@@ -398,13 +464,16 @@ export default function DashboardPage() {
   const cancelEditMode = () => {
     setTileDraft(null);
     setWidgetDraft(null);
-    setDragWidgetId(null);
+    setDragItemId(null);
     setEditMode(false);
   };
 
   const saveEditMode = () => {
-    if (tileDraft) reorderTiles.mutate(tileDraft.map((tile, index) => ({ id: tile.id, sort_order: index })));
-    if (widgetDraft) reorderWidgets.mutate(widgetDraft.map((widget, index) => ({ id: widget.id, sort_order: index })));
+    const ordered = dashboardItems.map((item, index) => ({ ...item, sort_order: index }));
+    const orderedTiles = ordered.filter((item) => item.kind === "app") as Array<DashboardItem & { kind: "app"; value: Tile }>;
+    const orderedWidgets = ordered.filter((item) => item.kind === "widget") as Array<DashboardItem & { kind: "widget"; value: WidgetInstance }>;
+    if (tileDraft && orderedTiles.length) reorderTiles.mutate(orderedTiles.map((item) => ({ id: item.value.id, sort_order: item.sort_order })));
+    if (widgetDraft && orderedWidgets.length) reorderWidgets.mutate(orderedWidgets.map((item) => ({ id: item.value.id, sort_order: item.sort_order })));
     setTileDraft(null);
     setWidgetDraft(null);
     setEditMode(false);
@@ -425,16 +494,17 @@ export default function DashboardPage() {
     });
   };
 
-  const moveWidgetBefore = (target: WidgetInstance) => {
-    const source = widgetDraft ?? widgets;
-    if (!dragWidgetId || dragWidgetId === target.id || !source) return;
-    const dragged = source.find((widget) => widget.id === dragWidgetId);
+  const moveItemBefore = (target: DashboardItem) => {
+    if (!dragItemId || dragItemId === target.id) return;
+    const dragged = dashboardItems.find((item) => item.id === dragItemId);
     if (!dragged) return;
-    const ordered = source.filter((widget) => widget.id !== dragWidgetId);
-    const targetIndex = ordered.findIndex((widget) => widget.id === target.id);
+    const ordered = dashboardItems.filter((item) => item.id !== dragItemId);
+    const targetIndex = ordered.findIndex((item) => item.id === target.id);
     ordered.splice(targetIndex >= 0 ? targetIndex : ordered.length, 0, dragged);
-    setWidgetDraft(ordered);
-    setDragWidgetId(null);
+    const withOrder = ordered.map((item, index) => ({ ...item, sort_order: index }));
+    setTileDraft(withOrder.filter((item) => item.kind === "app").map((item) => ({ ...(item.value as Tile), sort_order: item.sort_order })));
+    setWidgetDraft(withOrder.filter((item) => item.kind === "widget").map((item) => ({ ...(item.value as WidgetInstance), sort_order: item.sort_order })));
+    setDragItemId(null);
   };
 
   return (
@@ -463,12 +533,43 @@ export default function DashboardPage() {
       <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
         <section className="rounded-xl bg-card border border-line/60 p-4">
           <div className="mb-4 flex items-center justify-between">
-            <div className="label-xs flex items-center gap-1.5"><LayoutDashboard size={11} /> {t("dashboard.apps")}</div>
-            <span className="text-[11px] text-t3">{tiles?.length ?? 0}</span>
+            <div className="label-xs flex items-center gap-1.5"><LayoutDashboard size={11} /> {t("dashboard.apps_widgets")}</div>
+            <span className="text-[11px] text-t3">{dashboardItems.length}</span>
           </div>
-          {tiles && tiles.length > 0 ? <TileGrid editMode={editMode} tilesOverride={tileDraft ?? undefined} onReorder={setTileDraft} /> : (
+          {dashboardItems.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+              {dashboardItems.map((item) => (
+                <div key={item.id} className={item.kind === "widget" ? "sm:col-span-2" : ""}>
+                  {item.kind === "app" ? (
+                    <TileWrapper
+                      tile={item.value}
+                      editMode={editMode}
+                      draggable={editMode}
+                      onDragStart={() => setDragItemId(item.id)}
+                      onDragOver={(event) => editMode && event.preventDefault()}
+                      onDrop={() => moveItemBefore(item)}
+                    />
+                  ) : (
+                    <WidgetTile
+                      widget={item.value}
+                      editMode={editMode}
+                      draggable={editMode}
+                      onDragStart={() => setDragItemId(item.id)}
+                      onDragOver={(event) => editMode && event.preventDefault()}
+                      onDrop={() => moveItemBefore(item)}
+                      onEdit={() => {
+                        setEditingWidget(item.value);
+                        setWidgetModalOpen(true);
+                      }}
+                      onDelete={() => setDeleteWidgetTarget(item.value)}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
             <div className="rounded-lg border border-dashed border-line py-10 text-center text-[13px] text-t3">
-              {t("dashboard.empty_apps")}
+              {t("dashboard.empty_workspace")}
             </div>
           )}
         </section>
@@ -486,48 +587,6 @@ export default function DashboardPage() {
                 {!containers.length && <div className="text-[13px] text-t3">{t("dashboard.no_containers")}</div>}
               </div>
             )}
-          </section>
-
-          <section className="rounded-xl bg-card border border-line/60 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="label-xs flex items-center gap-1.5"><Activity size={11} /> {t("dashboard.widgets")}</div>
-              {editMode && <button onClick={() => { setEditingWidget(null); setWidgetModalOpen(true); }} className="text-[12px] text-accent">+ {t("dashboard.widget")}</button>}
-            </div>
-            <div className="space-y-1.5">
-              {visibleWidgets.map((widget) => (
-                <div
-                  key={widget.id}
-                  draggable={editMode}
-                  onDragStart={() => setDragWidgetId(widget.id)}
-                  onDragOver={(event) => editMode && event.preventDefault()}
-                  onDrop={() => moveWidgetBefore(widget)}
-                  className={`relative overflow-hidden rounded-[1.35rem] border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-2xl hover:shadow-accent/10 ${editMode ? "cursor-grab border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}
-                >
-                  <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-accent/10 to-transparent opacity-60" />
-                  <div className="relative flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-line/55 bg-card">
-                          <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={30} />
-                        </span>
-                        <div className="min-w-0">
-                          <div className="truncate text-[14px] font-semibold text-t1">{widget.title}</div>
-                          <div className="label-xs mt-1">{widget.type}</div>
-                        </div>
-                      </div>
-                    </div>
-                    {editMode && (
-                      <div className="flex gap-1">
-                        <button onClick={() => { setEditingWidget(widget); setWidgetModalOpen(true); }} className="rounded p-1 text-t3 hover:text-accent"><Pencil size={13} /></button>
-                        <button onClick={() => setDeleteWidgetTarget(widget)} className="rounded p-1 text-t3 hover:text-rose-500"><Trash2 size={13} /></button>
-                      </div>
-                    )}
-                  </div>
-                  <WidgetContent widget={widget} />
-                </div>
-              ))}
-              {!widgets?.length && <div className="text-[13px] text-t3">{t("dashboard.empty_widgets")}</div>}
-            </div>
           </section>
         </aside>
       </div>
