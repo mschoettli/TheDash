@@ -3,10 +3,12 @@ import { useTranslation } from "react-i18next";
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
   closestCenter,
+  useDraggable,
   useDroppable,
   useSensor,
   useSensors,
@@ -14,7 +16,6 @@ import {
 import {
   SortableContext,
   arrayMove,
-  rectSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
@@ -30,9 +31,6 @@ import {
   Eye,
   FolderPlus,
   GripVertical,
-  LayoutGrid,
-  List,
-  Maximize2,
   Pause,
   Pencil,
   Play,
@@ -92,26 +90,14 @@ const WIDGET_CONFIG: Record<string, { field?: string; placeholder?: string; requ
   stocks: { field: "Symbol", placeholder: "AAPL", required: true },
 };
 
-// Span system
+// Size presets (w = column span, h = row span)
 const SPAN_PRESETS = [
-  { label: "1×1", col: 1, row: 1 },
-  { label: "2×1", col: 2, row: 1 },
-  { label: "3×1", col: 3, row: 1 },
-  { label: "2×2", col: 2, row: 2 },
-  { label: "4×1", col: 4, row: 1 },
+  { label: "1×1", w: 1, h: 1 },
+  { label: "2×1", w: 2, h: 1 },
+  { label: "3×1", w: 3, h: 1 },
+  { label: "2×2", w: 2, h: 2 },
+  { label: "4×1", w: 4, h: 1 },
 ] as const;
-
-function colSpanClass(n: number) {
-  if (n === 4) return "col-span-4";
-  if (n === 3) return "col-span-3";
-  if (n === 2) return "col-span-2";
-  return "col-span-1";
-}
-function rowSpanClass(n: number) {
-  if (n === 3) return "row-span-3";
-  if (n === 2) return "row-span-2";
-  return "row-span-1";
-}
 
 // Section accent colors
 const SECTION_COLORS: { label: string; value: string | null; dot: string }[] = [
@@ -123,24 +109,80 @@ const SECTION_COLORS: { label: string; value: string | null; dot: string }[] = [
   { label: "Blue", value: "96 165 250", dot: "bg-blue-400" },
 ];
 
-type LayoutMode = "grid" | "list" | "wide";
+// Available column counts for sections
+const GRID_COLS_OPTIONS = [2, 3, 4, 6] as const;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ItemPos { col: number; row: number; w: number; h: number; }
+interface HoveredCell { sectionId: number; col: number; row: number; }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getSectionMeta(section: DashboardSection) {
   return {
     color: (section.layout.color as string | null) ?? null,
-    layoutMode: (section.layout.layoutMode as LayoutMode) ?? "grid",
+    gridCols: Number(section.layout.gridCols ?? 4),
   };
 }
 
-function gridClassForMode(mode: LayoutMode): string {
-  if (mode === "list") return "grid-cols-1";
-  if (mode === "wide") return "grid-cols-2 auto-rows-[minmax(160px,auto)]";
-  return "grid-cols-4 auto-rows-[minmax(120px,auto)]";
+/** Pack items into a grid. Items with explicit col/row keep their position;
+ *  others are auto-placed in reading order. */
+function autoAssignPositions(items: DashboardItem[], gridCols: number): Map<number, ItemPos> {
+  const result = new Map<number, ItemPos>();
+  const used = new Set<string>(); // "col,row"
+
+  const isFree = (col: number, row: number, w: number, h: number): boolean => {
+    for (let r = row; r < row + h; r++) {
+      for (let c = col; c < col + w; c++) {
+        if (used.has(`${c},${r}`) || c >= gridCols) return false;
+      }
+    }
+    return true;
+  };
+  const markUsed = (col: number, row: number, w: number, h: number) => {
+    for (let r = row; r < row + h; r++)
+      for (let c = col; c < col + w; c++)
+        used.add(`${c},${r}`);
+  };
+
+  // 1st pass: items with explicit positions
+  for (const item of items) {
+    if (item.layout?.col != null && item.layout?.row != null) {
+      const pos: ItemPos = {
+        col: Number(item.layout.col),
+        row: Number(item.layout.row),
+        w: Math.min(Number(item.layout.w ?? item.layout.spanCol ?? 1), gridCols),
+        h: Number(item.layout.h ?? item.layout.spanRow ?? 1),
+      };
+      result.set(item.id, pos);
+      markUsed(pos.col, pos.row, pos.w, pos.h);
+    }
+  }
+
+  // 2nd pass: auto-place the rest
+  let autoRow = 0, autoCol = 0;
+  for (const item of items) {
+    if (result.has(item.id)) continue;
+    const w = Math.min(Number(item.layout?.w ?? item.layout?.spanCol ?? 1), gridCols);
+    const h = Number(item.layout?.h ?? item.layout?.spanRow ?? 1);
+    let placed = false;
+    while (!placed) {
+      if (autoCol + w > gridCols) { autoCol = 0; autoRow++; }
+      if (isFree(autoCol, autoRow, w, h)) {
+        result.set(item.id, { col: autoCol, row: autoRow, w, h });
+        markUsed(autoCol, autoRow, w, h);
+        autoCol += w;
+        placed = true;
+      } else {
+        autoCol++;
+        if (autoCol >= gridCols) { autoCol = 0; autoRow++; }
+      }
+    }
+  }
+  return result;
 }
 
-// ─── ID helpers ───────────────────────────────────────────────────────────────
-
-function sortableItemId(id: number) { return `item:${id}`; }
 function sortableSectionId(id: number) { return `section:${id}`; }
 function numericId(id: string) { return Number(id.split(":")[1]); }
 
@@ -148,13 +190,11 @@ function hostFromUrl(url: string | null) {
   if (!url) return "";
   try { return new URL(url).host; } catch { return url; }
 }
-
 function widgetEndpointLabel(widget: WidgetInstance) {
   const e = String(widget.config.endpoint ?? "").trim();
   if (!e || widget.config.showAddress === false) return "";
   return hostFromUrl(e);
 }
-
 function requiresEndpoint(type: string) {
   return Boolean(WIDGET_CONFIG[type]?.required);
 }
@@ -215,7 +255,7 @@ function WidgetTile({ widget, editMode, onEdit, onDelete }: {
   onEdit: () => void; onDelete: () => void;
 }) {
   return (
-    <div className={`glass-panel relative min-h-[176px] overflow-hidden rounded-xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10 ${editMode ? "border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}>
+    <div className={`glass-panel relative h-full min-h-[176px] overflow-hidden rounded-xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10 ${editMode ? "border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}>
       <div className="absolute inset-y-0 left-0 w-1 bg-accent/70 opacity-70" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent opacity-70" />
       <div className="relative flex items-start justify-between gap-3 pl-1">
@@ -247,6 +287,7 @@ function DragPreviewTile({ tile, widget, section }: {
 }) {
   if (section) return (
     <div className="glass-panel flex items-center gap-3 rounded-xl border border-accent/50 px-4 py-3 shadow-2xl shadow-accent/20">
+      <GripVertical size={13} className="text-accent" />
       <span className="text-[11px] font-bold uppercase tracking-wider text-accent">{section.title}</span>
     </div>
   );
@@ -269,46 +310,87 @@ function DragPreviewTile({ tile, widget, section }: {
   return null;
 }
 
-// ─── Sortable Dashboard Item ───────────────────────────────────────────────────
+// ─── Grid Drop Cell ────────────────────────────────────────────────────────────
 
-function SortableDashboardItem({
-  item, tile, widget, editMode,
-  onEditWidget, onDeleteWidget, onSpanChange,
+function GridDropCell({ sectionId, col, row }: { sectionId: number; col: number; row: number }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `cell:${sectionId}:${col}:${row}`,
+    data: { type: "cell", sectionId, col, row },
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ gridColumn: col + 1, gridRow: row + 1 }}
+      className={`rounded-xl border-2 border-dashed transition-all duration-100 ${
+        isOver
+          ? "border-accent bg-accent/15 shadow-inner shadow-accent/10"
+          : "border-line/15 bg-transparent hover:border-line/30"
+      }`}
+    />
+  );
+}
+
+// ─── Draggable Dashboard Item ──────────────────────────────────────────────────
+
+function DraggableItem({
+  item, pos, gridCols, editMode,
+  tile, widget,
+  onEditWidget, onDeleteWidget, onSizeChange,
 }: {
   item: DashboardItem;
-  tile?: Tile; widget?: WidgetInstance;
+  pos: ItemPos;
+  gridCols: number;
   editMode: boolean;
+  tile?: Tile;
+  widget?: WidgetInstance;
   onEditWidget: (w: WidgetInstance) => void;
   onDeleteWidget: (w: WidgetInstance) => void;
-  onSpanChange: (itemId: number, col: number, row: number) => void;
+  onSizeChange: (itemId: number, w: number, h: number) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: sortableItemId(item.id),
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `item:${item.id}`,
     disabled: !editMode,
-    data: { type: "item", sectionId: item.section_id },
+    data: { type: "item", sectionId: item.section_id, w: pos.w, h: pos.h },
   });
-  const style = { transform: CSS.Transform.toString(transform), transition };
-  const spanCol = Number(item.layout?.spanCol ?? 1);
-  const spanRow = Number(item.layout?.spanRow ?? 1);
 
   if (item.item_type === "tile" && !tile) return null;
   if (item.item_type === "widget" && !widget) return null;
 
+  const clampedW = Math.min(pos.w, gridCols);
+
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className={`relative ${colSpanClass(spanCol)} ${rowSpanClass(spanRow)} ${isDragging ? "opacity-40" : ""}`}
+      style={{
+        gridColumn: `${pos.col + 1} / span ${clampedW}`,
+        gridRow: `${pos.row + 1} / span ${pos.h}`,
+        zIndex: isDragging ? 1 : 20,
+        opacity: isDragging ? 0.15 : 1,
+        transition: "opacity 120ms",
+      }}
+      className="relative"
     >
-      {/* Span picker */}
+      {/* Drag handle */}
       {editMode && (
-        <div className="absolute bottom-2 left-10 z-20 flex gap-0.5 rounded-lg border border-line/50 bg-surface/95 p-1 shadow-sm backdrop-blur-sm">
-          {SPAN_PRESETS.map(({ label, col, row }) => (
+        <button
+          className="absolute left-2 top-2 z-30 cursor-grab rounded-lg border border-line/50 bg-surface/95 p-1.5 text-t3 shadow-sm transition-colors hover:text-accent active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+          aria-label="Drag"
+        >
+          <GripVertical size={13} />
+        </button>
+      )}
+
+      {/* Size picker */}
+      {editMode && (
+        <div className="absolute bottom-2 left-10 z-30 flex gap-0.5 rounded-lg border border-line/50 bg-surface/95 p-1 shadow-sm backdrop-blur-sm">
+          {SPAN_PRESETS.map(({ label, w, h }) => (
             <button
               key={label}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSpanChange(item.id, col, row); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSizeChange(item.id, w, h); }}
               className={`rounded px-1.5 py-0.5 text-[9px] font-bold transition-colors ${
-                spanCol === col && spanRow === row ? "bg-accent text-bg" : "text-t3 hover:bg-line/40 hover:text-t1"
+                pos.w === w && pos.h === h ? "bg-accent text-bg" : "text-t3 hover:bg-line/40 hover:text-t1"
               }`}
             >
               {label}
@@ -316,33 +398,32 @@ function SortableDashboardItem({
           ))}
         </div>
       )}
-      {/* Drag handle */}
-      {editMode && (
-        <button
-          className="absolute left-2 top-2 z-20 rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 shadow-sm hover:text-accent"
-          {...attributes} {...listeners}
-          aria-label="Drag"
-        >
-          <GripVertical size={13} />
-        </button>
-      )}
-      {item.item_type === "tile" && tile ? (
-        <TileWrapper tile={tile} editMode={editMode} />
-      ) : widget ? (
-        <WidgetTile widget={widget} editMode={editMode} onEdit={() => onEditWidget(widget)} onDelete={() => onDeleteWidget(widget)} />
-      ) : null}
+
+      {/* Content */}
+      <div className="h-full">
+        {item.item_type === "tile" && tile ? (
+          <TileWrapper tile={tile} editMode={editMode} />
+        ) : widget ? (
+          <WidgetTile
+            widget={widget}
+            editMode={editMode}
+            onEdit={() => onEditWidget(widget)}
+            onDelete={() => onDeleteWidget(widget)}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
 
 // ─── Sortable Section ──────────────────────────────────────────────────────────
-// Visually transparent — no background box. Tiles float directly on the page.
 
 function SortableSection({
   section, tilesById, widgetsById, editMode,
   isCollapsed, onToggleCollapse,
-  onEditWidget, onDeleteWidget, onSpanChange,
-  onUpdateLayout, onRename, onDelete,
+  onEditWidget, onDeleteWidget, onSizeChange,
+  onUpdateLayout, onChangeGridCols, onRename, onDelete,
+  hoveredCell, activeDragSize,
   isLast,
 }: {
   section: DashboardSection;
@@ -353,10 +434,13 @@ function SortableSection({
   onToggleCollapse: () => void;
   onEditWidget: (w: WidgetInstance) => void;
   onDeleteWidget: (w: WidgetInstance) => void;
-  onSpanChange: (itemId: number, col: number, row: number) => void;
+  onSizeChange: (itemId: number, w: number, h: number) => void;
   onUpdateLayout: (patch: Record<string, unknown>) => void;
+  onChangeGridCols: (cols: number) => void;
   onRename: (title: string) => void;
   onDelete: () => void;
+  hoveredCell: HoveredCell | null;
+  activeDragSize: { w: number; h: number } | null;
   isLast: boolean;
 }) {
   const { t } = useTranslation();
@@ -365,44 +449,59 @@ function SortableSection({
     disabled: !editMode,
     data: { type: "section" },
   });
-  const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: `section-drop:${section.id}`,
-    disabled: !editMode,
-    data: { type: "section-drop", sectionId: section.id },
-  });
+
   const [localTitle, setLocalTitle] = useState(section.title);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const style = { transform: CSS.Transform.toString(transform), transition };
-  const { color, layoutMode } = getSectionMeta(section);
-  const accentStyle = color ? ({ "--accent": color } as React.CSSProperties) : undefined;
 
   useEffect(() => { setLocalTitle(section.title); }, [section.title]);
+
+  const { color, gridCols } = getSectionMeta(section);
+  const accentStyle = color ? ({ "--accent": color } as React.CSSProperties) : undefined;
+  const sectionStyle = { transform: CSS.Transform.toString(transform), transition, ...accentStyle };
+
+  // Compute item positions with explicit placement
+  const itemPositions = useMemo(
+    () => autoAssignPositions(section.items, gridCols),
+    [section.items, gridCols]
+  );
+
+  // How many drop-cell rows to show (items + 2 extra empty rows)
+  const maxRow = Math.max(2, ...Array.from(itemPositions.values()).map((p) => p.row + p.h)) + 1;
+
+  // Ghost highlight for the hovered drop cell (shows item size)
+  const ghost = (hoveredCell?.sectionId === section.id && activeDragSize)
+    ? {
+        col: hoveredCell.col,
+        row: hoveredCell.row,
+        w: Math.min(activeDragSize.w, gridCols - hoveredCell.col),
+        h: activeDragSize.h,
+      }
+    : null;
 
   return (
     <section
       ref={setNodeRef}
-      style={{ ...style, ...accentStyle }}
-      className={`${isDragging ? "opacity-50" : ""}`}
+      style={sectionStyle}
+      className={isDragging ? "opacity-50" : ""}
     >
-      {/* Minimal section header — just a label row */}
+      {/* Section header */}
       <div className="mb-3 flex items-center gap-2 px-1">
         {editMode && (
           <button
-            className="shrink-0 rounded-md p-1 text-t3 hover:text-accent transition-colors"
-            {...attributes} {...listeners}
+            className="shrink-0 cursor-grab rounded-md p-1 text-t3 transition-colors hover:text-accent active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
             aria-label="Drag section"
           >
             <GripVertical size={13} />
           </button>
         )}
 
-        {/* Color accent pip */}
         {color && <div className="h-3 w-1.5 shrink-0 rounded-full bg-accent/80" />}
 
-        {/* Title */}
         {editMode ? (
           <input
-            className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold uppercase tracking-wider text-t2 outline-none border-b border-transparent focus:border-accent/50 transition-colors"
+            className="min-w-0 flex-1 border-b border-transparent bg-transparent text-[11px] font-semibold uppercase tracking-wider text-t2 outline-none transition-colors focus:border-accent/50"
             value={localTitle}
             onChange={(e) => setLocalTitle(e.target.value)}
             onBlur={() => onRename(localTitle)}
@@ -411,7 +510,7 @@ function SortableSection({
         ) : (
           <button
             onClick={onToggleCollapse}
-            className="label-xs flex items-center gap-1.5 min-w-0 truncate text-left hover:text-t1 transition-colors"
+            className="label-xs flex min-w-0 items-center gap-1.5 truncate text-left transition-colors hover:text-t1"
           >
             {section.title}
             <span className="text-t3">{isCollapsed ? <ChevronRight size={11} /> : <ChevronDown size={11} />}</span>
@@ -420,23 +519,20 @@ function SortableSection({
 
         <span className="shrink-0 text-[11px] text-t3">{section.items.length}</span>
 
-        {/* Edit-mode section controls */}
         {editMode && (
           <div className="flex shrink-0 items-center gap-1">
-            {/* Layout mode */}
-            <div className="flex overflow-hidden rounded-lg border border-line/50">
-              {([
-                { mode: "grid" as LayoutMode, icon: <LayoutGrid size={10} /> },
-                { mode: "list" as LayoutMode, icon: <List size={10} /> },
-                { mode: "wide" as LayoutMode, icon: <Maximize2 size={10} /> },
-              ] as const).map(({ mode, icon }) => (
+            {/* Grid column picker */}
+            <div className="flex overflow-hidden rounded-lg border border-line/50 text-[10px] font-bold">
+              {GRID_COLS_OPTIONS.map((n) => (
                 <button
-                  key={mode}
-                  onClick={() => onUpdateLayout({ layoutMode: mode })}
-                  className={`p-1.5 transition-colors ${layoutMode === mode ? "bg-accent text-bg" : "text-t3 hover:text-t1 hover:bg-line/30"}`}
-                  title={mode}
+                  key={n}
+                  onClick={() => onChangeGridCols(n)}
+                  className={`px-2 py-1.5 transition-colors ${
+                    gridCols === n ? "bg-accent text-bg" : "text-t3 hover:bg-line/30 hover:text-t1"
+                  }`}
+                  title={`${n} Spalten`}
                 >
-                  {icon}
+                  {n}
                 </button>
               ))}
             </div>
@@ -445,7 +541,8 @@ function SortableSection({
             <div className="relative">
               <button
                 onClick={() => setShowColorPicker((v) => !v)}
-                className="rounded-lg border border-line/50 p-1.5 text-t3 hover:text-t1 transition-colors"
+                className="rounded-lg border border-line/50 p-1.5 text-t3 transition-colors hover:text-t1"
+                title="Sektionsfarbe"
               >
                 <span className="block h-3 w-3 rounded-full bg-accent/80" />
               </button>
@@ -456,58 +553,90 @@ function SortableSection({
                       key={c.label}
                       title={c.label}
                       onClick={() => { onUpdateLayout({ color: c.value }); setShowColorPicker(false); }}
-                      className={`h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 ${c.dot} ${color === c.value ? "border-t1 scale-110" : "border-transparent"}`}
+                      className={`h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 ${c.dot} ${color === c.value ? "scale-110 border-t1" : "border-transparent"}`}
                     />
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Collapse toggle */}
-            <button onClick={onToggleCollapse} className="rounded-md p-1 text-t3 hover:text-t1 transition-colors">
+            {/* Collapse */}
+            <button onClick={onToggleCollapse} className="rounded-md p-1 text-t3 transition-colors hover:text-t1">
               {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
             </button>
 
             {/* Delete */}
-            <button onClick={onDelete} className="rounded-md p-1 text-t3 hover:text-rose-500 transition-colors">
+            <button onClick={onDelete} className="rounded-md p-1 text-t3 transition-colors hover:text-rose-500">
               <Trash2 size={13} />
             </button>
           </div>
         )}
       </div>
 
-      {/* Items grid — NO background, NO border box. Items float on the page. */}
+      {/* Free-form item grid */}
       {!isCollapsed && (
-        <SortableContext items={section.items.map((item) => sortableItemId(item.id))} strategy={rectSortingStrategy}>
-          <div
-            ref={setDropRef}
-            className={`grid min-h-[80px] gap-3 rounded-2xl transition-all duration-150 ${gridClassForMode(layoutMode)} ${
-              isOver ? "bg-accent/5 ring-1 ring-inset ring-accent/25" : ""
-            }`}
-          >
-            {section.items.map((item) => (
-              <SortableDashboardItem
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+            gridAutoRows: "minmax(120px, auto)",
+            gap: "12px",
+            minHeight: "140px",
+          }}
+        >
+          {/* Drop cells — rendered below items in edit mode */}
+          {editMode &&
+            Array.from({ length: maxRow }, (_, row) =>
+              Array.from({ length: gridCols }, (_, col) => (
+                <GridDropCell key={`${col}-${row}`} sectionId={section.id} col={col} row={row} />
+              ))
+            )}
+
+          {/* Ghost preview — shows where the item will land */}
+          {ghost && (
+            <div
+              style={{
+                gridColumn: `${ghost.col + 1} / span ${ghost.w}`,
+                gridRow: `${ghost.row + 1} / span ${ghost.h}`,
+                zIndex: 15,
+                pointerEvents: "none",
+              }}
+              className="rounded-xl bg-accent/20 ring-2 ring-inset ring-accent/60"
+            />
+          )}
+
+          {/* Items */}
+          {section.items.map((item) => {
+            const pos = itemPositions.get(item.id) ?? { col: 0, row: 0, w: 1, h: 1 };
+            return (
+              <DraggableItem
                 key={item.id}
                 item={item}
+                pos={pos}
+                gridCols={gridCols}
+                editMode={editMode}
                 tile={item.item_type === "tile" ? tilesById.get(item.item_id) : undefined}
                 widget={item.item_type === "widget" ? widgetsById.get(item.item_id) : undefined}
-                editMode={editMode}
                 onEditWidget={onEditWidget}
                 onDeleteWidget={onDeleteWidget}
-                onSpanChange={onSpanChange}
+                onSizeChange={onSizeChange}
               />
-            ))}
-            {!section.items.length && (
-              <div className="col-span-full flex min-h-[80px] items-center justify-center rounded-xl text-[13px] text-t3">
-                {editMode ? t("dashboard.drop_here") : t("dashboard.empty_section")}
-              </div>
-            )}
-          </div>
-        </SortableContext>
+            );
+          })}
+
+          {/* Empty state */}
+          {!section.items.length && (
+            <div
+              style={{ gridColumn: `1 / span ${gridCols}`, gridRow: 1, zIndex: 25 }}
+              className="flex min-h-[80px] items-center justify-center rounded-xl text-[13px] text-t3"
+            >
+              {editMode ? t("dashboard.drop_here") : t("dashboard.empty_section")}
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Thin separator between sections (not after the last one) */}
-      {!isLast && <div className="mt-6 mb-2 border-t border-line/20" />}
+      {!isLast && <div className="mb-2 mt-6 border-t border-line/20" />}
     </section>
   );
 }
@@ -567,10 +696,7 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
         })
         .catch(() => setIcon(iconValue(detectIconKey(title))));
     }, 300);
-    return () => {
-      clearTimeout(timeout);
-      controller.abort();
-    };
+    return () => { clearTimeout(timeout); controller.abort(); };
   }, [open, title, endpoint, widget, iconTouched]);
 
   const save = () => {
@@ -607,9 +733,7 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
           <div className="label-xs mb-1.5">{t("dashboard.widget_type")}</div>
           <select className={input} value={type} onChange={(e) => {
             const next = catalog.find((item) => item.type === e.target.value);
-            setType(e.target.value);
-            setTitle(next?.title ?? "");
-            setIconTouched(false);
+            setType(e.target.value); setTitle(next?.title ?? ""); setIconTouched(false);
           }}>
             {catalog.map((item) => <option key={item.type} value={item.type}>{item.title} · {item.category}</option>)}
           </select>
@@ -618,15 +742,7 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
           <div className="label-xs mb-1.5">{t("dashboard.widget_title")}</div>
           <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
-        <IconPicker
-          value={icon}
-          name={title}
-          url={endpoint}
-          onChange={(value) => {
-            setIconTouched(true);
-            setIcon(value);
-          }}
-        />
+        <IconPicker value={icon} name={title} url={endpoint} onChange={(value) => { setIconTouched(true); setIcon(value); }} />
         {config.field && (
           <div>
             <div className="label-xs mb-1.5">{config.field}{config.required ? " *" : ""}</div>
@@ -680,14 +796,12 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
           <div className="label-xs mb-1.5">{t("dashboard.widget_notes")}</div>
           <textarea className={`${input} resize-none`} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
-
         {saveError && (
           <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500">
             <AlertCircle size={13} className="shrink-0" />
             {saveError}
           </div>
         )}
-
         <button onClick={save} disabled={!title.trim() || (config.required && !endpoint.trim()) || isSaving} className="w-full rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
           {isSaving ? "Speichern..." : t("common.save")}
         </button>
@@ -699,21 +813,17 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
 // ─── Docker Modal ──────────────────────────────────────────────────────────────
 
 function DockerModal({ open, onClose, containers, suggestions, onAdopt, onAction }: {
-  open: boolean;
-  onClose: () => void;
-  containers: DiscoveredContainer[];
-  suggestions: DiscoveredContainer[];
+  open: boolean; onClose: () => void;
+  containers: DiscoveredContainer[]; suggestions: DiscoveredContainer[];
   onAdopt: (c: DiscoveredContainer) => void;
   onAction: (c: DiscoveredContainer, a: "start" | "stop" | "restart") => void;
 }) {
   const { t } = useTranslation();
   const labeled = suggestions.filter((c) => c.app.is_labeled);
   const discovered = suggestions.filter((c) => !c.app.is_labeled);
-
   return (
     <Modal open={open} onClose={onClose} title="Docker" maxWidth="max-w-2xl">
       <div className="space-y-4">
-        {/* Running containers */}
         <div>
           <div className="label-xs mb-2 flex items-center gap-1.5">
             <Container size={10} /> {t("dashboard.docker")} ({containers.length})
@@ -739,8 +849,6 @@ function DockerModal({ open, onClose, containers, suggestions, onAdopt, onAction
             {!containers.length && <div className="text-[13px] text-t3">{t("dashboard.no_containers")}</div>}
           </div>
         </div>
-
-        {/* Discovered / Labeled */}
         {suggestions.length > 0 && (
           <div className="border-t border-line/30 pt-4">
             <div className="label-xs mb-2 flex items-center gap-1.5"><Eye size={10} /> {t("dashboard.discovered_apps")} ({suggestions.length})</div>
@@ -775,35 +883,21 @@ function DockerModal({ open, onClose, containers, suggestions, onAdopt, onAction
 // ─── Add Section Modal ─────────────────────────────────────────────────────────
 
 function AddSectionModal({ open, onClose, onCreate }: {
-  open: boolean; onClose: () => void;
-  onCreate: (title: string) => void;
+  open: boolean; onClose: () => void; onCreate: (title: string) => void;
 }) {
   const [title, setTitle] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (open) { setTitle(""); setTimeout(() => inputRef.current?.focus(), 50); }
-  }, [open]);
-
-  const submit = () => {
-    if (!title.trim()) return;
-    onCreate(title.trim());
-    onClose();
-  };
-
+  useEffect(() => { if (open) { setTitle(""); setTimeout(() => inputRef.current?.focus(), 50); } }, [open]);
+  const submit = () => { if (!title.trim()) return; onCreate(title.trim()); onClose(); };
   return (
     <Modal open={open} onClose={onClose} title="Neue Sektion">
       <div className="space-y-4">
         <div>
           <div className="label-xs mb-1.5">Name</div>
-          <input
-            ref={inputRef}
-            className={input}
-            value={title}
+          <input ref={inputRef} className={input} value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            placeholder="z.B. Medien, Netzwerk, Smart Home..."
-          />
+            placeholder="z.B. Medien, Netzwerk, Smart Home..." />
         </div>
         <button onClick={submit} disabled={!title.trim()} className="w-full rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
           Erstellen
@@ -817,6 +911,8 @@ function AddSectionModal({ open, onClose, onCreate }: {
 
 export default function DashboardPage() {
   const { t } = useTranslation();
+
+  // ─ UI state ─────────────────────────────────────────────────────────────────
   const [editMode, setEditMode] = useState(false);
   const [appModalOpen, setAppModalOpen] = useState(false);
   const [draftApp, setDraftApp] = useState<Partial<Tile> | null>(null);
@@ -827,10 +923,15 @@ export default function DashboardPage() {
   const [dockerActionTarget, setDockerActionTarget] = useState<{ container: DiscoveredContainer; action: "start" | "stop" | "restart" } | null>(null);
   const [dockerModalOpen, setDockerModalOpen] = useState(false);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
-  const [sectionsDraft, setSectionsDraft] = useState<DashboardSection[] | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
 
+  // ─ Draft & DnD state ────────────────────────────────────────────────────────
+  const [sectionsDraft, setSectionsDraft] = useState<DashboardSection[] | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeDragData, setActiveDragData] = useState<{ w: number; h: number } | null>(null);
+  const [hoveredCell, setHoveredCell] = useState<HoveredCell | null>(null);
+
+  // ─ Data ─────────────────────────────────────────────────────────────────────
   const { data: dashboard } = useDashboard();
   const { data: tiles = [] } = useTiles();
   const { data: discovery } = useDockerDiscovery();
@@ -856,23 +957,32 @@ export default function DashboardPage() {
     (c) => !tiles.some((t) => t.url === c.app.href || t.name === c.app.name)
   );
 
+  // ─ Modal helpers ─────────────────────────────────────────────────────────────
   const openAppModal = (initial?: Partial<Tile>, sectionId?: number | null) => {
     setDraftApp(initial ?? null);
     setDefaultSectionId(sectionId ?? sections[0]?.id ?? null);
     setAppModalOpen(true);
   };
 
+  // ─ Edit mode ─────────────────────────────────────────────────────────────────
   const enterEditMode = () => {
     setSectionsDraft(JSON.parse(JSON.stringify(dashboard?.sections ?? [])));
     setEditMode(true);
   };
 
-  const cancelEditMode = () => { setSectionsDraft(null); setActiveId(null); setEditMode(false); };
+  const cancelEditMode = () => {
+    setSectionsDraft(null);
+    setActiveId(null);
+    setActiveDragData(null);
+    setHoveredCell(null);
+    setEditMode(false);
+  };
 
   const saveEditMode = () => {
     const draft = sectionsDraft ?? sections;
     reorderDashboard.mutate({
-      sections: draft.map((s, i) => ({ id: s.id, sort_order: i })),
+      // Include title + layout so colors/gridCols persist ✓
+      sections: draft.map((s, i) => ({ id: s.id, sort_order: i, title: s.title, layout: s.layout })),
       items: draft.flatMap((s) =>
         s.items.map((item, i) => ({ id: item.id, section_id: s.id, sort_order: i, layout: item.layout }))
       ),
@@ -881,15 +991,38 @@ export default function DashboardPage() {
     setEditMode(false);
   };
 
+  // ─ Draft helpers ─────────────────────────────────────────────────────────────
   const updateItemLayout = (itemId: number, patch: Record<string, unknown>) => {
     setSectionsDraft((prev) =>
-      prev?.map((s) => ({ ...s, items: s.items.map((it) => it.id === itemId ? { ...it, layout: { ...it.layout, ...patch } } : it) })) ?? null
+      prev?.map((s) => ({
+        ...s,
+        items: s.items.map((it) => it.id === itemId ? { ...it, layout: { ...it.layout, ...patch } } : it),
+      })) ?? null
     );
   };
 
   const updateSectionLayout = (sectionId: number, patch: Record<string, unknown>) => {
     setSectionsDraft((prev) =>
       prev?.map((s) => s.id === sectionId ? { ...s, layout: { ...s.layout, ...patch } } : s) ?? null
+    );
+  };
+
+  /** Change gridCols and clear explicit positions so items are re-flowed */
+  const changeGridCols = (sectionId: number, gridCols: number) => {
+    setSectionsDraft((prev) =>
+      prev?.map((s) => {
+        if (s.id !== sectionId) return s;
+        return {
+          ...s,
+          layout: { ...s.layout, gridCols },
+          // Reset explicit positions — auto-assign will re-pack items into new column count
+          items: s.items.map((it) => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { col: _col, row: _row, ...rest } = it.layout as Record<string, unknown>;
+            return { ...it, layout: rest };
+          }),
+        };
+      }) ?? null
     );
   };
 
@@ -918,59 +1051,99 @@ export default function DashboardPage() {
     });
   };
 
-  // ─ DnD ─────────────────────────────────────────────────────────────────────
+  // ─ DnD handlers ──────────────────────────────────────────────────────────────
 
-  const moveItem = (activeItemId: number, overId: string) => {
-    const current = JSON.parse(JSON.stringify(sections)) as DashboardSection[];
-    let srcSec = -1, srcItem = -1;
-    current.forEach((s, si) => {
-      const ii = s.items.findIndex((it) => it.id === activeItemId);
-      if (ii >= 0) { srcSec = si; srcItem = ii; }
-    });
-    if (srcSec < 0 || srcItem < 0) return;
-
-    const [item] = current[srcSec].items.splice(srcItem, 1);
-    let dstSec = srcSec, dstItem = current[srcSec].items.length;
-
-    if (overId.startsWith("section-drop:")) {
-      dstSec = current.findIndex((s) => s.id === numericId(overId.replace("section-drop", "section")));
-      dstItem = current[dstSec]?.items.length ?? 0;
-    } else if (overId.startsWith("section:")) {
-      dstSec = current.findIndex((s) => s.id === numericId(overId));
-      dstItem = current[dstSec]?.items.length ?? 0;
-    } else if (overId.startsWith("item:")) {
-      const overItemId = numericId(overId);
-      current.forEach((s, si) => {
-        const ii = s.items.findIndex((it) => it.id === overItemId);
-        if (ii >= 0) { dstSec = si; dstItem = ii; }
+  const handleDragStart = (e: { active: { id: string | number; data: { current?: Record<string, unknown> } } }) => {
+    const id = String(e.active.id);
+    setActiveId(id);
+    if (id.startsWith("item:") && e.active.data.current) {
+      setActiveDragData({
+        w: Number(e.active.data.current.w ?? 1),
+        h: Number(e.active.data.current.h ?? 1),
       });
     }
+  };
 
-    if (dstSec < 0) return;
-    item.section_id = current[dstSec].id;
-    current[dstSec].items.splice(dstItem, 0, item);
-    setSectionsDraft(current.map((s, si) => ({
-      ...s, sort_order: si,
-      items: s.items.map((it, ii) => ({ ...it, section_id: s.id, sort_order: ii })),
-    })));
+  const handleDragOver = (e: DragOverEvent) => {
+    const { over, active } = e;
+    if (!over || !String(active.id).startsWith("item:")) {
+      setHoveredCell(null);
+      return;
+    }
+    const od = over.data.current;
+    if (od?.type === "cell") {
+      setHoveredCell({
+        sectionId: Number(od.sectionId),
+        col: Number(od.col),
+        row: Number(od.row),
+      });
+    } else {
+      setHoveredCell(null);
+    }
+  };
+
+  /** Move an item to an explicit grid cell (possibly in a different section) */
+  const placeItemAtCell = (itemId: number, targetSectionId: number, col: number, row: number) => {
+    setSectionsDraft((prev) => {
+      if (!prev) return null;
+      const next = JSON.parse(JSON.stringify(prev)) as DashboardSection[];
+
+      // Find and remove item from its current section
+      let movedItem: DashboardItem | undefined;
+      for (const s of next) {
+        const idx = s.items.findIndex((it) => it.id === itemId);
+        if (idx >= 0) {
+          [movedItem] = s.items.splice(idx, 1);
+          break;
+        }
+      }
+      if (!movedItem) return prev;
+
+      // Update position
+      movedItem.section_id = targetSectionId;
+      movedItem.layout = { ...movedItem.layout, col, row };
+
+      // Add to target section
+      const targetSec = next.find((s) => s.id === targetSectionId);
+      if (!targetSec) return prev;
+      targetSec.items.push(movedItem);
+
+      return next;
+    });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
-    if (!over || active.id === over.id) return;
-    const ak = String(active.id), ok = String(over.id);
+    setActiveDragData(null);
+    setHoveredCell(null);
 
+    if (!over || active.id === over.id) return;
+    const ak = String(active.id);
+    const ok = String(over.id);
+
+    // Section reorder
     if (ak.startsWith("section:") && ok.startsWith("section:")) {
       const cur = [...sections];
       const oi = cur.findIndex((s) => s.id === numericId(ak));
       const ni = cur.findIndex((s) => s.id === numericId(ok));
-      if (oi >= 0 && ni >= 0) setSectionsDraft(arrayMove(cur, oi, ni).map((s, i) => ({ ...s, sort_order: i })));
+      if (oi >= 0 && ni >= 0) {
+        setSectionsDraft(arrayMove(cur, oi, ni).map((s, i) => ({ ...s, sort_order: i })));
+      }
       return;
     }
-    if (ak.startsWith("item:")) moveItem(numericId(ak), ok);
+
+    // Item dropped onto a grid cell → free position
+    if (ak.startsWith("item:") && ok.startsWith("cell:")) {
+      const parts = ok.split(":");
+      const targetSectionId = Number(parts[1]);
+      const targetCol = Number(parts[2]);
+      const targetRow = Number(parts[3]);
+      placeItemAtCell(numericId(ak), targetSectionId, targetCol, targetRow);
+    }
   };
 
+  // ─ Active drag objects ───────────────────────────────────────────────────────
   const activeSection = activeId?.startsWith("section:") ? sections.find((s) => s.id === numericId(activeId)) : undefined;
   const activeItem = activeId?.startsWith("item:") ? sections.flatMap((s) => s.items).find((it) => it.id === numericId(activeId)) : undefined;
   const activeTile = activeItem?.item_type === "tile" ? tilesById.get(activeItem.item_id) : undefined;
@@ -979,7 +1152,7 @@ export default function DashboardPage() {
   const hasDocker = discovery?.status !== "disabled";
   const totalContainers = containers.length;
 
-  // ─ Render ───────────────────────────────────────────────────────────────────
+  // ─ Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-5 text-t1">
@@ -990,18 +1163,15 @@ export default function DashboardPage() {
           <h1 className="text-xl font-semibold text-t1">{t("dashboard.title")}</h1>
         </div>
         <div className="flex items-center gap-2">
-          {/* Docker indicator button */}
           {hasDocker && (
             <button
               onClick={() => setDockerModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 transition-colors hover:border-accent/40 hover:text-t1"
             >
               <Container size={13} />
               <span className="hidden sm:inline">Docker</span>
               {totalContainers > 0 && (
-                <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
-                  {totalContainers}
-                </span>
+                <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">{totalContainers}</span>
               )}
               {suggestions.length > 0 && (
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title={`${suggestions.length} suggested`} />
@@ -1011,7 +1181,7 @@ export default function DashboardPage() {
           {!editMode && (
             <button
               onClick={enterEditMode}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 transition-colors hover:border-accent/40 hover:text-t1"
             >
               <SlidersHorizontal size={14} /> {t("dashboard.edit")}
             </button>
@@ -1019,51 +1189,52 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Edit-Mode Toolbar — sticky below the header */}
+      {/* Edit mode toolbar */}
       {editMode && (
         <div className="sticky top-0 z-40 -mx-6 flex flex-wrap items-center gap-2 border-b border-line/40 bg-bg/90 px-6 py-2.5 backdrop-blur-md">
-          <span className="label-xs text-accent mr-1">EDIT MODE</span>
+          <span className="label-xs mr-1 text-accent">EDIT MODE</span>
           <button
             onClick={() => openAppModal()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg transition-opacity hover:opacity-90"
           >
             <Plus size={13} /> App
           </button>
           <button
             onClick={() => { setEditingWidget(null); setWidgetModalOpen(true); }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 transition-colors hover:border-accent/40 hover:text-t1"
           >
             <Boxes size={13} /> Widget
           </button>
           <button
             onClick={() => setAddSectionOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 transition-colors hover:border-accent/40 hover:text-t1"
           >
             <FolderPlus size={13} /> Sektion
           </button>
           <div className="flex-1" />
           <button
             onClick={saveEditMode}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-[13px] font-semibold text-emerald-500 hover:bg-emerald-500/20 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-[13px] font-semibold text-emerald-500 transition-colors hover:bg-emerald-500/20"
           >
             <Check size={13} /> Fertig
           </button>
           <button
             onClick={cancelEditMode}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 transition-colors hover:text-t1"
           >
             <X size={13} /> Abbrechen
           </button>
         </div>
       )}
 
-      {/* Full-width seamless grid — no sidebar split */}
+      {/* DnD context — sections sortable; items free-positioned via drop cells */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragStart={(e) => setActiveId(String(e.active.id))}
+        onDragStart={handleDragStart as never}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveId(null)}
+        onDragCancel={() => { setActiveId(null); setActiveDragData(null); setHoveredCell(null); }}
       >
         <SortableContext items={sections.map((s) => sortableSectionId(s.id))} strategy={verticalListSortingStrategy}>
           {sections.map((section, index) => (
@@ -1077,10 +1248,13 @@ export default function DashboardPage() {
               onToggleCollapse={() => toggleCollapse(section.id)}
               onEditWidget={(w) => { setEditingWidget(w); setWidgetModalOpen(true); }}
               onDeleteWidget={setDeleteWidgetTarget}
-              onSpanChange={(itemId, col, row) => updateItemLayout(itemId, { spanCol: col, spanRow: row })}
+              onSizeChange={(itemId, w, h) => updateItemLayout(itemId, { w, h })}
               onUpdateLayout={(patch) => updateSectionLayout(section.id, patch)}
+              onChangeGridCols={(cols) => changeGridCols(section.id, cols)}
               onRename={(title) => renameSectionInDraft(section.id, title)}
               onDelete={() => deleteSectionFromDraft(section.id)}
+              hoveredCell={hoveredCell}
+              activeDragSize={activeDragData}
               isLast={index === sections.length - 1}
             />
           ))}
@@ -1088,9 +1262,7 @@ export default function DashboardPage() {
 
         {!sections.length && (
           <div className="rounded-2xl border border-dashed border-line/40 py-16 text-center text-[13px] text-t3">
-            {editMode
-              ? "Klicke auf + Sektion um zu beginnen"
-              : t("dashboard.empty_workspace")}
+            {editMode ? "Klicke auf + Sektion um zu beginnen" : t("dashboard.empty_workspace")}
           </div>
         )}
 

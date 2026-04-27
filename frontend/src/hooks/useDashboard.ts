@@ -88,7 +88,7 @@ export function useReorderDashboard() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: {
-      sections: Array<{ id: number; sort_order: number }>;
+      sections: Array<{ id: number; sort_order: number; title?: string; layout?: Record<string, unknown> }>;
       items: Array<{ id: number; section_id: number; sort_order: number; layout?: Record<string, unknown> }>;
     }) =>
       fetchJson<{ ok: true }>("/api/dashboard/reorder", {

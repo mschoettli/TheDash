@@ -217,11 +217,15 @@ router.put("/reorder", (req, res) => {
   }
 
   db.transaction(() => {
-    const updateSection = db.prepare("UPDATE dashboard_sections SET sort_order = ? WHERE id = ?");
+    const updateSection = db.prepare(
+      "UPDATE dashboard_sections SET sort_order = ?, title = COALESCE(?, title), layout = COALESCE(?, layout) WHERE id = ?"
+    );
     sections.forEach((section: any) => {
       const id = Number(section.id);
       const sortOrder = Number(section.sort_order);
-      if (Number.isFinite(id) && Number.isFinite(sortOrder)) updateSection.run(sortOrder, id);
+      const title = section.title ? String(section.title) : null;
+      const layout = section.layout && typeof section.layout === "object" ? JSON.stringify(section.layout) : null;
+      if (Number.isFinite(id) && Number.isFinite(sortOrder)) updateSection.run(sortOrder, title, layout, id);
     });
 
     const updateItem = db.prepare(
