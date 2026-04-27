@@ -53,6 +53,7 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
   const [name, setName] = useState(tile?.name ?? initial?.name ?? "");
   const [url, setUrl] = useState(tile?.url ?? initial?.url ?? "");
   const [iconUrl, setIconUrl] = useState(tile?.icon_url ?? initial?.icon_url ?? "");
+  const [iconTouched, setIconTouched] = useState(false);
   const [style, setStyle] = useState<Tile["style"]>(tile?.style ?? initial?.style ?? "card");
   const [apiUrl, setApiUrl] = useState(tile?.api_url ?? initial?.api_url ?? "");
   const [apiKey, setApiKey] = useState(tile?.api_key ?? initial?.api_key ?? "");
@@ -67,6 +68,7 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
       setName(tile?.name ?? initial?.name ?? "");
       setUrl(tile?.url ?? initial?.url ?? "");
       setIconUrl(tile?.icon_url ?? initial?.icon_url ?? "");
+      setIconTouched(false);
       setStyle(tile?.style ?? initial?.style ?? "card");
       setApiUrl(tile?.api_url ?? initial?.api_url ?? "");
       setApiKey(tile?.api_key ?? initial?.api_key ?? "");
@@ -79,9 +81,29 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
   }, [open, tile, initial, defaultSectionId, sections]);
 
   useEffect(() => {
-    if (!open || tile || initial?.icon_url || iconUrl) return;
-    if (name.trim()) setIconUrl(iconValue(detectIconKey(name)));
-  }, [open, tile, initial, iconUrl, name]);
+    if (!open || tile || initial?.icon_url || iconTouched || (!name.trim() && !url.trim())) return;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      fetch(`/api/logos/resolve?${new URLSearchParams({ name, url }).toString()}`, { signal: controller.signal })
+        .then((res) => res.json())
+        .then((result) => {
+          if (result.status === "found" && result.value) {
+            setIconUrl(result.value);
+          } else if (!iconUrl) {
+            setIconUrl(iconValue(detectIconKey(name)));
+          }
+        })
+        .catch(() => {
+          if (!iconUrl) setIconUrl(iconValue(detectIconKey(name)));
+        });
+    }, 300);
+
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [open, tile, initial, iconTouched, iconUrl, name, url]);
 
   useEffect(() => {
     if (provider === "none" || apiUrl.trim()) return;
@@ -172,10 +194,26 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
         </Field>
 
         <Field label={t("tile.icon")}>
-          <input className={input} value={iconUrl} onChange={(e) => setIconUrl(e.target.value)} placeholder="https://..." />
+          <input
+            className={input}
+            value={iconUrl}
+            onChange={(e) => {
+              setIconTouched(true);
+              setIconUrl(e.target.value);
+            }}
+            placeholder="https://... or logo:selfhst:jellyfin"
+          />
         </Field>
 
-        <IconPicker value={isRegistryIcon(iconUrl) ? iconUrl : null} name={name} onChange={setIconUrl} />
+        <IconPicker
+          value={isRegistryIcon(iconUrl) ? iconUrl : null}
+          name={name}
+          url={url}
+          onChange={(value) => {
+            setIconTouched(true);
+            setIconUrl(value);
+          }}
+        />
 
         <Field label={t("tile.style")}>
           <div className="grid grid-cols-5 overflow-hidden rounded-lg border border-line/60">

@@ -41,6 +41,7 @@ export interface IconOption {
 
 export const ICON_PREFIX = "icon:";
 export const LOGO_PREFIX = "logo:";
+export type LogoSource = "selfhst" | "dashboard-icons" | "simple-icons" | "favicon" | "fallback";
 
 export const ICON_OPTIONS: IconOption[] = [
   { key: "jellyfin", label: "Jellyfin", category: "Media", keywords: ["jellyfin"], icon: Film, brandColor: "#00a4dc", shortLabel: "JF", logoSlug: "jellyfin" },
@@ -113,7 +114,28 @@ export function isRegistryIcon(value?: string | null): boolean {
 
 export function iconKeyFromValue(value?: string | null): string | null {
   if (!isRegistryIcon(value)) return null;
-  return value?.replace(ICON_PREFIX, "").replace(LOGO_PREFIX, "") ?? null;
+  const key = value?.replace(ICON_PREFIX, "").replace(LOGO_PREFIX, "") ?? null;
+  if (!key) return null;
+  const parts = key.split(":");
+  return parts.length >= 2 ? parts.slice(1).join(":") : key;
+}
+
+export function logoUrlFromValue(value?: string | null): string | null {
+  if (!value?.startsWith(LOGO_PREFIX)) return null;
+  const [, source, ...slugParts] = value.split(":");
+  const slug = slugParts.join(":");
+  if (!source || !slug) return null;
+  if (source === "selfhst") return `https://cdn.jsdelivr.net/gh/selfhst/icons/svg/${slug}.svg`;
+  if (source === "dashboard-icons") return `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${slug}.svg`;
+  if (source === "simple-icons") return `https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/${slug}.svg`;
+  return null;
+}
+
+export function logoLabelFromValue(value?: string | null): string | null {
+  if (!value?.startsWith(LOGO_PREFIX)) return null;
+  const [, source, ...slugParts] = value.split(":");
+  if (!source || !slugParts.length) return null;
+  return `${source} · ${slugParts.join(":")}`;
 }
 
 export function findIconOption(key?: string | null): IconOption | undefined {

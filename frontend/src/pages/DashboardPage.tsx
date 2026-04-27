@@ -525,6 +525,7 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
   const selected = catalog.find((item) => item.type === type) ?? catalog[0];
   const [title, setTitle] = useState(widget?.title ?? selected?.title ?? "");
   const [icon, setIcon] = useState(String(widget?.config?.icon ?? iconValue(detectIconKey(widget?.title ?? selected?.title ?? ""))));
+  const [iconTouched, setIconTouched] = useState(false);
   const [endpoint, setEndpoint] = useState(String(widget?.config?.endpoint ?? ""));
   const [provider, setProvider] = useState(String(widget?.config?.provider ?? "jellyfin"));
   const [client, setClient] = useState(String(widget?.config?.client ?? "qbittorrent"));
@@ -543,6 +544,7 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
     setType(widget?.type ?? current?.type ?? "docker");
     setTitle(widget?.title ?? current?.title ?? "");
     setIcon(String(widget?.config?.icon ?? iconValue(detectIconKey(widget?.title ?? current?.title ?? ""))));
+    setIconTouched(false);
     setEndpoint(String(widget?.config?.endpoint ?? ""));
     setProvider(String(widget?.config?.provider ?? "jellyfin"));
     setClient(String(widget?.config?.client ?? "qbittorrent"));
@@ -555,9 +557,21 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
   }, [open, widget, catalog, selected]);
 
   useEffect(() => {
-    if (!open || widget) return;
-    setIcon(iconValue(detectIconKey(title)));
-  }, [open, title, widget]);
+    if (!open || widget || iconTouched || !title.trim()) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      fetch(`/api/logos/resolve?${new URLSearchParams({ name: title, url: endpoint }).toString()}`, { signal: controller.signal })
+        .then((res) => res.json())
+        .then((result) => {
+          setIcon(result.status === "found" && result.value ? result.value : iconValue(detectIconKey(title)));
+        })
+        .catch(() => setIcon(iconValue(detectIconKey(title))));
+    }, 300);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [open, title, endpoint, widget, iconTouched]);
 
   const save = () => {
     if (!title.trim() || !type || (config.required && !endpoint.trim())) return;
@@ -591,7 +605,12 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
       <div className="space-y-4">
         <div>
           <div className="label-xs mb-1.5">{t("dashboard.widget_type")}</div>
-          <select className={input} value={type} onChange={(e) => { setType(e.target.value); setTitle(catalog.find((item) => item.type === e.target.value)?.title ?? ""); }}>
+          <select className={input} value={type} onChange={(e) => {
+            const next = catalog.find((item) => item.type === e.target.value);
+            setType(e.target.value);
+            setTitle(next?.title ?? "");
+            setIconTouched(false);
+          }}>
             {catalog.map((item) => <option key={item.type} value={item.type}>{item.title} · {item.category}</option>)}
           </select>
         </div>
@@ -599,7 +618,15 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
           <div className="label-xs mb-1.5">{t("dashboard.widget_title")}</div>
           <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
-        <IconPicker value={icon} name={title} onChange={setIcon} />
+        <IconPicker
+          value={icon}
+          name={title}
+          url={endpoint}
+          onChange={(value) => {
+            setIconTouched(true);
+            setIcon(value);
+          }}
+        />
         {config.field && (
           <div>
             <div className="label-xs mb-1.5">{config.field}{config.required ? " *" : ""}</div>

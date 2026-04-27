@@ -12,6 +12,12 @@ interface FaviconImgProps {
 
 const iconCache = new Map<string, string | null>();
 
+interface LogoResolveResult {
+  status: "found" | "not_found";
+  value?: string | null;
+  url?: string | null;
+}
+
 function letterAvatar(name: string): { letter: string; color: string } {
   const colors = [
     "bg-violet-500",
@@ -47,13 +53,9 @@ export default function FaviconImg({
   if (isRegistryIcon(explicitIconUrl)) {
     return <IconBadge value={explicitIconUrl} name={name} size={size} className={className} />;
   }
-  const detected = findIconOption(detectIconKey(`${name} ${url}`));
-  if (!explicitIconUrl && detected?.logoSlug) {
-    return <IconBadge value={iconValue(detected.key)} name={name} size={size} className={className} />;
-  }
 
   useEffect(() => {
-    const cacheKey = `${url}|${explicitIconUrl ?? ""}`;
+    const cacheKey = `${name}|${url}|${explicitIconUrl ?? ""}`;
     if (iconCache.has(cacheKey)) {
       const cached = iconCache.get(cacheKey) ?? null;
       setIconUrl(cached);
@@ -72,8 +74,18 @@ export default function FaviconImg({
       params.set("candidate", explicitIconUrl);
     }
 
-    fetch(`/api/favicon?${params.toString()}`, { signal: controller.signal })
-      .then((r) => r.json())
+    const request = explicitIconUrl && /^https?:\/\//i.test(explicitIconUrl)
+      ? fetch(`/api/favicon?${params.toString()}`, { signal: controller.signal }).then((r) => r.json())
+      : fetch(`/api/logos/resolve?${new URLSearchParams({ name, url }).toString()}`, { signal: controller.signal })
+          .then((r) => r.json() as Promise<LogoResolveResult>)
+          .then((result) => {
+            if (result.status === "found" && result.value) {
+              return { faviconUrl: result.value };
+            }
+            return fetch(`/api/favicon?${params.toString()}`, { signal: controller.signal }).then((r) => r.json());
+          });
+
+    request
       .then((data) => {
         if (cancelled) return;
         const discovered = data.faviconUrl ?? null;
@@ -93,7 +105,16 @@ export default function FaviconImg({
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [url, explicitIconUrl]);
+  }, [url, name, explicitIconUrl]);
+
+  if (!explicitIconUrl && isRegistryIcon(iconUrl)) {
+    return <IconBadge value={iconUrl} name={name} size={size} className={className} />;
+  }
+
+  const detected = findIconOption(detectIconKey(`${name} ${url}`));
+  if (!explicitIconUrl && detected?.logoSlug && failed) {
+    return <IconBadge value={iconValue(detected.key)} name={name} size={size} className={className} />;
+  }
 
   if (!failed && iconUrl) {
     return (

@@ -150,6 +150,13 @@ export function runMigrations(): void {
       payload     TEXT,
       created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS logo_cache (
+      cache_key   TEXT PRIMARY KEY,
+      result_json TEXT NOT NULL,
+      expires_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   if (columnExists("tiles", "api_endpoint")) {

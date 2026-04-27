@@ -1,6 +1,7 @@
 import { Request, Router } from "express";
 import db from "../db/client";
 import { DockerContainer, dockerPost, listContainers } from "../lib/docker";
+import { resolveLogo } from "../lib/logoResolver";
 
 const router = Router();
 
@@ -108,6 +109,18 @@ router.post("/discovery/:id/adopt", async (req, res) => {
       return;
     }
 
+    const resolvedLogo = await resolveLogo({
+      name: discovered.app.name,
+      url: discovered.app.href ?? "",
+      image: discovered.image,
+      labels: JSON.stringify(discovered.labels ?? {}),
+    });
+    const logo = discovered.app.icon ?? (
+      resolvedLogo.status === "found" && resolvedLogo.slug
+        ? `logo:${resolvedLogo.source}:${resolvedLogo.slug}`
+        : null
+    );
+
     const result = db
       .prepare(
         "INSERT INTO tiles (name, url, icon_url, style, api_url, api_key, provider, sort_order) VALUES (?, ?, ?, 'card', NULL, NULL, 'none', ?)"
@@ -115,7 +128,7 @@ router.post("/discovery/:id/adopt", async (req, res) => {
       .run(
         discovered.app.name,
         discovered.app.href,
-        discovered.app.icon,
+        logo,
         Date.now()
       );
     writeAudit("docker.adopt", "container", discovered.id, discovered.app);
