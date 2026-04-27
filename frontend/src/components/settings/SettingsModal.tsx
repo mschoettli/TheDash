@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Sun, Moon, Download, Upload } from "lucide-react";
 import Modal from "../ui/Modal";
@@ -46,6 +46,15 @@ export default function SettingsModal({ open, onClose }: Props) {
   const { t } = useTranslation();
   const { theme, language, widgetStyle, setTheme, setLanguage, setWidgetStyle } = useSettingsStore();
   const importRef = useRef<HTMLInputElement>(null);
+  const [runtime, setRuntime] = useState<{ aiTagging: { enabled: boolean; provider: string; model: string | null }; logos: { provider: string } } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/settings/runtime")
+      .then((res) => res.json())
+      .then(setRuntime)
+      .catch(() => setRuntime(null));
+  }, [open]);
 
   const handleExport = async () => {
     const res = await fetch("/api/export");
@@ -111,6 +120,23 @@ export default function SettingsModal({ open, onClose }: Props) {
             { value: "minimal" as const, label: t("settings.style_minimal") },
           ]}
         />
+
+        <div className="grid gap-3 border-t border-line/40 pt-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-line/60 bg-surface p-3">
+            <div className="label-xs mb-1">{t("settings.ai_tagging")}</div>
+            <div className="text-[13px] font-semibold text-t1">
+              {runtime?.aiTagging.enabled ? t("settings.enabled") : t("settings.local_fallback")}
+            </div>
+            <div className="mt-1 text-[11px] text-t3">
+              {runtime?.aiTagging.provider ?? "local"}{runtime?.aiTagging.model ? ` · ${runtime.aiTagging.model}` : ""}
+            </div>
+          </div>
+          <div className="rounded-xl border border-line/60 bg-surface p-3">
+            <div className="label-xs mb-1">{t("settings.logo_provider")}</div>
+            <div className="text-[13px] font-semibold text-t1">{runtime?.logos.provider ?? "simple-icons"}</div>
+            <div className="mt-1 text-[11px] text-t3">{t("settings.logo_provider_hint")}</div>
+          </div>
+        </div>
 
         <div className="flex gap-2 pt-2 border-t border-line/40">
           <button

@@ -95,3 +95,16 @@ export function useDeleteWidget() {
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 }
+
+export function useReorderWidgets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: Array<{ id: number; sort_order: number }>) =>
+      fetchJson<{ ok: true }>("/api/widgets/reorder/batch", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
+}

@@ -13,6 +13,20 @@ router.get("/", (_req, res) => {
   res.json(result);
 });
 
+router.get("/runtime", (_req, res) => {
+  res.json({
+    aiTagging: {
+      enabled: Boolean(process.env.AI_TAGGING_PROVIDER && (process.env.AI_TAGGING_API_KEY || process.env.OPENAI_API_KEY)),
+      provider: process.env.AI_TAGGING_PROVIDER || "local",
+      model: process.env.AI_TAGGING_MODEL || null,
+    },
+    logos: {
+      provider: "simple-icons",
+      proxy: "/api/logos/:key",
+    },
+  });
+});
+
 router.put("/", (req, res) => {
   const allowed = ["theme", "language", "widgetStyle"];
   const upsert = db.prepare(

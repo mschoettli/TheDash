@@ -79,6 +79,19 @@ export function useDeleteTile() {
   });
 }
 
+export function useReorderTiles() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: Array<{ id: number; sort_order: number }>) =>
+      fetchJson<{ ok: true }>("/api/tiles/reorder/batch", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
+}
+
 export async function fetchTileMetrics(id: number): Promise<TileMetrics> {
   return fetchJson<TileMetrics>(`/api/tiles/${id}/metrics`);
 }

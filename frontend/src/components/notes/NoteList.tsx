@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Archive, ChevronDown, ChevronRight, Copy, Edit3, FileText, Folder, FolderPlus, Inbox, Pin, Plus, Star, Trash2 } from "lucide-react";
+import { Archive, ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Edit3, FileText, Folder, FolderPlus, Inbox, Pin, Plus, Star, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import {
@@ -9,6 +9,7 @@ import {
   useCreateNoteFolder,
   useDeleteNote,
   useDeleteNoteFolder,
+  useReorderNotes,
   useReorderNoteFolders,
   useUpdateNote,
   useUpdateNoteFolder,
@@ -44,6 +45,7 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
   const updateFolder = useUpdateNoteFolder();
   const deleteFolder = useDeleteNoteFolder();
   const reorderFolders = useReorderNoteFolders();
+  const reorderNotes = useReorderNotes();
 
   const [openFolders, setOpenFolders] = useState<Set<number>>(() => new Set(folders.map((folder) => folder.id)));
   const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
@@ -116,7 +118,11 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
 
   const moveDraggedNote = (folderId: number | null) => {
     if (!dragNoteId) return;
-    updateNote.mutate({ id: dragNoteId, folder_id: folderId });
+    const targetNotes = folderNotes(notes, folderId).filter((note) => note.id !== dragNoteId);
+    reorderNotes.mutate([
+      { id: dragNoteId, folder_id: folderId, sort_order: -1 },
+      ...targetNotes.map((note, index) => ({ id: note.id, folder_id: folderId, sort_order: index })),
+    ]);
     setDragNoteId(null);
   };
 
@@ -146,6 +152,34 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
       return next;
     });
     setDragFolderId(null);
+  };
+
+  const moveFolderWithinParent = (folder: NoteFolder, direction: -1 | 1) => {
+    const siblings = [...(childFolders.get(folder.parent_id ?? null) ?? [])];
+    const currentIndex = siblings.findIndex((item) => item.id === folder.id);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.length) return;
+    const [moved] = siblings.splice(currentIndex, 1);
+    siblings.splice(nextIndex, 0, moved);
+    reorderFolders.mutate(siblings.map((item, index) => ({
+      id: item.id,
+      parent_id: item.parent_id ?? null,
+      sort_order: index,
+    })));
+  };
+
+  const moveNoteWithinFolder = (note: Note, direction: -1 | 1) => {
+    const siblings = folderNotes(notes, note.folder_id ?? null);
+    const currentIndex = siblings.findIndex((item) => item.id === note.id);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.length) return;
+    const [moved] = siblings.splice(currentIndex, 1);
+    siblings.splice(nextIndex, 0, moved);
+    reorderNotes.mutate(siblings.map((item, index) => ({
+      id: item.id,
+      folder_id: note.folder_id ?? null,
+      sort_order: index,
+    })));
   };
 
   const duplicateNote = (note: Note) => {
@@ -226,6 +260,12 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
           <button onClick={(event) => { event.stopPropagation(); duplicateNote(note); }} className="rounded p-0.5 text-t3 hover:text-accent">
             <Copy size={11} />
           </button>
+          <button onClick={(event) => { event.stopPropagation(); moveNoteWithinFolder(note, -1); }} className="rounded p-0.5 text-t3 hover:text-accent">
+            <ArrowUp size={11} />
+          </button>
+          <button onClick={(event) => { event.stopPropagation(); moveNoteWithinFolder(note, 1); }} className="rounded p-0.5 text-t3 hover:text-accent">
+            <ArrowDown size={11} />
+          </button>
           <button onClick={(event) => { event.stopPropagation(); updateNote.mutate({ id: note.id, is_archived: !note.is_archived }); }} className="rounded p-0.5 text-t3 hover:text-amber-500">
             <Archive size={11} />
           </button>
@@ -303,6 +343,12 @@ export default function NoteList({ notes, folders, selectedId, selectedScope, on
           </button>
           <button onClick={() => startRenameFolder(folder)} className="rounded p-1 text-t3 opacity-0 hover:bg-line/30 hover:text-accent group-hover:opacity-100">
             <Edit3 size={12} />
+          </button>
+          <button onClick={() => moveFolderWithinParent(folder, -1)} className="rounded p-1 text-t3 opacity-0 hover:bg-line/30 hover:text-accent group-hover:opacity-100">
+            <ArrowUp size={12} />
+          </button>
+          <button onClick={() => moveFolderWithinParent(folder, 1)} className="rounded p-1 text-t3 opacity-0 hover:bg-line/30 hover:text-accent group-hover:opacity-100">
+            <ArrowDown size={12} />
           </button>
           <button onClick={() => setDeleteFolderTarget(folder)} className="rounded p-1 text-t3 opacity-0 hover:bg-rose-500/10 hover:text-rose-500 group-hover:opacity-100">
             <Trash2 size={12} />

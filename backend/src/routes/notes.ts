@@ -162,6 +162,28 @@ router.put("/reorder/folders", (req, res) => {
   res.json({ ok: true });
 });
 
+router.put("/reorder/notes", (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  if (!items.length) {
+    res.status(400).json({ error: "items required" });
+    return;
+  }
+
+  db.transaction(() => {
+    const update = db.prepare("UPDATE notes SET folder_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?");
+    items.forEach((item: any) => {
+      const id = Number(item.id);
+      const folderId = item.folder_id === null || item.folder_id === undefined ? null : Number(item.folder_id);
+      const sortOrder = Number(item.sort_order);
+      if (Number.isFinite(id) && Number.isFinite(sortOrder) && (folderId === null || Number.isFinite(folderId))) {
+        update.run(folderId, sortOrder, id);
+      }
+    });
+  })();
+
+  res.json({ ok: true });
+});
+
 router.post("/", (req, res) => {
   const { title, content, folder_id, tags, is_pinned, is_archived, sort_order } = req.body ?? {};
   const folderId = folder_id ?? null;

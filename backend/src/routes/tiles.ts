@@ -97,6 +97,25 @@ router.post("/", (req, res) => {
   res.status(201).json(mapTile(row));
 });
 
+router.put("/reorder/batch", (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  if (!items.length) {
+    res.status(400).json({ error: "items required" });
+    return;
+  }
+
+  db.transaction(() => {
+    const update = db.prepare("UPDATE tiles SET sort_order = ? WHERE id = ?");
+    items.forEach((item: any) => {
+      const id = Number(item.id);
+      const sortOrder = Number(item.sort_order);
+      if (Number.isFinite(id) && Number.isFinite(sortOrder)) update.run(sortOrder, id);
+    });
+  })();
+
+  res.json({ ok: true });
+});
+
 router.put("/:id", (req, res) => {
   const existing = db.prepare("SELECT * FROM tiles WHERE id = ?").get(req.params.id) as
     | any

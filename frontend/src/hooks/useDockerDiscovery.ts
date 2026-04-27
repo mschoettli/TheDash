@@ -23,6 +23,7 @@ export interface DiscoveredContainer {
     description: string | null;
     is_labeled: boolean;
     suggested: boolean;
+    confidence: "label" | "port" | "image";
   };
 }
 

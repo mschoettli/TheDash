@@ -9,9 +9,14 @@ import TileEditModal from "./TileEditModal";
 
 interface Props {
   tile: Tile;
+  editMode?: boolean;
+  draggable?: boolean;
+  onDragStart?: () => void;
+  onDragOver?: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDrop?: () => void;
 }
 
-export default function TileWrapper({ tile }: Props) {
+export default function TileWrapper({ tile, editMode = false, draggable = false, onDragStart, onDragOver, onDrop }: Props) {
   const globalStyle = useSettingsStore((s) => s.widgetStyle);
   const effectiveStyle = tile.style ?? globalStyle;
 
@@ -75,7 +80,13 @@ export default function TileWrapper({ tile }: Props) {
   const tileProps = { tile, online, apiData };
 
   return (
-    <div className="relative group">
+    <div
+      className={`relative group ${editMode ? "rounded-2xl ring-1 ring-accent/20" : ""}`}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
       <a href={tile.url} target="_blank" rel="noopener noreferrer" className="block">
         {effectiveStyle === "compact" ? (
           <TileCompact {...tileProps} />
@@ -90,7 +101,7 @@ export default function TileWrapper({ tile }: Props) {
           e.preventDefault();
           setEditOpen(true);
         }}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-surface/90 border border-line/50 text-t3 hover:text-accent transition-all"
+        className={`absolute top-2 right-2 p-1.5 rounded-lg bg-surface/90 border border-line/50 text-t3 hover:text-accent transition-all ${editMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
         title="Bearbeiten"
       >
         <Pencil size={13} />

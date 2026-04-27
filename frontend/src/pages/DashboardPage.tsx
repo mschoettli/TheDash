@@ -23,12 +23,12 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 import TileGrid from "../components/tiles/TileGrid";
 import TileEditModal from "../components/tiles/TileEditModal";
 import { detectIconKey, iconValue } from "../lib/iconRegistry";
-import { Tile } from "../hooks/useTiles";
-import { useTiles } from "../hooks/useTiles";
+import { Tile, useReorderTiles, useTiles } from "../hooks/useTiles";
 import { DiscoveredContainer, useDockerAction, useDockerDiscovery } from "../hooks/useDockerDiscovery";
 import {
   useCreateWidget,
   useDeleteWidget,
+  useReorderWidgets,
   useUpdateWidget,
   useWidgetMetrics,
   useWidgetCatalog,
@@ -59,6 +59,8 @@ const WIDGET_CONFIG: Record<string, { field?: string; placeholder?: string; requ
   notifications: {},
 };
 
+const ACTIVE_WIDGET_TYPES = new Set(["docker", "system", "media", "downloads", "network", "rss", "weather", "calendar", "releases", "stocks"]);
+
 function hostFromUrl(url: string | null): string {
   if (!url) return "";
   try {
@@ -76,7 +78,10 @@ function widgetEndpointLabel(widget: WidgetInstance): string {
 
 function WidgetContent({ widget }: { widget: WidgetInstance }) {
   const { t } = useTranslation();
-  const { data: metrics } = useWidgetMetrics(widget.id, ["docker", "system", "rss", "weather"].includes(widget.type));
+  const { data: metrics } = useWidgetMetrics(
+    widget.id,
+    ["docker", "system", "rss", "weather", "media", "downloads", "network", "calendar", "releases", "stocks"].includes(widget.type)
+  );
   const endpoint = String(widget.config.endpoint ?? "").trim();
   const notes = String(widget.config.notes ?? "").trim();
   const label = widgetEndpointLabel(widget);
@@ -188,6 +193,11 @@ function WidgetEditModal({
   const [title, setTitle] = useState(widget?.title ?? selected?.title ?? "");
   const [icon, setIcon] = useState(String(widget?.config?.icon ?? iconValue(detectIconKey(widget?.title ?? selected?.title ?? ""))));
   const [endpoint, setEndpoint] = useState(String(widget?.config?.endpoint ?? ""));
+  const [provider, setProvider] = useState(String(widget?.config?.provider ?? "jellyfin"));
+  const [client, setClient] = useState(String(widget?.config?.client ?? "qbittorrent"));
+  const [username, setUsername] = useState(String(widget?.config?.username ?? ""));
+  const [password, setPassword] = useState("");
+  const [apiKey, setApiKey] = useState(String(widget?.config?.apiKey ?? ""));
   const [notes, setNotes] = useState(String(widget?.config?.notes ?? ""));
   const [showAddress, setShowAddress] = useState(Boolean(widget?.config?.showAddress ?? true));
   const config = WIDGET_CONFIG[type] ?? {};
@@ -199,6 +209,11 @@ function WidgetEditModal({
     setTitle(widget?.title ?? current?.title ?? "");
     setIcon(String(widget?.config?.icon ?? iconValue(detectIconKey(widget?.title ?? current?.title ?? ""))));
     setEndpoint(String(widget?.config?.endpoint ?? ""));
+    setProvider(String(widget?.config?.provider ?? "jellyfin"));
+    setClient(String(widget?.config?.client ?? "qbittorrent"));
+    setUsername(String(widget?.config?.username ?? ""));
+    setPassword("");
+    setApiKey("");
     setNotes(String(widget?.config?.notes ?? ""));
     setShowAddress(Boolean(widget?.config?.showAddress ?? true));
   }, [open, widget, catalog, selected]);
@@ -213,7 +228,7 @@ function WidgetEditModal({
     const payload = {
       type,
       title: title.trim(),
-      config: { endpoint: endpoint.trim(), notes: notes.trim(), icon, showAddress },
+      config: { endpoint: endpoint.trim(), provider, client, username: username.trim(), password: password.trim(), apiKey: apiKey.trim(), notes: notes.trim(), icon, showAddress },
       layout: widget?.layout ?? {},
       section_id: widget?.section_id ?? null,
       sort_order: widget?.sort_order ?? 0,
@@ -249,6 +264,45 @@ function WidgetEditModal({
             <input className={input} value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder={config.placeholder} />
           </div>
         )}
+        {type === "media" && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <div className="label-xs mb-1.5">{t("dashboard.provider")}</div>
+              <select className={input} value={provider} onChange={(event) => setProvider(event.target.value)}>
+                <option value="jellyfin">Jellyfin</option>
+                <option value="plex">Plex</option>
+                <option value="emby">Emby</option>
+              </select>
+            </div>
+            <div>
+              <div className="label-xs mb-1.5">{t("tile.api_key")}</div>
+              <input className={input} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={widget?.config?.hasApiKey ? t("dashboard.secret_keep") : "Token"} />
+            </div>
+          </div>
+        )}
+        {type === "downloads" && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <div className="label-xs mb-1.5">{t("dashboard.client")}</div>
+              <select className={input} value={client} onChange={(event) => setClient(event.target.value)}>
+                <option value="qbittorrent">qBittorrent</option>
+                <option value="sabnzbd">SABnzbd</option>
+              </select>
+            </div>
+            <div>
+              <div className="label-xs mb-1.5">{t("tile.api_key")}</div>
+              <input className={input} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={widget?.config?.hasApiKey ? t("dashboard.secret_keep") : t("dashboard.optional")} />
+            </div>
+            <div>
+              <div className="label-xs mb-1.5">{t("dashboard.username")}</div>
+              <input className={input} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="admin" />
+            </div>
+            <div>
+              <div className="label-xs mb-1.5">{t("dashboard.password")}</div>
+              <input className={input} type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={widget?.config?.hasPassword ? t("dashboard.secret_keep") : t("dashboard.optional")} />
+            </div>
+          </div>
+        )}
         <label className="flex items-center justify-between rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t2">
           <span>{t("tile.show_address")}</span>
           <input type="checkbox" checked={showAddress} onChange={(event) => setShowAddress(event.target.checked)} />
@@ -265,30 +319,36 @@ function WidgetEditModal({
   );
 }
 
-function ContainerRow({ container, onAdopt }: { container: DiscoveredContainer; onAdopt: (container: DiscoveredContainer) => void }) {
+function ContainerRow({
+  container,
+  onAdopt,
+  onAction,
+}: {
+  container: DiscoveredContainer;
+  onAdopt: (container: DiscoveredContainer) => void;
+  onAction: (container: DiscoveredContainer, action: "start" | "stop" | "restart") => void;
+}) {
   const { t } = useTranslation();
-  const dockerAction = useDockerAction();
   const isRunning = container.state === "running";
 
-  const runAction = (action: "start" | "stop" | "restart") => {
-    if (!window.confirm(t("dashboard.confirm_docker_action", { action, name: container.name }))) return;
-    dockerAction.mutate({ id: container.id, action });
-  };
-
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-line/50 bg-surface px-3 py-2">
+    <div className="flex items-center gap-3 rounded-xl border border-line/50 bg-surface px-3 py-2.5 transition-all hover:border-accent/30">
       <span className={`h-2 w-2 shrink-0 rounded-full ${isRunning ? "bg-emerald-400" : "bg-t3"}`} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium text-t1">{container.app.name}</div>
+        <div className="flex items-center gap-2">
+          <div className="truncate text-[13px] font-semibold text-t1">{container.app.name}</div>
+          <span className="rounded-full border border-line/50 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-t3">{container.app.confidence}</span>
+        </div>
         <div className="truncate text-[11px] text-t3">{container.app.href ?? container.image}</div>
+        <div className="mt-0.5 truncate text-[10px] text-t3">{container.status}{container.ports.length ? ` · ${container.ports.join(", ")}` : ""}</div>
       </div>
-      <button onClick={() => onAdopt(container)} className="rounded-lg border border-line px-2 py-1 text-[12px] text-t2 hover:border-accent/40 hover:text-accent">
+      <button onClick={() => onAdopt(container)} disabled={!container.app.href} className="rounded-lg border border-line px-2 py-1 text-[12px] text-t2 hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40">
         <Plus size={12} className="inline" /> {t("dashboard.app")}
       </button>
       <div className="flex items-center gap-0.5">
-        <button onClick={() => runAction("start")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-emerald-500"><Play size={13} /></button>
-        <button onClick={() => runAction("stop")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-amber-500"><Pause size={13} /></button>
-        <button onClick={() => runAction("restart")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-accent"><RefreshCw size={13} /></button>
+        <button onClick={() => onAction(container, "start")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-emerald-500"><Play size={13} /></button>
+        <button onClick={() => onAction(container, "stop")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-amber-500"><Pause size={13} /></button>
+        <button onClick={() => onAction(container, "restart")} className="rounded p-1 text-t3 hover:bg-line/40 hover:text-accent"><RefreshCw size={13} /></button>
       </div>
     </div>
   );
@@ -302,20 +362,52 @@ export default function DashboardPage() {
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
   const [deleteWidgetTarget, setDeleteWidgetTarget] = useState<WidgetInstance | null>(null);
+  const [dragWidgetId, setDragWidgetId] = useState<number | null>(null);
+  const [dockerActionTarget, setDockerActionTarget] = useState<{ container: DiscoveredContainer; action: "start" | "stop" | "restart" } | null>(null);
+  const [tileDraft, setTileDraft] = useState<Tile[] | null>(null);
+  const [widgetDraft, setWidgetDraft] = useState<WidgetInstance[] | null>(null);
   const { data: tiles } = useTiles();
   const { data: discovery } = useDockerDiscovery();
   const { data: widgets } = useWidgets();
   const { data: catalog = [] } = useWidgetCatalog();
   const deleteWidget = useDeleteWidget();
+  const reorderWidgets = useReorderWidgets();
+  const reorderTiles = useReorderTiles();
+  const dockerAction = useDockerAction();
+  const activeCatalog = catalog.filter((item) => ACTIVE_WIDGET_TYPES.has(item.type));
+  const visibleWidgets = widgetDraft ?? widgets ?? [];
 
   const containers = discovery?.containers ?? [];
   const suggestions = containers.filter(
     (container) => !tiles?.some((tile) => tile.url === container.app.href || tile.name === container.app.name)
   );
+  const labeledContainers = suggestions.filter((container) => container.app.is_labeled);
+  const discoveredContainers = suggestions.filter((container) => !container.app.is_labeled);
 
   const openAppModal = (initial?: Partial<Tile>) => {
     setDraftApp(initial ?? null);
     setAppModalOpen(true);
+  };
+
+  const enterEditMode = () => {
+    setTileDraft([...(tiles ?? [])]);
+    setWidgetDraft([...(widgets ?? [])]);
+    setEditMode(true);
+  };
+
+  const cancelEditMode = () => {
+    setTileDraft(null);
+    setWidgetDraft(null);
+    setDragWidgetId(null);
+    setEditMode(false);
+  };
+
+  const saveEditMode = () => {
+    if (tileDraft) reorderTiles.mutate(tileDraft.map((tile, index) => ({ id: tile.id, sort_order: index })));
+    if (widgetDraft) reorderWidgets.mutate(widgetDraft.map((widget, index) => ({ id: widget.id, sort_order: index })));
+    setTileDraft(null);
+    setWidgetDraft(null);
+    setEditMode(false);
   };
 
   const adoptContainer = (container: DiscoveredContainer) => {
@@ -333,6 +425,18 @@ export default function DashboardPage() {
     });
   };
 
+  const moveWidgetBefore = (target: WidgetInstance) => {
+    const source = widgetDraft ?? widgets;
+    if (!dragWidgetId || dragWidgetId === target.id || !source) return;
+    const dragged = source.find((widget) => widget.id === dragWidgetId);
+    if (!dragged) return;
+    const ordered = source.filter((widget) => widget.id !== dragWidgetId);
+    const targetIndex = ordered.findIndex((widget) => widget.id === target.id);
+    ordered.splice(targetIndex >= 0 ? targetIndex : ordered.length, 0, dragged);
+    setWidgetDraft(ordered);
+    setDragWidgetId(null);
+  };
+
   return (
     <div className="space-y-5 text-t1">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -342,15 +446,15 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           {!editMode ? (
-            <button onClick={() => setEditMode(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40">
+            <button onClick={enterEditMode} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40">
               <SlidersHorizontal size={14} /> {t("dashboard.edit")}
             </button>
           ) : (
             <>
               <button onClick={() => openAppModal()} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg"><Plus size={14} /> {t("dashboard.add_app")}</button>
               <button onClick={() => { setEditingWidget(null); setWidgetModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1"><Boxes size={14} /> {t("dashboard.add_widget")}</button>
-              <button onClick={() => setEditMode(false)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-[13px] font-medium text-emerald-600 dark:text-emerald-400"><Save size={14} /> {t("common.done")}</button>
-              <button onClick={() => setEditMode(false)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2"><X size={14} /> {t("common.cancel")}</button>
+              <button onClick={saveEditMode} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-[13px] font-medium text-emerald-600 dark:text-emerald-400"><Save size={14} /> {t("common.save")}</button>
+              <button onClick={cancelEditMode} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2"><X size={14} /> {t("common.cancel")}</button>
             </>
           )}
         </div>
@@ -362,7 +466,7 @@ export default function DashboardPage() {
             <div className="label-xs flex items-center gap-1.5"><LayoutDashboard size={11} /> {t("dashboard.apps")}</div>
             <span className="text-[11px] text-t3">{tiles?.length ?? 0}</span>
           </div>
-          {tiles && tiles.length > 0 ? <TileGrid /> : (
+          {tiles && tiles.length > 0 ? <TileGrid editMode={editMode} tilesOverride={tileDraft ?? undefined} onReorder={setTileDraft} /> : (
             <div className="rounded-lg border border-dashed border-line py-10 text-center text-[13px] text-t3">
               {t("dashboard.empty_apps")}
             </div>
@@ -378,7 +482,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-1.5">
-                {containers.slice(0, 8).map((container) => <ContainerRow key={container.id} container={container} onAdopt={adoptContainer} />)}
+                {containers.slice(0, 8).map((container) => <ContainerRow key={container.id} container={container} onAdopt={adoptContainer} onAction={(item, action) => setDockerActionTarget({ container: item, action })} />)}
                 {!containers.length && <div className="text-[13px] text-t3">{t("dashboard.no_containers")}</div>}
               </div>
             )}
@@ -390,8 +494,15 @@ export default function DashboardPage() {
               {editMode && <button onClick={() => { setEditingWidget(null); setWidgetModalOpen(true); }} className="text-[12px] text-accent">+ {t("dashboard.widget")}</button>}
             </div>
             <div className="space-y-1.5">
-              {widgets?.map((widget) => (
-                <div key={widget.id} className="rounded-2xl border border-line/60 bg-surface p-3 shadow-sm transition-all hover:border-accent/35 hover:shadow-lg hover:shadow-accent/5">
+              {visibleWidgets.map((widget) => (
+                <div
+                  key={widget.id}
+                  draggable={editMode}
+                  onDragStart={() => setDragWidgetId(widget.id)}
+                  onDragOver={(event) => editMode && event.preventDefault()}
+                  onDrop={() => moveWidgetBefore(widget)}
+                  className={`rounded-2xl border bg-surface p-3 shadow-sm transition-all hover:border-accent/35 hover:shadow-lg hover:shadow-accent/5 ${editMode ? "cursor-grab border-accent/20 ring-1 ring-accent/10" : "border-line/60"}`}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -424,14 +535,25 @@ export default function DashboardPage() {
             <div className="label-xs flex items-center gap-1.5"><Eye size={11} /> {t("dashboard.discovered_apps")}</div>
             <span className="text-[11px] text-t3">{suggestions.length}</span>
           </div>
-          <div className="grid gap-2 lg:grid-cols-2">
-            {suggestions.map((container) => <ContainerRow key={container.id} container={container} onAdopt={adoptContainer} />)}
+          {labeledContainers.length > 0 && (
+            <div className="mb-4">
+              <div className="label-xs mb-2">{t("dashboard.labeled_containers")}</div>
+              <div className="grid gap-2 lg:grid-cols-2">
+                {labeledContainers.map((container) => <ContainerRow key={container.id} container={container} onAdopt={adoptContainer} onAction={(item, action) => setDockerActionTarget({ container: item, action })} />)}
+              </div>
+            </div>
+          )}
+          <div>
+            <div className="label-xs mb-2">{t("dashboard.suggested_containers")}</div>
+            <div className="grid gap-2 lg:grid-cols-2">
+              {discoveredContainers.map((container) => <ContainerRow key={container.id} container={container} onAdopt={adoptContainer} onAction={(item, action) => setDockerActionTarget({ container: item, action })} />)}
+            </div>
           </div>
         </section>
       )}
 
       <TileEditModal open={appModalOpen} onClose={() => setAppModalOpen(false)} initial={draftApp ?? undefined} />
-      <WidgetEditModal open={widgetModalOpen} onClose={() => setWidgetModalOpen(false)} widget={editingWidget} catalog={catalog} />
+      <WidgetEditModal open={widgetModalOpen} onClose={() => setWidgetModalOpen(false)} widget={editingWidget} catalog={activeCatalog} />
       <ConfirmDialog
         open={Boolean(deleteWidgetTarget)}
         title={t("dashboard.delete_widget_title")}
@@ -442,6 +564,23 @@ export default function DashboardPage() {
           deleteWidget.mutate(deleteWidgetTarget.id, { onSuccess: () => setDeleteWidgetTarget(null) });
         }}
         isPending={deleteWidget.isPending}
+      />
+      <ConfirmDialog
+        open={Boolean(dockerActionTarget)}
+        title={t("dashboard.docker_action_title")}
+        description={t("dashboard.confirm_docker_action", {
+          action: dockerActionTarget?.action ?? "",
+          name: dockerActionTarget?.container.app.name ?? "",
+        })}
+        onCancel={() => setDockerActionTarget(null)}
+        onConfirm={() => {
+          if (!dockerActionTarget) return;
+          dockerAction.mutate(
+            { id: dockerActionTarget.container.id, action: dockerActionTarget.action },
+            { onSuccess: () => setDockerActionTarget(null) }
+          );
+        }}
+        isPending={dockerAction.isPending}
       />
     </div>
   );

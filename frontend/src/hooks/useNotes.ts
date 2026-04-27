@@ -102,6 +102,19 @@ export function useReorderNoteFolders() {
   });
 }
 
+export function useReorderNotes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: Array<{ id: number; folder_id: number | null; sort_order: number }>) =>
+      fetchJson<{ ok: true }>("/api/notes/reorder/notes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
+}
+
 export function useCreateNote() {
   const qc = useQueryClient();
   return useMutation({

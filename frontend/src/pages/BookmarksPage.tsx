@@ -5,7 +5,6 @@ import { useSections, useCreateSection } from "../hooks/useSections";
 import { Link, suggestAutoTags, useReorderLinks } from "../hooks/useLinks";
 import { useTags } from "../hooks/useTags";
 import LinkSection from "../components/links/LinkSection";
-import LinkItem from "../components/links/LinkItem";
 import BookmarkCard from "../components/links/BookmarkCard";
 import BookmarkPreviewDrawer from "../components/links/BookmarkPreviewDrawer";
 import LinkEditModal from "../components/links/LinkEditModal";
@@ -33,6 +32,7 @@ export default function BookmarksPage() {
   const [dragOverLinkId, setDragOverLinkId] = useState<number | null>(null);
   const [captureUrl, setCaptureUrl] = useState("");
   const [captureDraft, setCaptureDraft] = useState<Partial<Link> | null>(null);
+  const [linkDraft, setLinkDraft] = useState<Partial<Link> | null>(null);
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [selectedLink, setSelectedLink] = useState<Link | null>(null);
@@ -266,9 +266,12 @@ export default function BookmarksPage() {
               }}
             >
               <div className="border-b border-line/40 px-3 py-2 text-[13px] font-semibold text-t1">
-                {section.title}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate">{section.title}</span>
+                  <span className="rounded-full border border-line/50 px-2 py-0.5 text-[10px] text-t3">{section.links.length}</span>
+                </div>
               </div>
-              <div className="min-h-[100px] space-y-1 p-2">
+              <div className="min-h-[160px] space-y-1 p-2">
                 {[...section.links]
                   .filter((link) => filteredLinks.some((f) => f.id === link.id))
                   .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
@@ -283,11 +286,22 @@ export default function BookmarksPage() {
                         event.stopPropagation();
                         moveLinkToSection(section.id, link.id);
                       }}
-                      className={dragOverLinkId === link.id ? "rounded-lg ring-2 ring-accent/40" : ""}
+                      className={`rounded-lg transition-all ${dragOverLinkId === link.id ? "translate-y-0.5 ring-2 ring-accent/40" : ""}`}
                     >
-                      <LinkItem link={link} onPreview={setSelectedLink} />
+                      <BookmarkCard link={link} onOpen={setSelectedLink} />
                     </div>
                   ))}
+                {!section.links.filter((link) => filteredLinks.some((f) => f.id === link.id)).length && (
+                  <div className="rounded-xl border border-dashed border-line/70 px-3 py-8 text-center text-[12px] text-t3">
+                    {t("bookmarks.drop_here")}
+                  </div>
+                )}
+                <button
+                  onClick={() => setLinkDraft({ section_id: section.id, name: "", url: "", tags: [] } as Partial<Link>)}
+                  className="mt-2 w-full rounded-lg border border-dashed border-line/70 px-3 py-2 text-[12px] font-medium text-t3 transition-colors hover:border-accent/40 hover:text-accent"
+                >
+                  + {t("bookmarks.add_link")}
+                </button>
               </div>
             </div>
           ))}
@@ -303,6 +317,12 @@ export default function BookmarksPage() {
         }}
         initial={captureDraft ?? undefined}
         defaultSectionId={defaultSectionId}
+      />
+      <LinkEditModal
+        open={Boolean(linkDraft)}
+        onClose={() => setLinkDraft(null)}
+        initial={linkDraft ?? undefined}
+        defaultSectionId={linkDraft?.section_id ?? defaultSectionId}
       />
     </div>
   );

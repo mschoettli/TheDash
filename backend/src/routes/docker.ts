@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Request, Router } from "express";
 import db from "../db/client";
 import { DockerContainer, dockerPost, listContainers } from "../lib/docker";
 
@@ -12,7 +12,18 @@ function firstLabel(labels: Record<string, string>, keys: string[]): string | nu
   return null;
 }
 
-function hrefFromContainer(container: DockerContainer): string | null {
+function cleanImageName(image: string): string {
+  const withoutRegistry = image.split("/").pop() ?? image;
+  return withoutRegistry.split(":")[0]?.replace(/[-_]+/g, " ") ?? image;
+}
+
+function publicHostFromRequest(req: Request): string {
+  const configured = process.env.THEDASH_DOCKER_HOST?.trim();
+  if (configured) return configured.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+  return String(req.get("host") ?? "localhost").split(":")[0];
+}
+
+function hrefFromContainer(container: DockerContainer, publicHost: string): string | null {
   const labelHref = firstLabel(container.labels, [
     "thedash.href",
     "thedash.url",
@@ -21,16 +32,16 @@ function hrefFromContainer(container: DockerContainer): string | null {
   if (labelHref) return labelHref;
 
   const firstPort = container.ports[0]?.split(":")[0];
-  return firstPort ? `http://localhost:${firstPort}` : null;
+  return firstPort ? `http://${publicHost}:${firstPort}` : null;
 }
 
-function mapDiscovery(container: DockerContainer) {
+function mapDiscovery(container: DockerContainer, publicHost: string) {
   const labels = container.labels ?? {};
-  const name = firstLabel(labels, ["thedash.name", "homepage.name"]) ?? container.name;
+  const name = firstLabel(labels, ["thedash.name", "homepage.name"]) ?? cleanImageName(container.image) ?? container.name;
   const group = firstLabel(labels, ["thedash.group", "homepage.group"]) ?? "Discovered";
   const icon = firstLabel(labels, ["thedash.icon", "homepage.icon"]);
   const description = firstLabel(labels, ["thedash.description", "homepage.description"]);
-  const href = hrefFromContainer(container);
+  const href = hrefFromContainer(container, publicHost);
   const isLabeled = Object.keys(labels).some(
     (label) => label.startsWith("thedash.") || label.startsWith("homepage.")
   );
@@ -45,6 +56,7 @@ function mapDiscovery(container: DockerContainer) {
       description,
       is_labeled: isLabeled,
       suggested: !isLabeled,
+      confidence: isLabeled ? "label" : href ? "port" : "image",
     },
   };
 }
@@ -55,10 +67,11 @@ function writeAudit(action: string, targetType: string, targetId: string, payloa
   ).run(action, targetType, targetId, payload ? JSON.stringify(payload) : null);
 }
 
-router.get("/discovery", async (_req, res) => {
+router.get("/discovery", async (req, res) => {
   try {
     const containers = await listContainers();
-    res.json({ status: "ok", containers: containers.map(mapDiscovery) });
+    const publicHost = publicHostFromRequest(req);
+    res.json({ status: "ok", containers: containers.map((container) => mapDiscovery(container, publicHost)) });
   } catch (err: any) {
     res.status(200).json({
       status: "disabled",
@@ -88,7 +101,8 @@ router.post("/containers/:id/:action", async (req, res) => {
 router.post("/discovery/:id/adopt", async (req, res) => {
   try {
     const containers = await listContainers();
-    const discovered = containers.map(mapDiscovery).find((container) => container.id === req.params.id);
+    const publicHost = publicHostFromRequest(req);
+    const discovered = containers.map((container) => mapDiscovery(container, publicHost)).find((container) => container.id === req.params.id);
     if (!discovered || !discovered.app.href) {
       res.status(404).json({ error: "discoverable container not found" });
       return;
