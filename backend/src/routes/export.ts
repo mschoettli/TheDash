@@ -18,6 +18,9 @@ router.get("/export", (_req, res) => {
   const dashboardCards = db
     .prepare("SELECT * FROM dashboard_cards ORDER BY sort_order")
     .all();
+  const dashboardItems = db
+    .prepare("SELECT * FROM dashboard_items ORDER BY section_id, sort_order")
+    .all();
   const widgets = db.prepare("SELECT * FROM widgets ORDER BY sort_order").all();
   const widgetSecrets = db
     .prepare("SELECT widget_id, key, '***' AS value FROM widget_secrets ORDER BY widget_id, key")
@@ -38,6 +41,7 @@ router.get("/export", (_req, res) => {
     noteFolders,
     dashboardSections,
     dashboardCards,
+    dashboardItems,
     widgets,
     widgetSecrets,
     auditLog,
@@ -56,6 +60,7 @@ router.post("/import", (req, res) => {
     noteFolders,
     dashboardSections,
     dashboardCards,
+    dashboardItems,
     widgets,
   } = req.body;
 
@@ -65,6 +70,7 @@ router.post("/import", (req, res) => {
     db.prepare("DELETE FROM tags").run();
     db.prepare("DELETE FROM sections").run();
     db.prepare("DELETE FROM dashboard_cards").run();
+    db.prepare("DELETE FROM dashboard_items").run();
     db.prepare("DELETE FROM dashboard_sections").run();
     db.prepare("DELETE FROM widgets").run();
     db.prepare("DELETE FROM widget_secrets").run();
@@ -170,8 +176,8 @@ router.post("/import", (req, res) => {
 
     for (const section of dashboardSections ?? []) {
       db.prepare(
-        "INSERT INTO dashboard_sections (id, title, sort_order) VALUES (?, ?, ?)"
-      ).run(section.id, section.title, section.sort_order);
+        "INSERT INTO dashboard_sections (id, title, icon, layout, sort_order) VALUES (?, ?, ?, ?, ?)"
+      ).run(section.id, section.title, section.icon ?? null, section.layout ?? "{}", section.sort_order);
     }
 
     for (const card of dashboardCards ?? []) {
@@ -205,6 +211,21 @@ router.post("/import", (req, res) => {
         widget.is_enabled === false ? 0 : 1,
         widget.created_at ?? new Date().toISOString(),
         widget.updated_at ?? new Date().toISOString()
+      );
+    }
+
+    for (const item of dashboardItems ?? []) {
+      db.prepare(
+        "INSERT OR IGNORE INTO dashboard_items (id, section_id, item_type, item_id, sort_order, layout, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run(
+        item.id,
+        item.section_id,
+        item.item_type,
+        item.item_id,
+        item.sort_order ?? 0,
+        item.layout ?? "{}",
+        item.created_at ?? new Date().toISOString(),
+        item.updated_at ?? new Date().toISOString()
       );
     }
   });

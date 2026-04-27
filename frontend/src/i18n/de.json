@@ -12,6 +12,7 @@
     "theme": "Design",
     "theme_light": "Hell",
     "theme_dark": "Dunkel",
+    "theme_dashy": "Dashy Glass",
     "language": "Sprache",
     "widget_style": "Widget-Stil",
     "style_card": "Karte",
@@ -260,7 +261,10 @@
     "severity": "Schweregrad",
     "all": "Alle",
     "configured": "Konfiguriert",
-    "unavailable": "Nicht verfügbar"
+    "unavailable": "Nicht verfügbar",
+    "setup_required": "Einrichtung erforderlich",
+    "loading": "Lädt...",
+    "no_data": "Keine Daten verfügbar"
   },
   "metrics": {
     "cpu": "CPU",

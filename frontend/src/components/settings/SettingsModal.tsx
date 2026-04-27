@@ -108,6 +108,7 @@ export default function SettingsModal({ open, onClose }: Props) {
           options={[
             { value: "light" as const, label: `☀ ${t("settings.theme_light")}` },
             { value: "dark" as const, label: `☾ ${t("settings.theme_dark")}` },
+            { value: "dashy" as const, label: t("settings.theme_dashy") },
           ]}
         />
 

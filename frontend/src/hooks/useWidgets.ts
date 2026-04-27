@@ -38,6 +38,7 @@ export interface WidgetMetrics {
 }
 
 const KEY = ["widgets"];
+const DASHBOARD_KEY = ["dashboard"];
 
 export function useWidgetCatalog() {
   return useQuery<WidgetCatalogItem[]>({
@@ -71,7 +72,10 @@ export function useCreateWidget() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY });
+      qc.invalidateQueries({ queryKey: DASHBOARD_KEY });
+    },
   });
 }
 
@@ -84,7 +88,10 @@ export function useUpdateWidget() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY });
+      qc.invalidateQueries({ queryKey: DASHBOARD_KEY });
+    },
   });
 }
 
@@ -92,7 +99,10 @@ export function useDeleteWidget() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => fetchJson<{ ok: true }>(`/api/widgets/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY });
+      qc.invalidateQueries({ queryKey: DASHBOARD_KEY });
+    },
   });
 }
 

@@ -12,6 +12,7 @@
     "theme": "Theme",
     "theme_light": "Light",
     "theme_dark": "Dark",
+    "theme_dashy": "Dashy Glass",
     "language": "Language",
     "widget_style": "Widget Style",
     "style_card": "Card",
@@ -260,7 +261,10 @@
     "severity": "Severity",
     "all": "All",
     "configured": "Configured",
-    "unavailable": "Unavailable"
+    "unavailable": "Unavailable",
+    "setup_required": "Setup required",
+    "loading": "Loading...",
+    "no_data": "No data available"
   },
   "metrics": {
     "cpu": "CPU",

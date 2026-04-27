@@ -28,6 +28,7 @@ export interface TileMetrics {
 }
 
 const KEY = ["tiles"];
+const DASHBOARD_KEY = ["dashboard"];
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
@@ -53,7 +54,10 @@ export function useCreateTile() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY });
+      qc.invalidateQueries({ queryKey: DASHBOARD_KEY });
+    },
   });
 }
 
@@ -66,7 +70,10 @@ export function useUpdateTile() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY });
+      qc.invalidateQueries({ queryKey: DASHBOARD_KEY });
+    },
   });
 }
 
@@ -75,7 +82,10 @@ export function useDeleteTile() {
   return useMutation({
     mutationFn: (id: number) =>
       fetchJson<{ ok: true }>(`/api/tiles/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY });
+      qc.invalidateQueries({ queryKey: DASHBOARD_KEY });
+    },
   });
 }
 

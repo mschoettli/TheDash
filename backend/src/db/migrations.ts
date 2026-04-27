@@ -70,6 +70,8 @@ export function runMigrations(): void {
     CREATE TABLE IF NOT EXISTS dashboard_sections (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       title      TEXT    NOT NULL,
+      icon       TEXT,
+      layout     TEXT    NOT NULL DEFAULT '{}',
       sort_order INTEGER NOT NULL DEFAULT 0
     );
 
@@ -103,6 +105,18 @@ export function runMigrations(): void {
       sort_order   INTEGER NOT NULL DEFAULT 0,
       created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
       updated_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS dashboard_items (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      section_id  INTEGER NOT NULL REFERENCES dashboard_sections(id) ON DELETE CASCADE,
+      item_type   TEXT    NOT NULL CHECK (item_type IN ('tile', 'widget')),
+      item_id     INTEGER NOT NULL,
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      layout      TEXT    NOT NULL DEFAULT '{}',
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(item_type, item_id)
     );
 
     CREATE TABLE IF NOT EXISTS widgets (
@@ -203,6 +217,14 @@ export function runMigrations(): void {
     db.exec("ALTER TABLE tiles ADD COLUMN show_address INTEGER NOT NULL DEFAULT 1");
   }
 
+  if (!columnExists("dashboard_sections", "icon")) {
+    db.exec("ALTER TABLE dashboard_sections ADD COLUMN icon TEXT");
+  }
+
+  if (!columnExists("dashboard_sections", "layout")) {
+    db.exec("ALTER TABLE dashboard_sections ADD COLUMN layout TEXT NOT NULL DEFAULT '{}'");
+  }
+
   db.exec("UPDATE tiles SET provider = 'none' WHERE provider IS NULL OR provider = ''");
 
   if (!columnExists("links", "description")) {
@@ -267,6 +289,27 @@ export function runMigrations(): void {
   insert.run("theme", "dark");
   insert.run("language", "de");
   insert.run("widgetStyle", "card");
+
+  const home = db
+    .prepare("SELECT id FROM dashboard_sections ORDER BY sort_order ASC, id ASC LIMIT 1")
+    .get() as { id: number } | undefined;
+  const homeId =
+    home?.id ??
+    Number(
+      db
+        .prepare("INSERT INTO dashboard_sections (title, icon, sort_order, layout) VALUES ('Home', 'logo:dashboard', 0, '{}')")
+        .run().lastInsertRowid
+    );
+
+  db.exec(`
+    INSERT OR IGNORE INTO dashboard_items (section_id, item_type, item_id, sort_order, layout)
+    SELECT ${homeId}, 'tile', id, sort_order, '{}'
+    FROM tiles;
+
+    INSERT OR IGNORE INTO dashboard_items (section_id, item_type, item_id, sort_order, layout)
+    SELECT ${homeId}, 'widget', id, sort_order, '{}'
+    FROM widgets;
+  `);
 
   console.log("Database migrations complete.");
 }

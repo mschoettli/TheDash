@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import i18n from "../i18n/index";
 
-type Theme = "light" | "dark";
+type Theme = "light" | "dark" | "dashy";
 type Language = "de" | "en";
 type WidgetStyle = "card" | "compact" | "minimal";
 type BackgroundMode = "default" | "custom";
@@ -33,11 +33,12 @@ function syncToBackend(data: Partial<Record<string, string>>) {
 }
 
 function applyTheme(theme: Theme) {
-  if (theme === "dark") {
+  if (theme === "dark" || theme === "dashy") {
     document.documentElement.classList.add("dark");
   } else {
     document.documentElement.classList.remove("dark");
   }
+  document.documentElement.dataset.themePreset = theme;
 }
 
 function applyBackground(mode: BackgroundMode, image: string) {
@@ -48,7 +49,7 @@ function applyBackground(mode: BackgroundMode, image: string) {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      theme: "dark",
+      theme: "dashy",
       language: "de",
       widgetStyle: "card",
       backgroundMode: "default",

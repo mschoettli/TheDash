@@ -1,9 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Activity,
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   Boxes,
   Eye,
+  FolderPlus,
+  GripVertical,
   LayoutDashboard,
   Pause,
   Pencil,
@@ -23,12 +43,12 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 import TileWrapper from "../components/tiles/TileWrapper";
 import TileEditModal from "../components/tiles/TileEditModal";
 import { detectIconKey, iconValue } from "../lib/iconRegistry";
-import { Tile, useReorderTiles, useTiles } from "../hooks/useTiles";
+import { DashboardItem, DashboardSection, useCreateDashboardSection, useDashboard, useReorderDashboard } from "../hooks/useDashboard";
+import { Tile, useTiles } from "../hooks/useTiles";
 import { DiscoveredContainer, useDockerAction, useDockerDiscovery } from "../hooks/useDockerDiscovery";
 import {
   useCreateWidget,
   useDeleteWidget,
-  useReorderWidgets,
   useUpdateWidget,
   useWidgetMetrics,
   useWidgetCatalog,
@@ -38,32 +58,32 @@ import {
 } from "../hooks/useWidgets";
 
 const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
+const ACTIVE_WIDGET_TYPES = new Set(["docker", "system", "media", "downloads", "network", "rss", "weather", "calendar", "releases", "stocks"]);
 
 const WIDGET_CONFIG: Record<string, { field?: string; placeholder?: string; required?: boolean }> = {
   docker: {},
   system: {},
-  media: { field: "API URL", placeholder: "http://jellyfin:8096", required: false },
-  downloads: { field: "Client URL", placeholder: "http://qbittorrent:8080", required: false },
-  network: { field: "Service URL", placeholder: "http://adguard:3000", required: false },
+  media: { field: "API URL", placeholder: "http://jellyfin:8096", required: true },
+  downloads: { field: "Client URL", placeholder: "http://qbittorrent:8080", required: true },
+  network: { field: "Service URL", placeholder: "http://adguard:3000", required: true },
   rss: { field: "Feed URL", placeholder: "https://example.com/feed.xml", required: true },
   weather: { field: "Location", placeholder: "Zurich, CH", required: true },
-  notebook: {},
-  calendar: { field: "Calendar URL", placeholder: "https://calendar.example/ics", required: false },
-  iframe: { field: "Embed URL", placeholder: "https://example.com", required: true },
+  calendar: { field: "Calendar URL", placeholder: "https://calendar.example/ics", required: true },
   releases: { field: "Repository", placeholder: "owner/repository", required: true },
-  video: { field: "Stream URL", placeholder: "rtsp:// or https://", required: true },
-  automation: { field: "Webhook URL", placeholder: "https://...", required: true },
-  entity: { field: "Entity ID", placeholder: "sensor.status", required: true },
   stocks: { field: "Symbol", placeholder: "AAPL", required: true },
-  minecraft: { field: "Server", placeholder: "host:25565", required: true },
-  notifications: {},
 };
 
-const ACTIVE_WIDGET_TYPES = new Set(["docker", "system", "media", "downloads", "network", "rss", "weather", "calendar", "releases", "stocks"]);
+function sortableItemId(itemId: number): string {
+  return `item:${itemId}`;
+}
 
-type DashboardItem =
-  | { id: string; kind: "app"; sort_order: number; value: Tile }
-  | { id: string; kind: "widget"; sort_order: number; value: WidgetInstance };
+function sortableSectionId(sectionId: number): string {
+  return `section:${sectionId}`;
+}
+
+function numericId(id: string): number {
+  return Number(id.split(":")[1]);
+}
 
 function hostFromUrl(url: string | null): string {
   if (!url) return "";
@@ -80,99 +100,57 @@ function widgetEndpointLabel(widget: WidgetInstance): string {
   return hostFromUrl(endpoint);
 }
 
+function requiresEndpoint(type: string): boolean {
+  return Boolean(WIDGET_CONFIG[type]?.required);
+}
+
 function WidgetContent({ widget }: { widget: WidgetInstance }) {
   const { t } = useTranslation();
-  const { data: metrics } = useWidgetMetrics(
-    widget.id,
-    ["docker", "system", "rss", "weather", "media", "downloads", "network", "calendar", "releases", "stocks"].includes(widget.type)
-  );
   const endpoint = String(widget.config.endpoint ?? "").trim();
+  const needsSetup = requiresEndpoint(widget.type) && !endpoint;
+  const { data: metrics, isLoading } = useWidgetMetrics(
+    widget.id,
+    !needsSetup && ["docker", "system", "rss", "weather", "media", "downloads", "network", "calendar", "releases", "stocks"].includes(widget.type)
+  );
   const notes = String(widget.config.notes ?? "").trim();
   const label = widgetEndpointLabel(widget);
-  const rows: Record<string, Array<{ label: string; value: string }>> = {
-    docker: [
-      { label: t("widgets.scope"), value: t("widgets.containers") },
-      { label: t("widgets.actions"), value: t("widgets.start_stop_restart") },
-    ],
-    system: [
-      { label: "CPU", value: "Host" },
-      { label: "RAM", value: "Host" },
-    ],
-    media: [
-      { label: t("widgets.movies"), value: "API" },
-      { label: t("widgets.streams"), value: t("widgets.live") },
-    ],
-    downloads: [
-      { label: t("widgets.queue"), value: t("widgets.client") },
-      { label: t("widgets.speed"), value: "API" },
-    ],
-    network: [
-      { label: "DNS", value: "Status" },
-      { label: t("widgets.latency"), value: t("widgets.monitor") },
-    ],
-    rss: [
-      { label: "Feed", value: endpoint ? t("widgets.ready") : t("widgets.missing") },
-      { label: t("widgets.items"), value: t("widgets.latest") },
-    ],
-    weather: [
-      { label: t("widgets.location"), value: endpoint || t("widgets.missing") },
-      { label: t("widgets.forecast"), value: t("widgets.daily") },
-    ],
-    notebook: [
-      { label: t("widgets.mode"), value: t("widgets.quick_note") },
-      { label: t("widgets.storage"), value: t("widgets.local") },
-    ],
-    calendar: [
-      { label: t("widgets.events"), value: t("widgets.upcoming") },
-      { label: t("widgets.source"), value: endpoint ? "ICS" : t("widgets.manual") },
-    ],
-    iframe: [
-      { label: t("widgets.embed"), value: endpoint ? t("widgets.ready") : t("widgets.missing") },
-      { label: t("widgets.display"), value: t("widgets.panel") },
-    ],
-    releases: [
-      { label: t("widgets.repo"), value: endpoint || t("widgets.missing") },
-      { label: t("widgets.version"), value: t("widgets.latest") },
-    ],
-    video: [
-      { label: t("widgets.stream"), value: endpoint ? t("widgets.ready") : t("widgets.missing") },
-      { label: t("widgets.mode"), value: t("widgets.player") },
-    ],
-    automation: [
-      { label: t("widgets.trigger"), value: endpoint ? "Webhook" : t("widgets.missing") },
-      { label: t("widgets.safety"), value: t("widgets.confirm") },
-    ],
-    entity: [
-      { label: t("widgets.entity"), value: endpoint || t("widgets.missing") },
-      { label: t("widgets.state"), value: t("widgets.live") },
-    ],
-    stocks: [
-      { label: "Symbol", value: endpoint || t("widgets.missing") },
-      { label: t("widgets.price"), value: t("widgets.market") },
-    ],
-    minecraft: [
-      { label: "Server", value: endpoint || t("widgets.missing") },
-      { label: t("widgets.players"), value: t("tile.online") },
-    ],
-    notifications: [
-      { label: t("widgets.inbox"), value: t("widgets.recent") },
-      { label: t("widgets.severity"), value: t("widgets.all") },
-    ],
-  };
-  const values = metrics?.cards?.length ? metrics.cards : rows[widget.type] ?? [{ label: "Status", value: t("widgets.configured") }];
 
+  if (needsSetup) {
+    return (
+      <div className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-[12px] font-medium text-amber-700 dark:text-amber-300">
+        {t("widgets.setup_required")}
+      </div>
+    );
+  }
+
+  if (metrics?.status === "error") {
+    return (
+      <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[12px] font-medium text-rose-500">
+        {metrics.error ?? t("widgets.unavailable")}
+      </div>
+    );
+  }
+
+  if (isLoading && !metrics) {
+    return <div className="mt-4 rounded-xl border border-line/40 bg-card px-3 py-2 text-[12px] text-t3">{t("widgets.loading")}</div>;
+  }
+
+  const cards = metrics?.cards ?? [];
   return (
     <div className="mt-4 space-y-3">
       {label && <div className="truncate rounded-xl border border-line/45 bg-card px-3 py-1.5 text-[11px] font-medium text-t3">{label}</div>}
-      <div className="grid grid-cols-2 gap-2">
-        {values.slice(0, 4).map((item) => (
-          <div key={`${item.label}-${item.value}`} className="min-h-[64px] rounded-2xl border border-line/45 bg-card px-3 py-2.5">
-            <div className="mb-1 truncate text-[9px] font-semibold uppercase tracking-[0.16em] text-t3">{item.label}</div>
-            <div className="truncate text-[13px] font-semibold tabular-nums text-t1">{item.value}</div>
-          </div>
-        ))}
-      </div>
-      {metrics?.status === "error" && <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-400">{metrics.error ?? t("widgets.unavailable")}</div>}
+      {cards.length ? (
+        <div className="grid grid-cols-2 gap-2">
+          {cards.slice(0, 4).map((item) => (
+            <div key={`${item.label}-${item.value}`} className="min-h-[64px] rounded-2xl border border-line/45 bg-card px-3 py-2.5">
+              <div className="mb-1 truncate text-[9px] font-semibold uppercase tracking-[0.16em] text-t3">{item.label}</div>
+              <div className="truncate text-[13px] font-semibold tabular-nums text-t1">{item.value}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-line/40 bg-card px-3 py-2 text-[12px] text-t3">{t("widgets.no_data")}</div>
+      )}
       {notes && <p className="text-[12px] leading-relaxed text-t3 line-clamp-2">{notes}</p>}
     </div>
   );
@@ -181,30 +159,16 @@ function WidgetContent({ widget }: { widget: WidgetInstance }) {
 function WidgetTile({
   widget,
   editMode,
-  draggable,
-  onDragStart,
-  onDragOver,
-  onDrop,
   onEdit,
   onDelete,
 }: {
   widget: WidgetInstance;
   editMode: boolean;
-  draggable: boolean;
-  onDragStart: () => void;
-  onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
-  onDrop: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   return (
-    <div
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      className={`relative min-h-[176px] overflow-hidden rounded-xl border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10 ${editMode ? "cursor-grab border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}
-    >
+    <div className={`glass-panel relative min-h-[176px] overflow-hidden rounded-xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10 ${editMode ? "border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}>
       <div className="absolute inset-y-0 left-0 w-1 bg-accent/70 opacity-70" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent opacity-70" />
       <div className="relative flex items-start justify-between gap-3 pl-1">
@@ -232,6 +196,118 @@ function WidgetTile({
         <WidgetContent widget={widget} />
       </div>
     </div>
+  );
+}
+
+function SortableDashboardItem({
+  item,
+  tile,
+  widget,
+  editMode,
+  onEditWidget,
+  onDeleteWidget,
+}: {
+  item: DashboardItem;
+  tile?: Tile;
+  widget?: WidgetInstance;
+  editMode: boolean;
+  onEditWidget: (widget: WidgetInstance) => void;
+  onDeleteWidget: (widget: WidgetInstance) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: sortableItemId(item.id),
+    disabled: !editMode,
+    data: { type: "item", sectionId: item.section_id },
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  if (item.item_type === "tile" && !tile) return null;
+  if (item.item_type === "widget" && !widget) return null;
+
+  return (
+    <div ref={setNodeRef} style={style} className={`relative ${item.item_type === "widget" ? "sm:col-span-2" : ""} ${isDragging ? "opacity-45" : ""}`}>
+      {editMode && (
+        <button
+          className="absolute left-2 top-2 z-20 rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 shadow-sm hover:text-accent"
+          {...attributes}
+          {...listeners}
+          aria-label="Drag item"
+        >
+          <GripVertical size={13} />
+        </button>
+      )}
+      {item.item_type === "tile" && tile ? (
+        <TileWrapper tile={tile} editMode={editMode} />
+      ) : widget ? (
+        <WidgetTile
+          widget={widget}
+          editMode={editMode}
+          onEdit={() => onEditWidget(widget)}
+          onDelete={() => onDeleteWidget(widget)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function SortableSection({
+  section,
+  tilesById,
+  widgetsById,
+  editMode,
+  onEditWidget,
+  onDeleteWidget,
+}: {
+  section: DashboardSection;
+  tilesById: Map<number, Tile>;
+  widgetsById: Map<number, WidgetInstance>;
+  editMode: boolean;
+  onEditWidget: (widget: WidgetInstance) => void;
+  onDeleteWidget: (widget: WidgetInstance) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: sortableSectionId(section.id),
+    disabled: !editMode,
+    data: { type: "section" },
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <section ref={setNodeRef} style={style} className={`glass-panel rounded-2xl border border-line/60 p-4 ${isDragging ? "opacity-50" : ""}`}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          {editMode && (
+            <button className="rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 hover:text-accent" {...attributes} {...listeners} aria-label="Drag section">
+              <GripVertical size={13} />
+            </button>
+          )}
+          <LayoutDashboard size={12} className="text-t3" />
+          <div className="label-xs truncate">{section.title}</div>
+        </div>
+        <span className="text-[11px] text-t3">{section.items.length}</span>
+      </div>
+
+      <SortableContext items={section.items.map((item) => sortableItemId(item.id))} strategy={rectSortingStrategy}>
+        <div className="grid min-h-[120px] grid-cols-1 gap-3 rounded-xl border border-dashed border-line/35 p-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {section.items.map((item) => (
+            <SortableDashboardItem
+              key={item.id}
+              item={item}
+              tile={item.item_type === "tile" ? tilesById.get(item.item_id) : undefined}
+              widget={item.item_type === "widget" ? widgetsById.get(item.item_id) : undefined}
+              editMode={editMode}
+              onEditWidget={onEditWidget}
+              onDeleteWidget={onDeleteWidget}
+            />
+          ))}
+          {!section.items.length && (
+            <div className="col-span-full flex min-h-[90px] items-center justify-center rounded-xl text-[13px] text-t3">
+              Drop items here
+            </div>
+          )}
+        </div>
+      </SortableContext>
+    </section>
   );
 }
 
@@ -393,7 +469,7 @@ function ContainerRow({
   const isRunning = container.state === "running";
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-line/50 bg-surface px-3 py-2.5 transition-all hover:border-accent/30">
+    <div className="glass-panel flex items-center gap-3 rounded-xl border border-line/50 px-3 py-2.5 transition-all hover:border-accent/30">
       <span className={`h-2 w-2 shrink-0 rounded-full ${isRunning ? "bg-emerald-400" : "bg-t3"}`} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -423,29 +499,30 @@ export default function DashboardPage() {
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
   const [deleteWidgetTarget, setDeleteWidgetTarget] = useState<WidgetInstance | null>(null);
-  const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [dockerActionTarget, setDockerActionTarget] = useState<{ container: DiscoveredContainer; action: "start" | "stop" | "restart" } | null>(null);
-  const [tileDraft, setTileDraft] = useState<Tile[] | null>(null);
-  const [widgetDraft, setWidgetDraft] = useState<WidgetInstance[] | null>(null);
-  const { data: tiles } = useTiles();
+  const [sectionsDraft, setSectionsDraft] = useState<DashboardSection[] | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const { data: dashboard } = useDashboard();
+  const { data: tiles = [] } = useTiles();
   const { data: discovery } = useDockerDiscovery();
-  const { data: widgets } = useWidgets();
+  const { data: widgets = [] } = useWidgets();
   const { data: catalog = [] } = useWidgetCatalog();
+  const createSection = useCreateDashboardSection();
+  const reorderDashboard = useReorderDashboard();
   const deleteWidget = useDeleteWidget();
-  const reorderWidgets = useReorderWidgets();
-  const reorderTiles = useReorderTiles();
   const dockerAction = useDockerAction();
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
   const activeCatalog = catalog.filter((item) => ACTIVE_WIDGET_TYPES.has(item.type));
-  const visibleTiles = tileDraft ?? tiles ?? [];
-  const visibleWidgets = widgetDraft ?? widgets ?? [];
-  const dashboardItems: DashboardItem[] = [
-    ...visibleTiles.map((tile) => ({ id: `app:${tile.id}`, kind: "app" as const, sort_order: tile.sort_order, value: tile })),
-    ...visibleWidgets.map((widget) => ({ id: `widget:${widget.id}`, kind: "widget" as const, sort_order: widget.sort_order, value: widget })),
-  ].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
+  const sections = sectionsDraft ?? dashboard?.sections ?? [];
+  const tilesById = useMemo(() => new Map(tiles.map((tile) => [tile.id, tile])), [tiles]);
+  const widgetsById = useMemo(() => new Map(widgets.map((widget) => [widget.id, widget])), [widgets]);
 
   const containers = discovery?.containers ?? [];
   const suggestions = containers.filter(
-    (container) => !tiles?.some((tile) => tile.url === container.app.href || tile.name === container.app.name)
+    (container) => !tiles.some((tile) => tile.url === container.app.href || tile.name === container.app.name)
   );
   const labeledContainers = suggestions.filter((container) => container.app.is_labeled);
   const discoveredContainers = suggestions.filter((container) => !container.app.is_labeled);
@@ -456,27 +533,37 @@ export default function DashboardPage() {
   };
 
   const enterEditMode = () => {
-    setTileDraft([...(tiles ?? [])]);
-    setWidgetDraft([...(widgets ?? [])]);
+    setSectionsDraft(JSON.parse(JSON.stringify(dashboard?.sections ?? [])));
     setEditMode(true);
   };
 
   const cancelEditMode = () => {
-    setTileDraft(null);
-    setWidgetDraft(null);
-    setDragItemId(null);
+    setSectionsDraft(null);
+    setActiveId(null);
     setEditMode(false);
   };
 
   const saveEditMode = () => {
-    const ordered = dashboardItems.map((item, index) => ({ ...item, sort_order: index }));
-    const orderedTiles = ordered.filter((item) => item.kind === "app") as Array<DashboardItem & { kind: "app"; value: Tile }>;
-    const orderedWidgets = ordered.filter((item) => item.kind === "widget") as Array<DashboardItem & { kind: "widget"; value: WidgetInstance }>;
-    if (tileDraft && orderedTiles.length) reorderTiles.mutate(orderedTiles.map((item) => ({ id: item.value.id, sort_order: item.sort_order })));
-    if (widgetDraft && orderedWidgets.length) reorderWidgets.mutate(orderedWidgets.map((item) => ({ id: item.value.id, sort_order: item.sort_order })));
-    setTileDraft(null);
-    setWidgetDraft(null);
+    const draft = sectionsDraft ?? sections;
+    reorderDashboard.mutate({
+      sections: draft.map((section, index) => ({ id: section.id, sort_order: index })),
+      items: draft.flatMap((section) =>
+        section.items.map((item, index) => ({
+          id: item.id,
+          section_id: section.id,
+          sort_order: index,
+          layout: item.layout,
+        }))
+      ),
+    });
+    setSectionsDraft(null);
     setEditMode(false);
+  };
+
+  const addSection = () => {
+    const title = window.prompt(t("dashboard.new_section"));
+    if (!title?.trim()) return;
+    createSection.mutate({ title: title.trim(), icon: iconValue("dashboard") });
   };
 
   const adoptContainer = (container: DiscoveredContainer) => {
@@ -494,18 +581,78 @@ export default function DashboardPage() {
     });
   };
 
-  const moveItemBefore = (target: DashboardItem) => {
-    if (!dragItemId || dragItemId === target.id) return;
-    const dragged = dashboardItems.find((item) => item.id === dragItemId);
-    if (!dragged) return;
-    const ordered = dashboardItems.filter((item) => item.id !== dragItemId);
-    const targetIndex = ordered.findIndex((item) => item.id === target.id);
-    ordered.splice(targetIndex >= 0 ? targetIndex : ordered.length, 0, dragged);
-    const withOrder = ordered.map((item, index) => ({ ...item, sort_order: index }));
-    setTileDraft(withOrder.filter((item) => item.kind === "app").map((item) => ({ ...(item.value as Tile), sort_order: item.sort_order })));
-    setWidgetDraft(withOrder.filter((item) => item.kind === "widget").map((item) => ({ ...(item.value as WidgetInstance), sort_order: item.sort_order })));
-    setDragItemId(null);
+  const moveItem = (activeItemId: number, overId: string) => {
+    const current = JSON.parse(JSON.stringify(sections)) as DashboardSection[];
+    let sourceSectionIndex = -1;
+    let sourceItemIndex = -1;
+    current.forEach((section, sectionIndex) => {
+      const itemIndex = section.items.findIndex((item) => item.id === activeItemId);
+      if (itemIndex >= 0) {
+        sourceSectionIndex = sectionIndex;
+        sourceItemIndex = itemIndex;
+      }
+    });
+    if (sourceSectionIndex < 0 || sourceItemIndex < 0) return;
+
+    const [item] = current[sourceSectionIndex].items.splice(sourceItemIndex, 1);
+    let targetSectionIndex = sourceSectionIndex;
+    let targetItemIndex = current[sourceSectionIndex].items.length;
+
+    if (overId.startsWith("section:")) {
+      targetSectionIndex = current.findIndex((section) => section.id === numericId(overId));
+      targetItemIndex = current[targetSectionIndex]?.items.length ?? 0;
+    } else if (overId.startsWith("item:")) {
+      const overItemId = numericId(overId);
+      current.forEach((section, sectionIndex) => {
+        const itemIndex = section.items.findIndex((entry) => entry.id === overItemId);
+        if (itemIndex >= 0) {
+          targetSectionIndex = sectionIndex;
+          targetItemIndex = itemIndex;
+        }
+      });
+    }
+
+    if (targetSectionIndex < 0) return;
+    item.section_id = current[targetSectionIndex].id;
+    current[targetSectionIndex].items.splice(targetItemIndex, 0, item);
+    setSectionsDraft(current.map((section, sectionIndex) => ({
+      ...section,
+      sort_order: sectionIndex,
+      items: section.items.map((entry, itemIndex) => ({ ...entry, section_id: section.id, sort_order: itemIndex })),
+    })));
   };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    if (!over || active.id === over.id) return;
+    const activeKey = String(active.id);
+    const overKey = String(over.id);
+
+    if (activeKey.startsWith("section:") && overKey.startsWith("section:")) {
+      const current = [...sections];
+      const oldIndex = current.findIndex((section) => section.id === numericId(activeKey));
+      const newIndex = current.findIndex((section) => section.id === numericId(overKey));
+      if (oldIndex >= 0 && newIndex >= 0) {
+        setSectionsDraft(arrayMove(current, oldIndex, newIndex).map((section, index) => ({ ...section, sort_order: index })));
+      }
+      return;
+    }
+
+    if (activeKey.startsWith("item:")) {
+      moveItem(numericId(activeKey), overKey);
+    }
+  };
+
+  const activeLabel = (() => {
+    if (!activeId) return "";
+    if (activeId.startsWith("section:")) return sections.find((section) => section.id === numericId(activeId))?.title ?? "";
+    const itemId = numericId(activeId);
+    const item = sections.flatMap((section) => section.items).find((entry) => entry.id === itemId);
+    if (!item) return "";
+    if (item.item_type === "tile") return tilesById.get(item.item_id)?.name ?? "";
+    return widgetsById.get(item.item_id)?.title ?? "";
+  })();
 
   return (
     <div className="space-y-5 text-t1">
@@ -521,6 +668,7 @@ export default function DashboardPage() {
             </button>
           ) : (
             <>
+              <button onClick={addSection} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1"><FolderPlus size={14} /> {t("dashboard.add_section")}</button>
               <button onClick={() => openAppModal()} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-semibold text-bg"><Plus size={14} /> {t("dashboard.add_app")}</button>
               <button onClick={() => { setEditingWidget(null); setWidgetModalOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 hover:text-t1"><Boxes size={14} /> {t("dashboard.add_widget")}</button>
               <button onClick={saveEditMode} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-[13px] font-medium text-emerald-600 dark:text-emerald-400"><Save size={14} /> {t("common.save")}</button>
@@ -531,51 +679,41 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
-        <section className="rounded-xl bg-card border border-line/60 p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="label-xs flex items-center gap-1.5"><LayoutDashboard size={11} /> {t("dashboard.apps_widgets")}</div>
-            <span className="text-[11px] text-t3">{dashboardItems.length}</span>
-          </div>
-          {dashboardItems.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-              {dashboardItems.map((item) => (
-                <div key={item.id} className={item.kind === "widget" ? "sm:col-span-2" : ""}>
-                  {item.kind === "app" ? (
-                    <TileWrapper
-                      tile={item.value}
-                      editMode={editMode}
-                      draggable={editMode}
-                      onDragStart={() => setDragItemId(item.id)}
-                      onDragOver={(event) => editMode && event.preventDefault()}
-                      onDrop={() => moveItemBefore(item)}
-                    />
-                  ) : (
-                    <WidgetTile
-                      widget={item.value}
-                      editMode={editMode}
-                      draggable={editMode}
-                      onDragStart={() => setDragItemId(item.id)}
-                      onDragOver={(event) => editMode && event.preventDefault()}
-                      onDrop={() => moveItemBefore(item)}
-                      onEdit={() => {
-                        setEditingWidget(item.value);
-                        setWidgetModalOpen(true);
-                      }}
-                      onDelete={() => setDeleteWidgetTarget(item.value)}
-                    />
-                  )}
-                </div>
+        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={(event) => setActiveId(String(event.active.id))} onDragEnd={handleDragEnd} onDragCancel={() => setActiveId(null)}>
+          <div className="space-y-4">
+            <SortableContext items={sections.map((section) => sortableSectionId(section.id))} strategy={verticalListSortingStrategy}>
+              {sections.map((section) => (
+                <SortableSection
+                  key={section.id}
+                  section={section}
+                  tilesById={tilesById}
+                  widgetsById={widgetsById}
+                  editMode={editMode}
+                  onEditWidget={(widget) => {
+                    setEditingWidget(widget);
+                    setWidgetModalOpen(true);
+                  }}
+                  onDeleteWidget={setDeleteWidgetTarget}
+                />
               ))}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-line py-10 text-center text-[13px] text-t3">
-              {t("dashboard.empty_workspace")}
-            </div>
-          )}
-        </section>
+            </SortableContext>
+            {!sections.length && (
+              <div className="glass-panel rounded-xl border border-dashed border-line py-10 text-center text-[13px] text-t3">
+                {t("dashboard.empty_workspace")}
+              </div>
+            )}
+          </div>
+          <DragOverlay>
+            {activeLabel ? (
+              <div className="glass-panel rounded-xl border border-accent/40 px-4 py-3 text-[13px] font-semibold text-t1 shadow-2xl">
+                {activeLabel}
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
 
         <aside className="space-y-4">
-          <section className="rounded-xl bg-card border border-line/60 p-4">
+          <section className="glass-panel rounded-xl border border-line/60 p-4">
             <div className="label-xs mb-3 flex items-center gap-1.5"><Server size={11} /> {t("dashboard.docker")}</div>
             {discovery?.status === "disabled" ? (
               <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-[12px] text-amber-700 dark:text-amber-300">
@@ -592,7 +730,7 @@ export default function DashboardPage() {
       </div>
 
       {suggestions.length > 0 && (
-        <section className="rounded-xl bg-card border border-line/60 p-4">
+        <section className="glass-panel rounded-xl border border-line/60 p-4">
           <div className="mb-4 flex items-center justify-between">
             <div className="label-xs flex items-center gap-1.5"><Eye size={11} /> {t("dashboard.discovered_apps")}</div>
             <span className="text-[11px] text-t3">{suggestions.length}</span>
