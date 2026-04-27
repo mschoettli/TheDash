@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
@@ -11,12 +11,18 @@ interface ModalProps {
 }
 
 export default function Modal({ open, onClose, title, children, maxWidth = "max-w-lg" }: ModalProps) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (open && bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, [open]);
 
   return (
     <AnimatePresence>
@@ -27,9 +33,9 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+          <div className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={onClose} />
           <motion.div
-            className={`relative flex max-h-[calc(100vh-2rem)] w-full ${maxWidth} flex-col overflow-hidden rounded-2xl border border-line/70 bg-surface shadow-2xl`}
+            className={`modal-panel relative flex max-h-[calc(100vh-2rem)] w-full ${maxWidth} flex-col overflow-hidden rounded-2xl border border-line/70 shadow-2xl`}
             initial={{ opacity: 0, scale: 0.96, y: 6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 6 }}
@@ -46,7 +52,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
                 </button>
               </div>
             )}
-            <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+            <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
           </motion.div>
         </motion.div>
       )}

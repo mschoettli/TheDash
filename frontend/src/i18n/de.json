@@ -77,7 +77,9 @@
     "new_section": "Neue Sektion",
     "add_section": "Sektion hinzufügen",
     "new_card": "Neue Karte",
-    "add_card": "Karte"
+    "add_card": "Karte",
+    "drop_here": "Hier ablegen",
+    "empty_section": "Keine Elemente in dieser Sektion"
   },
   "add": {
     "title": "Hinzufügen",

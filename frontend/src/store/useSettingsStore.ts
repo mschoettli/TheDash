@@ -88,6 +88,15 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "thedash-settings",
+      version: 2,
+      migrate: (persisted: unknown, version) => {
+        const state = persisted as Partial<SettingsState> | undefined;
+        if (!state) return persisted;
+        if (version < 2 && state.theme !== "dashy") {
+          return { ...state, theme: "dashy" };
+        }
+        return persisted;
+      },
       onRehydrateStorage: () => (state) => {
         if (state) {
           applyTheme(state.theme);

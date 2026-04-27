@@ -7,6 +7,7 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCorners,
+  useDroppable,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -265,10 +266,16 @@ function SortableSection({
   onEditWidget: (widget: WidgetInstance) => void;
   onDeleteWidget: (widget: WidgetInstance) => void;
 }) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: sortableSectionId(section.id),
     disabled: !editMode,
     data: { type: "section" },
+  });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `section-drop:${section.id}`,
+    disabled: !editMode,
+    data: { type: "section-drop", sectionId: section.id },
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
@@ -288,7 +295,12 @@ function SortableSection({
       </div>
 
       <SortableContext items={section.items.map((item) => sortableItemId(item.id))} strategy={rectSortingStrategy}>
-        <div className="grid min-h-[120px] grid-cols-1 gap-3 rounded-xl border border-dashed border-line/35 p-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <div
+          ref={setDropRef}
+          className={`grid min-h-[120px] grid-cols-1 gap-3 rounded-xl border border-dashed p-1 transition-colors sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${
+            isOver ? "border-accent/70 bg-accent/10" : "border-line/35"
+          }`}
+        >
           {section.items.map((item) => (
             <SortableDashboardItem
               key={item.id}
@@ -302,7 +314,7 @@ function SortableSection({
           ))}
           {!section.items.length && (
             <div className="col-span-full flex min-h-[90px] items-center justify-center rounded-xl text-[13px] text-t3">
-              Drop items here
+              {editMode ? t("dashboard.drop_here") : t("dashboard.empty_section")}
             </div>
           )}
         </div>
@@ -598,7 +610,10 @@ export default function DashboardPage() {
     let targetSectionIndex = sourceSectionIndex;
     let targetItemIndex = current[sourceSectionIndex].items.length;
 
-    if (overId.startsWith("section:")) {
+    if (overId.startsWith("section-drop:")) {
+      targetSectionIndex = current.findIndex((section) => section.id === numericId(overId.replace("section-drop", "section")));
+      targetItemIndex = current[targetSectionIndex]?.items.length ?? 0;
+    } else if (overId.startsWith("section:")) {
       targetSectionIndex = current.findIndex((section) => section.id === numericId(overId));
       targetItemIndex = current[targetSectionIndex]?.items.length ?? 0;
     } else if (overId.startsWith("item:")) {
