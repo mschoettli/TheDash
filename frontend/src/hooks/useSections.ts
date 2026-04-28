@@ -41,7 +41,7 @@ export function useCreateSection() {
 export function useUpdateSection() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: number; title?: string }) =>
+    mutationFn: ({ id, ...data }: { id: number; title?: string; sort_order?: number }) =>
       fetchJson<Section>(`/api/sections/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

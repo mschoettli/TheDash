@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  CollisionDetection,
   DndContext,
   DragEndEvent,
   DragOverEvent,
@@ -8,6 +9,8 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCenter,
+  pointerWithin,
+  rectIntersection,
   useDraggable,
   useDroppable,
   useSensor,
@@ -1152,6 +1155,30 @@ export default function DashboardPage() {
   const hasDocker = discovery?.status !== "disabled";
   const totalContainers = containers.length;
 
+  /**
+   * Custom collision detection:
+   * - When dragging an ITEM  → only test "cell:" droppables (pointer-within for precision)
+   * - When dragging a SECTION → only test "section:" sortables (closestCenter)
+   * This prevents the large section sortable areas from winning over small cell targets.
+   */
+  const collisionDetection = useCallback<CollisionDetection>((args) => {
+    const id = String(args.active.id);
+
+    if (id.startsWith("item:")) {
+      const cells = args.droppableContainers.filter((c) => String(c.id).startsWith("cell:"));
+      const hits = pointerWithin({ ...args, droppableContainers: cells });
+      if (hits.length > 0) return hits;
+      return rectIntersection({ ...args, droppableContainers: cells });
+    }
+
+    if (id.startsWith("section:")) {
+      const secs = args.droppableContainers.filter((c) => String(c.id).startsWith("section:"));
+      return closestCenter({ ...args, droppableContainers: secs });
+    }
+
+    return closestCenter(args);
+  }, []);
+
   // ─ Render ────────────────────────────────────────────────────────────────────
 
   return (
@@ -1230,7 +1257,7 @@ export default function DashboardPage() {
       {/* DnD context — sections sortable; items free-positioned via drop cells */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={collisionDetection}
         onDragStart={handleDragStart as never}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}

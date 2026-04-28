@@ -1,322 +1,707 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Columns3, LayoutGrid, Plus, Search, Send, Rows3 } from "lucide-react";
-import { useSections, useCreateSection } from "../hooks/useSections";
+import {
+  Archive,
+  Bookmark,
+  GripVertical,
+  LayoutGrid,
+  List,
+  Plus,
+  Search,
+  Send,
+  Star,
+  Trash2,
+  X,
+} from "lucide-react";
+import {
+  CollisionDetection,
+  DndContext,
+  DragEndEvent,
+  DragOverEvent,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  pointerWithin,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Section, useCreateSection, useDeleteSection, useSections, useUpdateSection } from "../hooks/useSections";
 import { Link, suggestAutoTags, useReorderLinks } from "../hooks/useLinks";
 import { useTags } from "../hooks/useTags";
-import LinkSection from "../components/links/LinkSection";
 import BookmarkCard from "../components/links/BookmarkCard";
-import BookmarkPreviewDrawer from "../components/links/BookmarkPreviewDrawer";
 import LinkEditModal from "../components/links/LinkEditModal";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type ActiveSection = "all" | "favorites" | "archive" | number;
+type ViewMode = "grid" | "list";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function matchesSearch(link: Link, query: string): boolean {
-  const value = query.trim().toLowerCase();
-  if (!value) return true;
+  const v = query.trim().toLowerCase();
+  if (!v) return true;
   return [link.name, link.url, link.description ?? "", link.note ?? "", ...link.tags.map((t) => t.name)]
     .join(" ")
     .toLowerCase()
-    .includes(value);
+    .includes(v);
 }
+
+// ─── Sortable Sidebar Section ──────────────────────────────────────────────────
+
+function SortableSidebarSection({
+  section, isActive, isDropOver, onSelect, onRename, onDelete,
+}: {
+  section: Section;
+  isActive: boolean;
+  isDropOver: boolean;
+  onSelect: () => void;
+  onRename: (title: string) => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  const { attributes, listeners, setNodeRef: setSortRef, transform, transition, isDragging } = useSortable({
+    id: `section:${section.id}`,
+    data: { type: "section" },
+  });
+  const { setNodeRef: setDropRef } = useDroppable({
+    id: `sidebar:${section.id}`,
+    data: { type: "sidebar-section", sectionId: section.id },
+  });
+
+  const [editing, setEditing] = useState(false);
+  const [localTitle, setLocalTitle] = useState(section.title);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const sortStyle = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <>
+      <div
+        ref={setSortRef}
+        style={sortStyle}
+        className={isDragging ? "opacity-40" : ""}
+      >
+        {/* The button itself is the drop target */}
+        <div
+          ref={setDropRef}
+          className={`group flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] transition-all ${
+            isActive
+              ? "bg-accent/15 font-semibold text-accent"
+              : isDropOver
+              ? "bg-accent/10 text-accent ring-1 ring-accent/40"
+              : "text-t2 hover:bg-line/20 hover:text-t1"
+          }`}
+        >
+          {/* Drag handle */}
+          <button
+            className="shrink-0 cursor-grab opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical size={12} className="text-t3" />
+          </button>
+
+          {/* Title (inline edit) */}
+          {editing ? (
+            <input
+              autoFocus
+              className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold outline-none"
+              value={localTitle}
+              onChange={(e) => setLocalTitle(e.target.value)}
+              onBlur={() => { onRename(localTitle); setEditing(false); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { onRename(localTitle); setEditing(false); }
+                if (e.key === "Escape") { setLocalTitle(section.title); setEditing(false); }
+              }}
+            />
+          ) : (
+            <button
+              className="min-w-0 flex-1 truncate text-left"
+              onClick={onSelect}
+              onDoubleClick={() => { setLocalTitle(section.title); setEditing(true); }}
+            >
+              {section.title}
+            </button>
+          )}
+
+          {/* Count + actions */}
+          <span className={`shrink-0 text-[11px] ${isActive ? "text-accent/70" : "text-t3"}`}>{section.links.length}</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+            className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 text-t3 hover:text-rose-400"
+            title={t("bookmarks.delete_section")}
+          >
+            <Trash2 size={11} />
+          </button>
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title={t("bookmarks.delete_section")}
+        description={t("bookmarks.delete_section_description", { title: section.title })}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => { onDelete(); setConfirmDelete(false); }}
+      />
+    </>
+  );
+}
+
+// ─── Sortable Bookmark ─────────────────────────────────────────────────────────
+
+function SortableBookmark({
+  link, view,
+}: {
+  link: Link;
+  view: ViewMode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `link:${link.id}`,
+    data: { type: "link", sectionId: link.section_id },
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  const handle = (
+    <button
+      className="flex h-7 w-7 cursor-grab items-center justify-center rounded-lg border border-line/50 bg-surface/90 text-t3 shadow-sm transition-colors hover:text-accent active:cursor-grabbing"
+      {...attributes}
+      {...listeners}
+    >
+      <GripVertical size={13} />
+    </button>
+  );
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <BookmarkCard link={link} variant={view} dragHandle={handle} isDragging={isDragging} />
+    </div>
+  );
+}
+
+// ─── Drag Preview ──────────────────────────────────────────────────────────────
+
+function DragPreview({ link }: { link: Link }) {
+  return (
+    <div className="w-[200px] rounded-xl border border-accent/50 bg-card p-3 shadow-2xl shadow-accent/20 opacity-95">
+      <div className="truncate text-[13px] font-semibold text-t1">{link.name}</div>
+      <div className="mt-0.5 truncate text-[11px] text-t3">
+        {(() => { try { return new URL(link.url).hostname.replace(/^www\./, ""); } catch { return link.url; } })()}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function BookmarksPage() {
   const { t } = useTranslation();
   const { data: sections, isLoading } = useSections();
-  const { data: tags } = useTags();
+  const { data: allTags } = useTags();
   const createSection = useCreateSection();
+  const updateSection = useUpdateSection();
+  const deleteSection = useDeleteSection();
   const reorderLinks = useReorderLinks();
 
-  const [newTitle, setNewTitle] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [view, setView] = useState<"feed" | "sections" | "kanban">("feed");
-  const [dragLinkId, setDragLinkId] = useState<number | null>(null);
-  const [dragOverLinkId, setDragOverLinkId] = useState<number | null>(null);
+  // ─ UI state ─────────────────────────────────────────────────────────────────
+  const [activeSection, setActiveSection] = useState<ActiveSection>("all");
+  const [view, setView] = useState<ViewMode>("grid");
+  const [query, setQuery] = useState("");
+  const [activeTag, setActiveTag] = useState<string | null>(null);
   const [captureUrl, setCaptureUrl] = useState("");
   const [captureDraft, setCaptureDraft] = useState<Partial<Link> | null>(null);
   const [linkDraft, setLinkDraft] = useState<Partial<Link> | null>(null);
-  const [query, setQuery] = useState("");
-  const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [selectedLink, setSelectedLink] = useState<Link | null>(null);
+  const [addingSectionTitle, setAddingSectionTitle] = useState("");
+  const [addingSectionOpen, setAddingSectionOpen] = useState(false);
+  const addSectionInputRef = useRef<HTMLInputElement>(null);
 
-  const allLinks = useMemo(() => sections?.flatMap((s) => s.links) ?? [], [sections]);
-  const filteredLinks = useMemo(
-    () =>
-      allLinks.filter((link) => {
-        const tagMatch = activeTag ? link.tags.some((t) => t.name === activeTag) : true;
-        return tagMatch && matchesSearch(link, query);
-      }),
-    [activeTag, allLinks, query]
+  // ─ DnD state ────────────────────────────────────────────────────────────────
+  const [sectionsDraft, setSectionsDraft] = useState<Section[] | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [dropOverSidebarId, setDropOverSidebarId] = useState<number | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const defaultSectionId = sections?.[0]?.id;
+  // ─ Data ─────────────────────────────────────────────────────────────────────
+  const displaySections = sectionsDraft ?? sections ?? [];
+  const allLinks = useMemo(() => displaySections.flatMap((s) => s.links), [displaySections]);
+  const favoriteLinks = useMemo(() => allLinks.filter((l) => l.is_favorite && !l.is_archived), [allLinks]);
+  const archiveLinks = useMemo(() => allLinks.filter((l) => l.is_archived), [allLinks]);
+  const defaultSectionId = displaySections[0]?.id;
 
-  const handleAddSection = () => {
-    if (!newTitle.trim()) return;
-    createSection.mutate({ title: newTitle.trim() }, { onSuccess: () => { setNewTitle(""); setAdding(false); } });
-  };
+  const visibleLinks = useMemo(() => {
+    let base: Link[];
+    if (activeSection === "all") base = allLinks.filter((l) => !l.is_archived);
+    else if (activeSection === "favorites") base = favoriteLinks;
+    else if (activeSection === "archive") base = archiveLinks;
+    else base = displaySections.find((s) => s.id === activeSection)?.links ?? [];
+    return base.filter((l) => {
+      const tagMatch = activeTag ? l.tags.some((t) => t.name === activeTag) : true;
+      return tagMatch && matchesSearch(l, query);
+    });
+  }, [activeSection, activeTag, allLinks, archiveLinks, displaySections, favoriteLinks, query]);
 
+  // ─ Active drag item ─────────────────────────────────────────────────────────
+  const activeLinkId = activeId?.startsWith("link:") ? Number(activeId.split(":")[1]) : null;
+  const activeLink = activeLinkId ? allLinks.find((l) => l.id === activeLinkId) : null;
+
+  // ─ URL Capture ──────────────────────────────────────────────────────────────
   const handleCapture = () => {
     if (!defaultSectionId || !captureUrl.trim()) return;
     const url = captureUrl.trim();
     let name = url;
-    try {
-      name = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, "");
-    } catch {
-      name = url;
-    }
+    try { name = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, ""); }
+    catch { name = url; }
     setCaptureDraft({
-      section_id: defaultSectionId,
-      url,
-      name,
-      tags: suggestAutoTags(url, name).map((tag, index) => ({
-        id: -index - 1,
-        name: tag,
-        source: "auto",
-        created_at: new Date().toISOString(),
+      section_id: typeof activeSection === "number" ? activeSection : defaultSectionId,
+      url, name,
+      tags: suggestAutoTags(url, name).map((tag, i) => ({
+        id: -i - 1, name: tag, source: "auto" as const, created_at: new Date().toISOString(),
       })),
     } as Partial<Link>);
   };
 
-  const moveLinkToSection = (sectionId: number, beforeLinkId?: number) => {
-    if (!dragLinkId) return;
-    const section = sections?.find((item) => item.id === sectionId);
-    const dragged = allLinks.find((link) => link.id === dragLinkId);
-    if (!section || !dragged) return;
-    const ordered = [...section.links]
-      .filter((link) => link.id !== dragLinkId)
-      .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
-    const targetIndex = beforeLinkId ? ordered.findIndex((link) => link.id === beforeLinkId) : -1;
-    const insertAt = targetIndex >= 0 ? targetIndex : ordered.length;
-    ordered.splice(insertAt, 0, dragged);
-    reorderLinks.mutate(ordered.map((link, index) => ({ id: link.id, section_id: sectionId, sort_order: index })));
-    setDragLinkId(null);
-    setDragOverLinkId(null);
+  // ─ Section operations ────────────────────────────────────────────────────────
+  const handleCreateSection = () => {
+    if (!addingSectionTitle.trim()) return;
+    createSection.mutate(
+      { title: addingSectionTitle.trim() },
+      { onSuccess: () => { setAddingSectionTitle(""); setAddingSectionOpen(false); } }
+    );
+  };
+  const handleRenameSection = (id: number, title: string) => {
+    updateSection.mutate({ id, title });
+  };
+  const handleDeleteSection = (id: number) => {
+    deleteSection.mutate(id, {
+      onSuccess: () => {
+        if (activeSection === id) setActiveSection("all");
+      },
+    });
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 rounded-xl bg-card animate-pulse" />
-        ))}
-      </div>
-    );
-  }
+  // ─ DnD: reorder links within section ────────────────────────────────────────
+  const handleReorderLinks = (sectionId: number, orderedIds: number[]) => {
+    const sec = displaySections.find((s) => s.id === sectionId);
+    if (!sec) return;
+    const items = orderedIds.map((id, idx) => ({
+      id,
+      section_id: sectionId,
+      sort_order: idx,
+    }));
+    reorderLinks.mutate(items);
+  };
 
-  const views = [
-    { id: "feed", icon: Rows3, label: t("bookmarks.view_feed") },
-    { id: "sections", icon: LayoutGrid, label: t("bookmarks.view_sections") },
-    { id: "kanban", icon: Columns3, label: t("bookmarks.view_kanban") },
-  ] as const;
+  // ─ DnD: move link to different section ──────────────────────────────────────
+  const handleMoveToSection = (linkId: number, targetSectionId: number) => {
+    const link = allLinks.find((l) => l.id === linkId);
+    if (!link || link.section_id === targetSectionId) return;
+    const targetSec = displaySections.find((s) => s.id === targetSectionId);
+    const newOrder = (targetSec?.links.length ?? 0);
+    reorderLinks.mutate([{ id: linkId, section_id: targetSectionId, sort_order: newOrder }]);
+    // Navigate to target section
+    setActiveSection(targetSectionId);
+  };
+
+  // ─ DnD: reorder sections ────────────────────────────────────────────────────
+  const handleReorderSections = (orderedIds: number[]) => {
+    orderedIds.forEach((id, idx) => {
+      updateSection.mutate({ id, sort_order: idx });
+    });
+  };
+
+  // ─ Custom collision detection ────────────────────────────────────────────────
+  const collisionDetection = useCallback<CollisionDetection>((args) => {
+    const id = String(args.active.id);
+
+    if (id.startsWith("link:")) {
+      // Try sidebar sections first (pointer-within for precise hit)
+      const sidebarDrops = args.droppableContainers.filter((c) => String(c.id).startsWith("sidebar:"));
+      const hits = pointerWithin({ ...args, droppableContainers: sidebarDrops });
+      if (hits.length > 0) return hits;
+      // Then grid sortables
+      const gridItems = args.droppableContainers.filter((c) => String(c.id).startsWith("link:"));
+      return closestCenter({ ...args, droppableContainers: gridItems });
+    }
+
+    if (id.startsWith("section:")) {
+      const secs = args.droppableContainers.filter((c) => String(c.id).startsWith("section:"));
+      return closestCenter({ ...args, droppableContainers: secs });
+    }
+
+    return closestCenter(args);
+  }, []);
+
+  const handleDragOver = (e: DragOverEvent) => {
+    const { over, active } = e;
+    if (!String(active.id).startsWith("link:")) { setDropOverSidebarId(null); return; }
+    if (over?.data.current?.type === "sidebar-section") {
+      setDropOverSidebarId(Number(over.data.current.sectionId));
+    } else {
+      setDropOverSidebarId(null);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    setDropOverSidebarId(null);
+    if (!over || active.id === over.id) return;
+
+    const ak = String(active.id);
+    const ok = String(over.id);
+
+    // Section reorder
+    if (ak.startsWith("section:") && ok.startsWith("section:")) {
+      const cur = displaySections.map((s) => s.id);
+      const oi = cur.indexOf(Number(ak.split(":")[1]));
+      const ni = cur.indexOf(Number(ok.split(":")[1]));
+      if (oi >= 0 && ni >= 0) {
+        const reordered = arrayMove(cur, oi, ni);
+        setSectionsDraft(arrayMove([...displaySections], oi, ni));
+        handleReorderSections(reordered);
+      }
+      return;
+    }
+
+    // Link dropped on sidebar section = cross-section move
+    if (ak.startsWith("link:") && ok.startsWith("sidebar:")) {
+      const linkId = Number(ak.split(":")[1]);
+      const targetSectionId = Number(ok.split(":")[1]);
+      handleMoveToSection(linkId, targetSectionId);
+      return;
+    }
+
+    // Link reorder within same section
+    if (ak.startsWith("link:") && ok.startsWith("link:")) {
+      const aId = Number(ak.split(":")[1]);
+      const oId = Number(ok.split(":")[1]);
+      const aLink = allLinks.find((l) => l.id === aId);
+      const oLink = allLinks.find((l) => l.id === oId);
+      if (!aLink || !oLink || aLink.section_id !== oLink.section_id) return;
+
+      const sec = displaySections.find((s) => s.id === aLink.section_id);
+      if (!sec) return;
+      const ids = sec.links.map((l) => l.id);
+      const oi = ids.indexOf(aId);
+      const ni = ids.indexOf(oId);
+      if (oi >= 0 && ni >= 0) {
+        handleReorderLinks(sec.id, arrayMove(ids, oi, ni));
+      }
+    }
+  };
+
+  // ─ Render ────────────────────────────────────────────────────────────────────
+
+  if (isLoading) return (
+    <div className="flex gap-5">
+      <div className="w-52 shrink-0 space-y-2">
+        {[1, 2, 3, 4].map((i) => <div key={i} className="h-9 rounded-xl bg-card animate-pulse" />)}
+      </div>
+      <div className="flex-1 grid grid-cols-3 gap-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => <div key={i} className="h-48 rounded-xl bg-card animate-pulse" />)}
+      </div>
+    </div>
+  );
+
+  const isReorderable = typeof activeSection === "number";
 
   return (
-    <div className="space-y-4 text-t1">
+    <DndContext
+      sensors={sensors}
+      collisionDetection={collisionDetection}
+      onDragStart={(e) => setActiveId(String(e.active.id))}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => { setActiveId(null); setDropOverSidebarId(null); setSectionsDraft(null); }}
+    >
+      <div className="flex min-h-0 gap-5 text-t1">
 
-      {/* ── Header + Controls ────────────────────────────── */}
-      <div className="rounded-xl bg-card border border-line/60 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div>
-            <div className="label-xs mb-1">Resource Library</div>
-            <h1 className="text-xl font-semibold text-t1">{t("bookmarks.title")}</h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="inline-flex overflow-hidden rounded-lg border border-line/60">
-              {views.map(({ id, icon: Icon, label }) => (
-                <button
-                  key={id}
-                  onClick={() => setView(id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                    view === id ? "bg-accent text-bg" : "text-t2 hover:bg-line/30 hover:text-t1"
-                  }`}
-                >
-                  <Icon size={13} /> {label}
-                </button>
-              ))}
+        {/* ── Left Sidebar ─────────────────────────────────────────────────────── */}
+        <aside className="w-52 shrink-0">
+          <div className="sticky top-0 space-y-0.5">
+            {/* Page title */}
+            <div className="mb-4 px-1">
+              <div className="label-xs mb-1">{t("bookmarks.library")}</div>
+              <h1 className="text-lg font-semibold text-t1">{t("bookmarks.title")}</h1>
             </div>
 
-            {view === "sections" && (
+            {/* Smart collections */}
+            <div className="label-xs mb-2 px-3">{t("bookmarks.collections", "Collections")}</div>
+            {[
+              {
+                id: "all" as const, icon: <Bookmark size={14} />, label: t("bookmarks.view_all", "All"),
+                count: allLinks.filter((l) => !l.is_archived).length,
+              },
+              {
+                id: "favorites" as const, icon: <Star size={14} />, label: t("link.favorite"),
+                count: favoriteLinks.length,
+              },
+              {
+                id: "archive" as const, icon: <Archive size={14} />, label: t("link.archive"),
+                count: archiveLinks.length,
+              },
+            ].map(({ id, icon, label, count }) => (
               <button
-                onClick={() => setAdding(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-t2 hover:text-t1 hover:border-accent/40 transition-colors"
+                key={id}
+                onClick={() => setActiveSection(id)}
+                className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-all ${
+                  activeSection === id
+                    ? "bg-accent/15 font-semibold text-accent"
+                    : "text-t2 hover:bg-line/20 hover:text-t1"
+                }`}
               >
-                <Plus size={13} /> {t("bookmarks.add_section")}
+                <span className={activeSection === id ? "text-accent" : "text-t3"}>{icon}</span>
+                <span className="flex-1 text-left">{label}</span>
+                <span className={`text-[11px] ${activeSection === id ? "text-accent/70" : "text-t3"}`}>{count}</span>
+              </button>
+            ))}
+
+            {/* User sections */}
+            {displaySections.length > 0 && (
+              <div className="label-xs mb-2 mt-4 px-3">{t("bookmarks.sections", "Sections")}</div>
+            )}
+            <SortableContext
+              items={displaySections.map((s) => `section:${s.id}`)}
+              strategy={verticalListSortingStrategy}
+            >
+              {displaySections.map((section) => (
+                <SortableSidebarSection
+                  key={section.id}
+                  section={section}
+                  isActive={activeSection === section.id}
+                  isDropOver={dropOverSidebarId === section.id}
+                  onSelect={() => setActiveSection(section.id)}
+                  onRename={(title) => handleRenameSection(section.id, title)}
+                  onDelete={() => handleDeleteSection(section.id)}
+                />
+              ))}
+            </SortableContext>
+
+            {/* Add section */}
+            {addingSectionOpen ? (
+              <div className="mt-1 flex items-center gap-1 rounded-xl border border-line/50 px-2 py-1">
+                <input
+                  ref={addSectionInputRef}
+                  autoFocus
+                  className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3"
+                  placeholder={t("bookmarks.section_title")}
+                  value={addingSectionTitle}
+                  onChange={(e) => setAddingSectionTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateSection();
+                    if (e.key === "Escape") { setAddingSectionTitle(""); setAddingSectionOpen(false); }
+                  }}
+                />
+                <button
+                  onClick={handleCreateSection}
+                  disabled={!addingSectionTitle.trim()}
+                  className="rounded-lg bg-accent px-2 py-1 text-[11px] font-semibold text-bg disabled:opacity-40"
+                >
+                  +
+                </button>
+                <button onClick={() => { setAddingSectionTitle(""); setAddingSectionOpen(false); }} className="text-t3 hover:text-t1">
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setAddingSectionOpen(true)}
+                className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[12px] text-t3 transition-colors hover:text-t1"
+              >
+                <Plus size={12} /> {t("bookmarks.add_section")}
               </button>
             )}
           </div>
-        </div>
+        </aside>
 
-        {/* Capture + Search */}
-        <div className="grid gap-2 lg:grid-cols-[1fr_300px]">
-          <div className="flex items-center gap-2 rounded-lg border border-line/60 bg-surface px-3 py-2">
-            <Send size={14} className="text-accent shrink-0" />
-            <input
-              value={captureUrl}
-              onChange={(e) => setCaptureUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleCapture(); }}
-              placeholder={t("bookmarks.capture_placeholder")}
-              className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3"
-            />
-            <button
-              disabled={!defaultSectionId || !captureUrl.trim()}
-              onClick={handleCapture}
-              className="rounded-lg bg-accent px-3 py-1 text-[13px] font-semibold text-bg disabled:opacity-40 hover:opacity-90 transition-opacity"
-            >
-              {t("bookmarks.capture")}
-            </button>
-          </div>
+        {/* ── Main Content ─────────────────────────────────────────────────────── */}
+        <div className="min-w-0 flex-1 space-y-4">
 
-          <div className="flex items-center gap-2 rounded-lg border border-line/60 bg-surface px-3 py-2">
-            <Search size={14} className="text-t3 shrink-0" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("bookmarks.search")}
-              className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ── Add section form ─────────────────────────────── */}
-      {adding && view === "sections" && (
-        <div className="flex max-w-sm gap-2">
-          <input
-            autoFocus
-            className="flex-1 rounded-lg border border-line bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50"
-            placeholder={t("bookmarks.section_title")}
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAddSection();
-              if (e.key === "Escape") setAdding(false);
-            }}
-          />
-          <button
-            onClick={handleAddSection}
-            disabled={!newTitle.trim()}
-            className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-bg disabled:opacity-50 hover:opacity-90 transition-opacity"
-          >
-            {t("link.save")}
-          </button>
-        </div>
-      )}
-
-      {/* ── Tag filter ───────────────────────────────────── */}
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-        <button
-          onClick={() => setActiveTag(null)}
-          className={`shrink-0 rounded-lg px-3 py-1 text-[12px] font-medium transition-colors ${
-            activeTag === null
-              ? "bg-accent text-bg"
-              : "bg-surface border border-line/50 text-t2 hover:text-t1"
-          }`}
-        >
-          {t("bookmarks.all_tags")} {allLinks.length}
-        </button>
-        {tags?.map((tag) => (
-          <button
-            key={tag.id}
-            onClick={() => setActiveTag(tag.name)}
-            className={`shrink-0 rounded-lg px-3 py-1 text-[12px] font-medium transition-colors ${
-              activeTag === tag.name
-                ? "bg-accent text-bg"
-                : "bg-surface border border-line/50 text-t2 hover:text-t1"
-            }`}
-          >
-            {tag.name} {tag.count}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Empty state ──────────────────────────────────── */}
-      {(!sections || sections.length === 0) && !adding && (
-        <div className="py-12 text-center text-[13px] text-t3">
-          {t("bookmarks.no_sections")}
-        </div>
-      )}
-
-      {/* ── Feed view ────────────────────────────────────── */}
-      {view === "feed" && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {filteredLinks.map((link) => (
-            <BookmarkCard key={link.id} link={link} onOpen={setSelectedLink} />
-          ))}
-        </div>
-      )}
-
-      {/* ── Sections view ────────────────────────────────── */}
-      {view === "sections" && (
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-          {sections?.map((section) => (
-            <LinkSection key={section.id} section={section} />
-          ))}
-        </div>
-      )}
-
-      {/* ── Kanban view ──────────────────────────────────── */}
-      {view === "kanban" && (
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {sections?.map((section) => (
-            <div
-              key={section.id}
-              className="w-[280px] shrink-0 rounded-xl bg-card border border-line/60"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => {
-                moveLinkToSection(section.id);
-              }}
-            >
-              <div className="border-b border-line/40 px-3 py-2 text-[13px] font-semibold text-t1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate">{section.title}</span>
-                  <span className="rounded-full border border-line/50 px-2 py-0.5 text-[10px] text-t3">{section.links.length}</span>
-                </div>
-              </div>
-              <div className="min-h-[160px] space-y-1 p-2">
-                {[...section.links]
-                  .filter((link) => filteredLinks.some((f) => f.id === link.id))
-                  .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
-                  .map((link) => (
-                    <div
-                      key={link.id}
-                      draggable
-                      onDragStart={() => setDragLinkId(link.id)}
-                      onDragEnter={() => setDragOverLinkId(link.id)}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={(event) => {
-                        event.stopPropagation();
-                        moveLinkToSection(section.id, link.id);
-                      }}
-                      className={`rounded-lg transition-all ${dragOverLinkId === link.id ? "translate-y-0.5 ring-2 ring-accent/40" : ""}`}
-                    >
-                      <BookmarkCard link={link} onOpen={setSelectedLink} />
-                    </div>
-                  ))}
-                {!section.links.filter((link) => filteredLinks.some((f) => f.id === link.id)).length && (
-                  <div className="rounded-xl border border-dashed border-line/70 px-3 py-8 text-center text-[12px] text-t3">
-                    {t("bookmarks.drop_here")}
-                  </div>
-                )}
-                <button
-                  onClick={() => setLinkDraft({ section_id: section.id, name: "", url: "", tags: [] } as Partial<Link>)}
-                  className="mt-2 w-full rounded-lg border border-dashed border-line/70 px-3 py-2 text-[12px] font-medium text-t3 transition-colors hover:border-accent/40 hover:text-accent"
-                >
-                  + {t("bookmarks.add_link")}
-                </button>
-              </div>
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* URL Capture */}
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-line/60 bg-card px-3 py-2 transition-colors focus-within:border-accent/40">
+              <Send size={14} className="shrink-0 text-accent" />
+              <input
+                value={captureUrl}
+                onChange={(e) => setCaptureUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleCapture(); }}
+                placeholder={t("bookmarks.capture_placeholder")}
+                className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3"
+              />
+              {captureUrl.trim() && (
+                <>
+                  <button onClick={() => setCaptureUrl("")} className="text-t3 hover:text-t1"><X size={13} /></button>
+                  <button
+                    disabled={!defaultSectionId}
+                    onClick={handleCapture}
+                    className="shrink-0 rounded-lg bg-accent px-3 py-1 text-[12px] font-semibold text-bg hover:opacity-90 disabled:opacity-40"
+                  >
+                    {t("bookmarks.capture")}
+                  </button>
+                </>
+              )}
             </div>
-          ))}
-        </div>
-      )}
 
-      <BookmarkPreviewDrawer link={selectedLink} onClose={() => setSelectedLink(null)} />
+            {/* Search */}
+            <div className="flex items-center gap-2 rounded-xl border border-line/60 bg-card px-3 py-2 transition-colors focus-within:border-accent/40 sm:w-56">
+              <Search size={14} className="shrink-0 text-t3" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("bookmarks.search")}
+                className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3"
+              />
+              {query && <button onClick={() => setQuery("")} className="text-t3 hover:text-t1"><X size={12} /></button>}
+            </div>
+
+            {/* Add link */}
+            <button
+              onClick={() => setLinkDraft({ section_id: typeof activeSection === "number" ? activeSection : defaultSectionId, name: "", url: "", tags: [] } as Partial<Link>)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-[13px] font-semibold text-bg transition-opacity hover:opacity-90"
+            >
+              <Plus size={14} /> {t("bookmarks.add_link")}
+            </button>
+
+            {/* View toggle */}
+            <div className="flex overflow-hidden rounded-xl border border-line/60">
+              <button
+                onClick={() => setView("grid")}
+                className={`p-2 transition-colors ${view === "grid" ? "bg-accent text-bg" : "text-t3 hover:bg-line/30 hover:text-t1"}`}
+                title="Grid"
+              >
+                <LayoutGrid size={14} />
+              </button>
+              <button
+                onClick={() => setView("list")}
+                className={`p-2 transition-colors ${view === "list" ? "bg-accent text-bg" : "text-t3 hover:bg-line/30 hover:text-t1"}`}
+                title="List"
+              >
+                <List size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* Tag filter */}
+          {allTags && allTags.length > 0 && (
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+              <button
+                onClick={() => setActiveTag(null)}
+                className={`shrink-0 rounded-lg px-3 py-1 text-[11px] font-semibold transition-colors ${
+                  activeTag === null
+                    ? "bg-accent text-bg"
+                    : "border border-line/50 bg-card text-t2 hover:text-t1"
+                }`}
+              >
+                {t("bookmarks.all_tags")} <span className="opacity-60">{visibleLinks.length}</span>
+              </button>
+              {allTags.map((tag) => (
+                <button
+                  key={tag.id}
+                  onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
+                  className={`shrink-0 rounded-lg px-3 py-1 text-[11px] font-semibold transition-colors ${
+                    activeTag === tag.name
+                      ? "bg-accent text-bg"
+                      : "border border-line/50 bg-card text-t2 hover:text-t1"
+                  }`}
+                >
+                  {tag.name} <span className="opacity-60">{tag.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Section heading when inside a section */}
+          {typeof activeSection === "number" && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[15px] font-semibold text-t1">
+                  {displaySections.find((s) => s.id === activeSection)?.title}
+                </h2>
+                <span className="rounded-full border border-line/50 bg-surface px-2 py-0.5 text-[11px] text-t3">
+                  {visibleLinks.length}
+                </span>
+              </div>
+              {isReorderable && (
+                <span className="text-[11px] text-t3">Drag to reorder</span>
+              )}
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!sections || sections.length === 0 ? (
+            <div className="py-20 text-center">
+              <div className="mb-3 text-[36px]">🔖</div>
+              <div className="text-[14px] font-semibold text-t1">{t("bookmarks.no_sections")}</div>
+              <p className="mt-1 text-[13px] text-t3">Erstelle eine Sektion um Lesezeichen hinzuzufügen</p>
+              <button
+                onClick={() => setAddingSectionOpen(true)}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-[13px] font-semibold text-bg hover:opacity-90"
+              >
+                <Plus size={14} /> {t("bookmarks.add_section")}
+              </button>
+            </div>
+          ) : visibleLinks.length === 0 ? (
+            <div className="py-16 text-center text-[13px] text-t3">
+              {query || activeTag ? "Keine Treffer für diese Suche." : "Noch keine Lesezeichen hier."}
+            </div>
+          ) : (
+            /* Bookmark grid / list with DnD */
+            isReorderable ? (
+              <SortableContext
+                items={visibleLinks.map((l) => `link:${l.id}`)}
+                strategy={view === "list" ? verticalListSortingStrategy : rectSortingStrategy}
+              >
+                <div className={view === "list" ? "space-y-2" : "grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4"}>
+                  {visibleLinks.map((link) => (
+                    <SortableBookmark key={link.id} link={link} view={view} />
+                  ))}
+                </div>
+              </SortableContext>
+            ) : (
+              /* Non-reorderable views (All, Favorites, Archive) — just grid */
+              <div className={view === "list" ? "space-y-2" : "grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4"}>
+                {visibleLinks.map((link) => (
+                  <BookmarkCard key={link.id} link={link} variant={view} />
+                ))}
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* DragOverlay */}
+      <DragOverlay dropAnimation={{ duration: 150, easing: "ease-out" }}>
+        {activeLink && (
+          <div className="cursor-grabbing rotate-1 scale-105">
+            <DragPreview link={activeLink} />
+          </div>
+        )}
+      </DragOverlay>
+
+      {/* Modals */}
       <LinkEditModal
         open={Boolean(captureDraft)}
-        onClose={() => {
-          setCaptureDraft(null);
-          setCaptureUrl("");
-        }}
+        onClose={() => { setCaptureDraft(null); setCaptureUrl(""); }}
         initial={captureDraft ?? undefined}
-        defaultSectionId={defaultSectionId}
+        defaultSectionId={captureDraft?.section_id ?? defaultSectionId}
       />
       <LinkEditModal
         open={Boolean(linkDraft)}
@@ -324,6 +709,6 @@ export default function BookmarksPage() {
         initial={linkDraft ?? undefined}
         defaultSectionId={linkDraft?.section_id ?? defaultSectionId}
       />
-    </div>
+    </DndContext>
   );
 }

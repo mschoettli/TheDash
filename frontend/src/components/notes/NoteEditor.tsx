@@ -153,6 +153,14 @@ export default function NoteEditor({ note, folder }: Props) {
             </button>
           )}
 
+          {/* Word / char count */}
+          {content && (
+            <span className="text-t3">
+              · {content.trim().split(/\s+/).filter(Boolean).length} words
+              · {content.length} chars
+            </span>
+          )}
+
           <span className="ml-auto flex items-center gap-1">
             <button
               onClick={() => updateNote.mutate({ id: note.id, is_pinned: !note.is_pinned })}
