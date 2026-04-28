@@ -323,11 +323,11 @@ function GridDropCell({ sectionId, col, row }: { sectionId: number; col: number;
   return (
     <div
       ref={setNodeRef}
-      style={{ gridColumn: col + 1, gridRow: row + 1 }}
+      style={{ gridColumn: col + 1, gridRow: row + 1, minHeight: "80px" }}
       className={`rounded-xl border-2 border-dashed transition-all duration-100 ${
         isOver
           ? "border-accent bg-accent/15 shadow-inner shadow-accent/10"
-          : "border-line/15 bg-transparent hover:border-line/30"
+          : "border-line/20 bg-transparent hover:border-line/35"
       }`}
     />
   );
@@ -470,8 +470,8 @@ function SortableSection({
     [section.items, gridCols]
   );
 
-  // How many drop-cell rows to show (items + 2 extra empty rows)
-  const maxRow = Math.max(2, ...Array.from(itemPositions.values()).map((p) => p.row + p.h)) + 1;
+  // How many drop-cell rows to show (items + 1 extra empty row)
+  const maxRow = Math.max(1, ...Array.from(itemPositions.values()).map((p) => p.row + p.h)) + 1;
 
   // Cells already occupied by non-dragging items — no drop cell rendered there
   const occupiedCells = useMemo(() => {
@@ -596,13 +596,13 @@ function SortableSection({
           style={{
             display: "grid",
             gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-            gridAutoRows: "minmax(120px, auto)",
+            gridAutoRows: "minmax(56px, auto)",
             gap: "12px",
-            minHeight: "140px",
+            minHeight: editMode && activeDragSize !== null ? "100px" : undefined,
           }}
         >
-          {/* Drop cells — only in empty (unoccupied) cells */}
-          {editMode &&
+          {/* Drop cells — only visible while an item is being dragged */}
+          {editMode && activeDragSize !== null &&
             Array.from({ length: maxRow }, (_, row) =>
               Array.from({ length: gridCols }, (_, col) => {
                 if (occupiedCells.has(`${col},${row}`)) return null;
@@ -645,8 +645,8 @@ function SortableSection({
           {/* Empty state */}
           {!section.items.length && (
             <div
-              style={{ gridColumn: `1 / span ${gridCols}`, gridRow: 1, zIndex: 25 }}
-              className="flex min-h-[80px] items-center justify-center rounded-xl text-[13px] text-t3"
+              style={{ gridColumn: `1 / span ${gridCols}`, gridRow: 1, zIndex: 25, minHeight: "80px" }}
+              className="flex items-center justify-center rounded-xl text-[13px] text-t3"
             >
               {editMode ? t("dashboard.drop_here") : t("dashboard.empty_section")}
             </div>
