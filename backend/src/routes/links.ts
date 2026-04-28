@@ -91,6 +91,13 @@ export function attachTags<T extends { id: number }>(links: T[]): Array<T & { ta
   }));
 }
 
+/** Remove tags that are no longer referenced by any link. */
+function pruneOrphanedTags(): void {
+  db.prepare(
+    "DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM link_tags)"
+  ).run();
+}
+
 function syncLinkTags(linkId: number, tags: unknown): void {
   if (!Array.isArray(tags)) return;
 
@@ -121,6 +128,8 @@ function syncLinkTags(linkId: number, tags: unknown): void {
     const row = selectTag.get(name) as { id: number } | undefined;
     if (row) insertLinkTag.run(linkId, row.id);
   });
+
+  pruneOrphanedTags();
 }
 
 router.post("/", (req, res) => {
@@ -138,8 +147,8 @@ router.post("/", (req, res) => {
     tags,
   } = req.body;
 
-  if (!section_id || !name || !url) {
-    res.status(400).json({ error: "section_id, name and url required" });
+  if (!name || !url) {
+    res.status(400).json({ error: "name and url required" });
     return;
   }
 
@@ -151,7 +160,7 @@ router.post("/", (req, res) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
       )
       .run(
-        section_id,
+        section_id ?? null,
         name,
         normalizeUrl(url),
         icon_url ?? null,
@@ -172,12 +181,13 @@ router.post("/", (req, res) => {
 });
 
 router.post("/capture", async (req, res) => {
-  const sectionId = Number(req.body?.section_id);
+  const rawSectionId = req.body?.section_id;
+  const sectionId = rawSectionId != null && rawSectionId !== "" ? Number(rawSectionId) : null;
   const url = String(req.body?.url ?? "").trim();
   const tags = req.body?.tags ?? [];
 
-  if (!sectionId || !url) {
-    res.status(400).json({ error: "section_id and url required" });
+  if (!url) {
+    res.status(400).json({ error: "url required" });
     return;
   }
 
@@ -193,7 +203,7 @@ router.post("/capture", async (req, res) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
       )
       .run(
-        sectionId,
+        sectionId ?? null,
         name,
         normalizedUrl,
         metadata.iconUrl,
@@ -240,9 +250,9 @@ router.put("/reorder/batch", (req, res) => {
     const update = db.prepare("UPDATE links SET section_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?");
     items.forEach((item: any) => {
       const id = Number(item.id);
-      const sectionId = Number(item.section_id);
+      const sectionId = item.section_id == null ? null : Number(item.section_id);
       const sortOrder = Number(item.sort_order);
-      if (Number.isFinite(id) && Number.isFinite(sectionId) && Number.isFinite(sortOrder)) {
+      if (Number.isFinite(id) && Number.isFinite(sortOrder)) {
         update.run(sectionId, sortOrder, id);
       }
     });
@@ -302,7 +312,11 @@ router.put("/:id", (req, res) => {
 });
 
 router.delete("/:id", (req, res) => {
-  db.prepare("DELETE FROM links WHERE id = ?").run(req.params.id);
+  db.transaction(() => {
+    db.prepare("DELETE FROM links WHERE id = ?").run(req.params.id);
+    // link_tags rows are cascade-deleted; now remove orphaned tag rows
+    pruneOrphanedTags();
+  })();
   res.json({ ok: true });
 });
 

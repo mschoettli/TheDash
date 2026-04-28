@@ -371,12 +371,12 @@ function DraggableItem({
         opacity: isDragging ? 0.15 : 1,
         transition: "opacity 120ms",
       }}
-      className="relative"
+      className="group relative"
     >
       {/* Drag handle */}
       {editMode && (
         <button
-          className="absolute left-2 top-2 z-30 cursor-grab rounded-lg border border-line/50 bg-surface/95 p-1.5 text-t3 shadow-sm transition-colors hover:text-accent active:cursor-grabbing"
+          className="absolute left-2 top-2 z-30 cursor-grab rounded-lg border border-line/50 bg-surface/95 p-1.5 text-t3 shadow-sm opacity-0 transition-all group-hover:opacity-100 hover:text-accent active:cursor-grabbing"
           {...attributes}
           {...listeners}
           aria-label="Drag"
@@ -385,9 +385,9 @@ function DraggableItem({
         </button>
       )}
 
-      {/* Size picker */}
+      {/* Size picker — visible only on hover */}
       {editMode && (
-        <div className="absolute bottom-2 left-10 z-30 flex gap-0.5 rounded-lg border border-line/50 bg-surface/95 p-1 shadow-sm backdrop-blur-sm">
+        <div className="absolute bottom-2 left-2 z-30 flex gap-0.5 rounded-lg border border-line/50 bg-surface/95 p-1 shadow-sm backdrop-blur-sm opacity-0 transition-opacity group-hover:opacity-100">
           {SPAN_PRESETS.map(({ label, w, h }) => (
             <button
               key={label}
@@ -426,7 +426,7 @@ function SortableSection({
   isCollapsed, onToggleCollapse,
   onEditWidget, onDeleteWidget, onSizeChange,
   onUpdateLayout, onChangeGridCols, onRename, onDelete,
-  hoveredCell, activeDragSize,
+  hoveredCell, activeDragSize, activeItemId,
   isLast,
 }: {
   section: DashboardSection;
@@ -444,6 +444,8 @@ function SortableSection({
   onDelete: () => void;
   hoveredCell: HoveredCell | null;
   activeDragSize: { w: number; h: number } | null;
+  /** Numeric id of the item currently being dragged (so its own cell stays free) */
+  activeItemId: number | null;
   isLast: boolean;
 }) {
   const { t } = useTranslation();
@@ -470,6 +472,18 @@ function SortableSection({
 
   // How many drop-cell rows to show (items + 2 extra empty rows)
   const maxRow = Math.max(2, ...Array.from(itemPositions.values()).map((p) => p.row + p.h)) + 1;
+
+  // Cells already occupied by non-dragging items — no drop cell rendered there
+  const occupiedCells = useMemo(() => {
+    const set = new Set<string>();
+    for (const [itemId, p] of itemPositions) {
+      if (itemId === activeItemId) continue; // keep the dragging item's cell free
+      for (let r = p.row; r < p.row + p.h; r++)
+        for (let c = p.col; c < p.col + p.w; c++)
+          set.add(`${c},${r}`);
+    }
+    return set;
+  }, [itemPositions, activeItemId]);
 
   // Ghost highlight for the hovered drop cell (shows item size)
   const ghost = (hoveredCell?.sectionId === section.id && activeDragSize)
@@ -587,12 +601,13 @@ function SortableSection({
             minHeight: "140px",
           }}
         >
-          {/* Drop cells — rendered below items in edit mode */}
+          {/* Drop cells — only in empty (unoccupied) cells */}
           {editMode &&
             Array.from({ length: maxRow }, (_, row) =>
-              Array.from({ length: gridCols }, (_, col) => (
-                <GridDropCell key={`${col}-${row}`} sectionId={section.id} col={col} row={row} />
-              ))
+              Array.from({ length: gridCols }, (_, col) => {
+                if (occupiedCells.has(`${col},${row}`)) return null;
+                return <GridDropCell key={`${col}-${row}`} sectionId={section.id} col={col} row={row} />;
+              })
             )}
 
           {/* Ghost preview — shows where the item will land */}
@@ -1282,6 +1297,7 @@ export default function DashboardPage() {
               onDelete={() => deleteSectionFromDraft(section.id)}
               hoveredCell={hoveredCell}
               activeDragSize={activeDragData}
+              activeItemId={activeId?.startsWith("item:") ? numericId(activeId) : null}
               isLast={index === sections.length - 1}
             />
           ))}

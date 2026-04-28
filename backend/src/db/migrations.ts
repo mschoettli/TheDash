@@ -318,5 +318,44 @@ export function runMigrations(): void {
     FROM widgets;
   `);
 
+  // Migration: make links.section_id nullable (was NOT NULL)
+  const linksTableInfo = db.prepare("PRAGMA table_info(links)").all() as Array<{
+    name: string; notnull: number;
+  }>;
+  const sectionIdCol = linksTableInfo.find((c) => c.name === "section_id");
+  if (sectionIdCol && sectionIdCol.notnull === 1) {
+    db.exec("PRAGMA foreign_keys = OFF");
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS links_v2 (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        section_id  INTEGER REFERENCES sections(id) ON DELETE SET NULL,
+        name        TEXT    NOT NULL,
+        url         TEXT    NOT NULL,
+        icon_url    TEXT,
+        sort_order  INTEGER NOT NULL DEFAULT 0,
+        description TEXT,
+        image_url   TEXT,
+        note        TEXT,
+        is_favorite INTEGER NOT NULL DEFAULT 0,
+        is_archived INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT,
+        updated_at  TEXT
+      );
+    `);
+    db.exec(`
+      INSERT INTO links_v2 (id, section_id, name, url, icon_url, sort_order,
+        description, image_url, note, is_favorite, is_archived, created_at, updated_at)
+      SELECT id, section_id, name, url, icon_url, sort_order,
+        description, image_url, note, is_favorite, is_archived, created_at, updated_at
+      FROM links;
+    `);
+    db.exec("DROP TABLE links");
+    db.exec("ALTER TABLE links_v2 RENAME TO links");
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+
+  // One-time cleanup: remove orphaned tags left over from previous deletes
+  db.exec("DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM link_tags)");
+
   console.log("Database migrations complete.");
 }

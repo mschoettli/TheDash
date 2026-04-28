@@ -14,7 +14,7 @@ export interface TagSuggestion {
 
 export interface Link {
   id: number;
-  section_id: number;
+  section_id: number | null;
   name: string;
   url: string;
   icon_url: string | null;
@@ -51,7 +51,7 @@ function invalidateBookmarks(qc: ReturnType<typeof useQueryClient>) {
 export function useCreateLink() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: LinkMutationData & { section_id: number; name: string; url: string }) =>
+    mutationFn: (data: LinkMutationData & { section_id?: number | null; name: string; url: string }) =>
       fetchJson<Link>("/api/links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -64,7 +64,7 @@ export function useCreateLink() {
 export function useCaptureLink() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { section_id: number; url: string; tags?: LinkInputTag[] }) =>
+    mutationFn: (data: { section_id?: number | null; url: string; tags?: LinkInputTag[] }) =>
       fetchJson<Link>("/api/links/capture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -131,7 +131,7 @@ export function useDeleteLink() {
 export function useReorderLinks() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (items: Array<{ id: number; section_id: number; sort_order: number }>) =>
+    mutationFn: (items: Array<{ id: number; section_id: number | null; sort_order: number }>) =>
       fetchJson<{ ok: true }>("/api/links/reorder/batch", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

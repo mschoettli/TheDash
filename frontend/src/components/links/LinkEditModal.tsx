@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import Modal from "../ui/Modal";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import { fetchTagSuggestions, useCreateLink, useUpdateLink, useDeleteLink, Link, suggestAutoTags } from "../../hooks/useLinks";
-import { useSections, useCreateSection } from "../../hooks/useSections";
+import { useSections, useCreateSection, SectionsData } from "../../hooks/useSections";
 
 const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
 const selectCls = `${input} appearance-none`;
@@ -28,7 +28,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default function LinkEditModal({ open, onClose, link, initial, defaultSectionId }: Props) {
   const { t } = useTranslation();
   const isEdit = Boolean(link);
-  const { data: sections } = useSections();
+  const { data: sectionsData } = useSections();
+  const sections = (sectionsData as SectionsData | undefined)?.sections;
 
   const [name, setName] = useState(link?.name ?? initial?.name ?? "");
   const [url, setUrl] = useState(link?.url ?? initial?.url ?? "");
@@ -41,7 +42,9 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
   const [suggestingTags, setSuggestingTags] = useState(false);
   const [isFavorite, setIsFavorite] = useState(Boolean(link?.is_favorite ?? initial?.is_favorite));
   const [isArchived, setIsArchived] = useState(Boolean(link?.is_archived ?? initial?.is_archived));
-  const [sectionId, setSectionId] = useState<number | "new">(link?.section_id ?? initial?.section_id ?? defaultSectionId ?? "new");
+  const [sectionId, setSectionId] = useState<number | null | "new">(
+    link !== undefined ? (link.section_id ?? null) : (initial?.section_id ?? defaultSectionId ?? null)
+  );
   const [newSectionTitle, setNewSectionTitle] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -58,7 +61,11 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
       setSuggestingTags(false);
       setIsFavorite(Boolean(link?.is_favorite ?? initial?.is_favorite));
       setIsArchived(Boolean(link?.is_archived ?? initial?.is_archived));
-      setSectionId(link?.section_id ?? initial?.section_id ?? defaultSectionId ?? (sections?.[0]?.id ?? "new"));
+      setSectionId(
+        link !== undefined
+          ? (link.section_id ?? null)
+          : (initial?.section_id ?? defaultSectionId ?? null)
+      );
       setNewSectionTitle("");
       setDeleteOpen(false);
     }
@@ -70,11 +77,13 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
   const createSection = useCreateSection();
 
   const handleSave = async () => {
-    let targetSectionId = sectionId as number;
+    let targetSectionId: number | null = null;
     if (sectionId === "new") {
       if (!newSectionTitle.trim()) return;
       const newSection = await createSection.mutateAsync({ title: newSectionTitle.trim() });
       targetSectionId = newSection.id;
+    } else {
+      targetSectionId = sectionId;
     }
     const tags = tagInput
       .split(",")
@@ -161,7 +170,17 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
         </Field>
 
         <Field label={t("link.section")}>
-          <select className={selectCls} value={sectionId} onChange={(e) => setSectionId(e.target.value === "new" ? "new" : Number(e.target.value))}>
+          <select
+            className={selectCls}
+            value={sectionId === null ? "none" : sectionId === "new" ? "new" : String(sectionId)}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "none") setSectionId(null);
+              else if (v === "new") setSectionId("new");
+              else setSectionId(Number(v));
+            }}
+          >
+            <option value="none">{t("link.no_section", "Keine Sektion")}</option>
             {sections?.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
             <option value="new">{t("link.new_section")}</option>
           </select>

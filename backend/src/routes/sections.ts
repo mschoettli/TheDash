@@ -10,14 +10,16 @@ router.get("/", (_req, res) => {
     .all() as Array<{ id: number; title: string; sort_order: number }>;
   const links = db
     .prepare("SELECT * FROM links ORDER BY sort_order ASC, id ASC")
-    .all() as Array<{ id: number; section_id: number }>;
+    .all() as Array<{ id: number; section_id: number | null }>;
   const linksWithTags = attachTags(links);
 
-  const result = sections.map((s) => ({
+  const sectionsResult = sections.map((s) => ({
     ...s,
     links: linksWithTags.filter((l) => l.section_id === s.id),
   }));
-  res.json(result);
+  const unsectionedLinks = linksWithTags.filter((l) => l.section_id === null);
+
+  res.json({ sections: sectionsResult, unsectionedLinks });
 });
 
 router.post("/", (req, res) => {

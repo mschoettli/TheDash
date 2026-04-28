@@ -37,7 +37,7 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Section, useCreateSection, useDeleteSection, useSections, useUpdateSection } from "../hooks/useSections";
+import { Section, SectionsData, useCreateSection, useDeleteSection, useSections, useUpdateSection } from "../hooks/useSections";
 import { Link, suggestAutoTags, useReorderLinks } from "../hooks/useLinks";
 import { useTags } from "../hooks/useTags";
 import BookmarkCard from "../components/links/BookmarkCard";
@@ -46,7 +46,7 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ActiveSection = "all" | "favorites" | "archive" | number;
+type ActiveSection = "all" | "favorites" | "archive" | "unsectioned" | number;
 type ViewMode = "grid" | "list";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -58,6 +58,40 @@ function matchesSearch(link: Link, query: string): boolean {
     .join(" ")
     .toLowerCase()
     .includes(v);
+}
+
+// ─── Unsectioned Sidebar Item ─────────────────────────────────────────────────
+
+function UnsectionedSidebarItem({
+  count, isActive, isDropOver, onSelect,
+}: {
+  count: number;
+  isActive: boolean;
+  isDropOver: boolean;
+  onSelect: () => void;
+}) {
+  const { t } = useTranslation();
+  const { setNodeRef } = useDroppable({
+    id: "sidebar:unsectioned",
+    data: { type: "sidebar-unsectioned" },
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      onClick={onSelect}
+      className={`flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-all ${
+        isActive
+          ? "bg-accent/15 font-semibold text-accent"
+          : isDropOver
+          ? "bg-accent/10 text-accent ring-1 ring-accent/40"
+          : "text-t2 hover:bg-line/20 hover:text-t1"
+      }`}
+    >
+      <span className={isActive ? "text-accent" : "text-t3"}><Bookmark size={14} /></span>
+      <span className="flex-1 text-left">{t("bookmarks.unsectioned", "Unsortiert")}</span>
+      <span className={`text-[11px] ${isActive ? "text-accent/70" : "text-t3"}`}>{count}</span>
+    </div>
+  );
 }
 
 // ─── Sortable Sidebar Section ──────────────────────────────────────────────────
@@ -209,7 +243,9 @@ function DragPreview({ link }: { link: Link }) {
 
 export default function BookmarksPage() {
   const { t } = useTranslation();
-  const { data: sections, isLoading } = useSections();
+  const { data: sectionsData, isLoading } = useSections();
+  const sections = (sectionsData as SectionsData | undefined)?.sections;
+  const unsectionedLinks = (sectionsData as SectionsData | undefined)?.unsectionedLinks ?? [];
   const { data: allTags } = useTags();
   const createSection = useCreateSection();
   const updateSection = useUpdateSection();
@@ -232,6 +268,7 @@ export default function BookmarksPage() {
   const [sectionsDraft, setSectionsDraft] = useState<Section[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dropOverSidebarId, setDropOverSidebarId] = useState<number | null>(null);
+  const [dropOverUnsectioned, setDropOverUnsectioned] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -240,22 +277,26 @@ export default function BookmarksPage() {
 
   // ─ Data ─────────────────────────────────────────────────────────────────────
   const displaySections = sectionsDraft ?? sections ?? [];
-  const allLinks = useMemo(() => displaySections.flatMap((s) => s.links), [displaySections]);
+  const allLinks = useMemo(
+    () => [...displaySections.flatMap((s) => s.links), ...unsectionedLinks],
+    [displaySections, unsectionedLinks]
+  );
   const favoriteLinks = useMemo(() => allLinks.filter((l) => l.is_favorite && !l.is_archived), [allLinks]);
   const archiveLinks = useMemo(() => allLinks.filter((l) => l.is_archived), [allLinks]);
-  const defaultSectionId = displaySections[0]?.id;
+  const defaultSectionId = displaySections[0]?.id ?? null;
 
   const visibleLinks = useMemo(() => {
     let base: Link[];
     if (activeSection === "all") base = allLinks.filter((l) => !l.is_archived);
     else if (activeSection === "favorites") base = favoriteLinks;
     else if (activeSection === "archive") base = archiveLinks;
+    else if (activeSection === "unsectioned") base = unsectionedLinks.filter((l) => !l.is_archived);
     else base = displaySections.find((s) => s.id === activeSection)?.links ?? [];
     return base.filter((l) => {
       const tagMatch = activeTag ? l.tags.some((t) => t.name === activeTag) : true;
       return tagMatch && matchesSearch(l, query);
     });
-  }, [activeSection, activeTag, allLinks, archiveLinks, displaySections, favoriteLinks, query]);
+  }, [activeSection, activeTag, allLinks, archiveLinks, displaySections, favoriteLinks, unsectionedLinks, query]);
 
   // ─ Active drag item ─────────────────────────────────────────────────────────
   const activeLinkId = activeId?.startsWith("link:") ? Number(activeId.split(":")[1]) : null;
@@ -263,13 +304,14 @@ export default function BookmarksPage() {
 
   // ─ URL Capture ──────────────────────────────────────────────────────────────
   const handleCapture = () => {
-    if (!defaultSectionId || !captureUrl.trim()) return;
+    if (!captureUrl.trim()) return;
     const url = captureUrl.trim();
     let name = url;
     try { name = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, ""); }
     catch { name = url; }
+    const captureSectionId = typeof activeSection === "number" ? activeSection : defaultSectionId;
     setCaptureDraft({
-      section_id: typeof activeSection === "number" ? activeSection : defaultSectionId,
+      section_id: captureSectionId,
       url, name,
       tags: suggestAutoTags(url, name).map((tag, i) => ({
         id: -i - 1, name: tag, source: "auto" as const, created_at: new Date().toISOString(),
@@ -297,9 +339,7 @@ export default function BookmarksPage() {
   };
 
   // ─ DnD: reorder links within section ────────────────────────────────────────
-  const handleReorderLinks = (sectionId: number, orderedIds: number[]) => {
-    const sec = displaySections.find((s) => s.id === sectionId);
-    if (!sec) return;
+  const handleReorderLinks = (sectionId: number | null, orderedIds: number[]) => {
     const items = orderedIds.map((id, idx) => ({
       id,
       section_id: sectionId,
@@ -309,14 +349,14 @@ export default function BookmarksPage() {
   };
 
   // ─ DnD: move link to different section ──────────────────────────────────────
-  const handleMoveToSection = (linkId: number, targetSectionId: number) => {
+  const handleMoveToSection = (linkId: number, targetSectionId: number | null) => {
     const link = allLinks.find((l) => l.id === linkId);
     if (!link || link.section_id === targetSectionId) return;
-    const targetSec = displaySections.find((s) => s.id === targetSectionId);
-    const newOrder = (targetSec?.links.length ?? 0);
+    const newOrder = targetSectionId === null
+      ? unsectionedLinks.length
+      : (displaySections.find((s) => s.id === targetSectionId)?.links.length ?? 0);
     reorderLinks.mutate([{ id: linkId, section_id: targetSectionId, sort_order: newOrder }]);
-    // Navigate to target section
-    setActiveSection(targetSectionId);
+    setActiveSection(targetSectionId === null ? "unsectioned" : targetSectionId);
   };
 
   // ─ DnD: reorder sections ────────────────────────────────────────────────────
@@ -350,11 +390,16 @@ export default function BookmarksPage() {
 
   const handleDragOver = (e: DragOverEvent) => {
     const { over, active } = e;
-    if (!String(active.id).startsWith("link:")) { setDropOverSidebarId(null); return; }
+    if (!String(active.id).startsWith("link:")) { setDropOverSidebarId(null); setDropOverUnsectioned(false); return; }
     if (over?.data.current?.type === "sidebar-section") {
       setDropOverSidebarId(Number(over.data.current.sectionId));
+      setDropOverUnsectioned(false);
+    } else if (over?.data.current?.type === "sidebar-unsectioned") {
+      setDropOverUnsectioned(true);
+      setDropOverSidebarId(null);
     } else {
       setDropOverSidebarId(null);
+      setDropOverUnsectioned(false);
     }
   };
 
@@ -362,6 +407,7 @@ export default function BookmarksPage() {
     const { active, over } = event;
     setActiveId(null);
     setDropOverSidebarId(null);
+    setDropOverUnsectioned(false);
     if (!over || active.id === over.id) return;
 
     const ak = String(active.id);
@@ -383,7 +429,8 @@ export default function BookmarksPage() {
     // Link dropped on sidebar section = cross-section move
     if (ak.startsWith("link:") && ok.startsWith("sidebar:")) {
       const linkId = Number(ak.split(":")[1]);
-      const targetSectionId = Number(ok.split(":")[1]);
+      const targetKey = ok.split(":")[1];
+      const targetSectionId = targetKey === "unsectioned" ? null : Number(targetKey);
       handleMoveToSection(linkId, targetSectionId);
       return;
     }
@@ -396,13 +443,15 @@ export default function BookmarksPage() {
       const oLink = allLinks.find((l) => l.id === oId);
       if (!aLink || !oLink || aLink.section_id !== oLink.section_id) return;
 
-      const sec = displaySections.find((s) => s.id === aLink.section_id);
-      if (!sec) return;
-      const ids = sec.links.map((l) => l.id);
+      const sectionId = aLink.section_id;
+      const sectionLinks = sectionId === null
+        ? unsectionedLinks
+        : (displaySections.find((s) => s.id === sectionId)?.links ?? []);
+      const ids = sectionLinks.map((l) => l.id);
       const oi = ids.indexOf(aId);
       const ni = ids.indexOf(oId);
       if (oi >= 0 && ni >= 0) {
-        handleReorderLinks(sec.id, arrayMove(ids, oi, ni));
+        handleReorderLinks(sectionId, arrayMove(ids, oi, ni));
       }
     }
   };
@@ -420,7 +469,7 @@ export default function BookmarksPage() {
     </div>
   );
 
-  const isReorderable = typeof activeSection === "number";
+  const isReorderable = typeof activeSection === "number" || activeSection === "unsectioned";
 
   return (
     <DndContext
@@ -429,7 +478,7 @@ export default function BookmarksPage() {
       onDragStart={(e) => setActiveId(String(e.active.id))}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => { setActiveId(null); setDropOverSidebarId(null); setSectionsDraft(null); }}
+      onDragCancel={() => { setActiveId(null); setDropOverSidebarId(null); setDropOverUnsectioned(false); setSectionsDraft(null); }}
     >
       <div className="flex min-h-0 gap-5 text-t1">
 
@@ -472,6 +521,16 @@ export default function BookmarksPage() {
                 <span className={`text-[11px] ${activeSection === id ? "text-accent/70" : "text-t3"}`}>{count}</span>
               </button>
             ))}
+
+            {/* Unsectioned */}
+            {unsectionedLinks.length > 0 && (
+              <UnsectionedSidebarItem
+                count={unsectionedLinks.filter((l) => !l.is_archived).length}
+                isActive={activeSection === "unsectioned"}
+                isDropOver={dropOverUnsectioned}
+                onSelect={() => setActiveSection("unsectioned")}
+              />
+            )}
 
             {/* User sections */}
             {displaySections.length > 0 && (
@@ -550,9 +609,8 @@ export default function BookmarksPage() {
                 <>
                   <button onClick={() => setCaptureUrl("")} className="text-t3 hover:text-t1"><X size={13} /></button>
                   <button
-                    disabled={!defaultSectionId}
                     onClick={handleCapture}
-                    className="shrink-0 rounded-lg bg-accent px-3 py-1 text-[12px] font-semibold text-bg hover:opacity-90 disabled:opacity-40"
+                    className="shrink-0 rounded-lg bg-accent px-3 py-1 text-[12px] font-semibold text-bg hover:opacity-90"
                   >
                     {t("bookmarks.capture")}
                   </button>
@@ -574,7 +632,7 @@ export default function BookmarksPage() {
 
             {/* Add link */}
             <button
-              onClick={() => setLinkDraft({ section_id: typeof activeSection === "number" ? activeSection : defaultSectionId, name: "", url: "", tags: [] } as Partial<Link>)}
+              onClick={() => setLinkDraft({ section_id: typeof activeSection === "number" ? activeSection : (activeSection === "unsectioned" ? null : defaultSectionId), name: "", url: "", tags: [] } as Partial<Link>)}
               className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-[13px] font-semibold text-bg transition-opacity hover:opacity-90"
             >
               <Plus size={14} /> {t("bookmarks.add_link")}
@@ -629,11 +687,13 @@ export default function BookmarksPage() {
           )}
 
           {/* Section heading when inside a section */}
-          {typeof activeSection === "number" && (
+          {(typeof activeSection === "number" || activeSection === "unsectioned") && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h2 className="text-[15px] font-semibold text-t1">
-                  {displaySections.find((s) => s.id === activeSection)?.title}
+                  {activeSection === "unsectioned"
+                    ? t("bookmarks.unsectioned", "Unsortiert")
+                    : displaySections.find((s) => s.id === activeSection)?.title}
                 </h2>
                 <span className="rounded-full border border-line/50 bg-surface px-2 py-0.5 text-[11px] text-t3">
                   {visibleLinks.length}
@@ -646,19 +706,7 @@ export default function BookmarksPage() {
           )}
 
           {/* Empty state */}
-          {!sections || sections.length === 0 ? (
-            <div className="py-20 text-center">
-              <div className="mb-3 text-[36px]">🔖</div>
-              <div className="text-[14px] font-semibold text-t1">{t("bookmarks.no_sections")}</div>
-              <p className="mt-1 text-[13px] text-t3">Erstelle eine Sektion um Lesezeichen hinzuzufügen</p>
-              <button
-                onClick={() => setAddingSectionOpen(true)}
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-[13px] font-semibold text-bg hover:opacity-90"
-              >
-                <Plus size={14} /> {t("bookmarks.add_section")}
-              </button>
-            </div>
-          ) : visibleLinks.length === 0 ? (
+          {visibleLinks.length === 0 ? (
             <div className="py-16 text-center text-[13px] text-t3">
               {query || activeTag ? "Keine Treffer für diese Suche." : "Noch keine Lesezeichen hier."}
             </div>
@@ -669,7 +717,7 @@ export default function BookmarksPage() {
                 items={visibleLinks.map((l) => `link:${l.id}`)}
                 strategy={view === "list" ? verticalListSortingStrategy : rectSortingStrategy}
               >
-                <div className={view === "list" ? "space-y-2" : "grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4"}>
+                <div className={view === "list" ? "space-y-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"}>
                   {visibleLinks.map((link) => (
                     <SortableBookmark key={link.id} link={link} view={view} />
                   ))}
@@ -677,7 +725,7 @@ export default function BookmarksPage() {
               </SortableContext>
             ) : (
               /* Non-reorderable views (All, Favorites, Archive) — just grid */
-              <div className={view === "list" ? "space-y-2" : "grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-4"}>
+              <div className={view === "list" ? "space-y-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"}>
                 {visibleLinks.map((link) => (
                   <BookmarkCard key={link.id} link={link} variant={view} />
                 ))}

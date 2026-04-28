@@ -8,6 +8,11 @@ export interface Section {
   links: Link[];
 }
 
+export interface SectionsData {
+  sections: Section[];
+  unsectionedLinks: Link[];
+}
+
 const KEY = ["sections"];
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -19,9 +24,9 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export function useSections() {
-  return useQuery<Section[]>({
+  return useQuery<SectionsData>({
     queryKey: KEY,
-    queryFn: () => fetchJson<Section[]>("/api/sections"),
+    queryFn: () => fetchJson<SectionsData>("/api/sections"),
   });
 }
 
