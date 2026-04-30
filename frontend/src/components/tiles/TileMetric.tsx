@@ -27,7 +27,7 @@ export default function TileMetric({ tile, status, apiData }: Props) {
     : [];
 
   return (
-    <div className="tile-glass group relative flex min-h-[160px] flex-col overflow-hidden rounded-xl border border-line/60 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10">
+    <div className="tile-glass group relative flex h-full flex-col overflow-hidden rounded-xl border border-line/60 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10">
       {/* Background decoration */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent" />
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent via-accent/60 to-transparent" />

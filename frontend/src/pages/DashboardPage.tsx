@@ -232,13 +232,13 @@ function WidgetContent({ widget }: { widget: WidgetInstance }) {
 
   const cards = metrics?.cards ?? [];
   return (
-    <div className="mt-4 space-y-3">
+    <div className="mt-3 space-y-2">
       {label && <div className="truncate rounded-xl border border-line/45 bg-card px-3 py-1.5 text-[11px] font-medium text-t3">{label}</div>}
       {cards.length ? (
         <div className="grid grid-cols-2 gap-2">
           {cards.slice(0, 4).map((item) => (
-            <div key={`${item.label}-${item.value}`} className="min-h-[64px] rounded-2xl border border-line/45 bg-card px-3 py-2.5">
-              <div className="mb-1 truncate text-[9px] font-semibold uppercase tracking-[0.16em] text-t3">{item.label}</div>
+            <div key={`${item.label}-${item.value}`} className="rounded-2xl border border-line/45 bg-card px-3 py-2">
+              <div className="mb-0.5 truncate text-[9px] font-semibold uppercase tracking-[0.16em] text-t3">{item.label}</div>
               <div className="truncate text-[13px] font-semibold tabular-nums text-t1">{item.value}</div>
             </div>
           ))}
@@ -258,7 +258,7 @@ function WidgetTile({ widget, editMode, onEdit, onDelete }: {
   onEdit: () => void; onDelete: () => void;
 }) {
   return (
-    <div className={`glass-panel relative h-full min-h-[176px] overflow-hidden rounded-xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10 ${editMode ? "border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}>
+    <div className={`glass-panel relative h-full overflow-hidden rounded-xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10 ${editMode ? "border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}>
       <div className="absolute inset-y-0 left-0 w-1 bg-accent/70 opacity-70" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent opacity-70" />
       <div className="relative flex items-start justify-between gap-3 pl-1">
@@ -596,9 +596,8 @@ function SortableSection({
           style={{
             display: "grid",
             gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-            gridAutoRows: "minmax(56px, auto)",
+            gridAutoRows: "160px",
             gap: "12px",
-            minHeight: editMode && activeDragSize !== null ? "100px" : undefined,
           }}
         >
           {/* Drop cells — only visible while an item is being dragged */}

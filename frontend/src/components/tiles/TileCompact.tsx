@@ -18,7 +18,7 @@ export default function TileCompact({ tile, status, apiData }: Props) {
   })();
 
   return (
-    <div className="tile-glass relative flex min-h-[56px] items-center gap-2.5 overflow-hidden rounded-xl border border-line/60 px-3 py-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-lg hover:shadow-accent/5">
+    <div className="tile-glass relative flex h-full items-center gap-2.5 overflow-hidden rounded-xl border border-line/60 px-3 py-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-lg hover:shadow-accent/5">
       <div className="absolute inset-y-0 left-0 w-0.5 bg-accent/70" />
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/50 bg-surface">
         <FaviconImg url={tile.url} name={tile.name} size={22} explicitIconUrl={tile.icon_url} />

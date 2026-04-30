@@ -93,12 +93,12 @@ export default function TileWrapper({ tile, editMode = false }: Props) {
   const tileProps = { tile, status, apiData };
 
   return (
-    <div className={`relative group ${editMode ? "rounded-2xl ring-1 ring-accent/20" : ""}`}>
+    <div className={`relative group h-full ${editMode ? "rounded-2xl ring-1 ring-accent/20" : ""}`}>
       <a
         href={tile.url}
         target="_blank"
         rel="noopener noreferrer"
-        className={`block ${editMode ? "pointer-events-none" : ""}`}
+        className={`block h-full ${editMode ? "pointer-events-none" : ""}`}
       >
         {effectiveStyle === "compact" ? (
           <TileCompact {...tileProps} />

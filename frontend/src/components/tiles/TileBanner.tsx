@@ -19,7 +19,7 @@ export default function TileBanner({ tile, status, apiData }: Props) {
   const hasMetrics = apiData?.status === "ok";
 
   return (
-    <div className="tile-glass group relative flex min-h-[80px] items-center overflow-hidden rounded-xl border border-line/60 px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-xl hover:shadow-accent/10">
+    <div className="tile-glass group relative flex h-full items-center overflow-hidden rounded-xl border border-line/60 px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-xl hover:shadow-accent/10">
       {/* Gradient backgrounds */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-accent/12 via-accent/4 to-transparent" />
       <div className="absolute inset-y-0 left-0 w-1.5 rounded-l-xl bg-gradient-to-b from-accent via-accent/80 to-accent/40" />

@@ -19,7 +19,7 @@ export default function TileCard({ tile, status, apiData }: Props) {
   const hasMetrics = apiData?.status === "ok";
 
   return (
-    <div className="tile-glass group relative flex min-h-[92px] overflow-hidden rounded-xl border border-line/60 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10">
+    <div className="tile-glass group relative flex h-full overflow-hidden rounded-xl border border-line/60 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10">
       <div className="absolute inset-y-0 left-0 w-1 bg-accent/70" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/8 via-transparent to-transparent" />
 
