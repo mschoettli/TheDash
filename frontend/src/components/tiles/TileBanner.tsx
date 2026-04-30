@@ -19,33 +19,33 @@ export default function TileBanner({ tile, status, apiData }: Props) {
   const hasMetrics = apiData?.status === "ok";
 
   return (
-    <div className="tile-glass group relative flex h-full items-center overflow-hidden rounded-xl border border-line/60 px-4 py-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-xl hover:shadow-accent/10">
+    <div className="tile-glass group relative flex h-full items-center overflow-hidden rounded-xl border border-line/60 px-3.5 py-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-xl hover:shadow-accent/10">
       {/* Gradient backgrounds */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-accent/12 via-accent/4 to-transparent" />
       <div className="absolute inset-y-0 left-0 w-1.5 rounded-l-xl bg-gradient-to-b from-accent via-accent/80 to-accent/40" />
 
       {/* Icon */}
-      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-line/50 bg-surface shadow-inner shadow-white/5">
-        <FaviconImg url={tile.url} name={tile.name} size={34} explicitIconUrl={tile.icon_url} />
+      <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-line/50 bg-surface shadow-inner shadow-white/5">
+        <FaviconImg url={tile.url} name={tile.name} size={27} explicitIconUrl={tile.icon_url} />
       </div>
 
       {/* Main info */}
-      <div className="relative ml-4 min-w-0 flex-1">
+      <div className="relative ml-3 min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-[16px] font-bold leading-6 text-t1">{tile.name}</span>
-          <StatusDot status={status} size="md" />
+          <span className="truncate text-[14px] font-bold leading-5 text-t1">{tile.name}</span>
+          <StatusDot status={status} size="sm" />
         </div>
         {tile.show_address && (
           <div className="truncate text-[11px] font-medium text-t3">{hostname}</div>
         )}
         {hasMetrics && (
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {[
               { label: "Series", val: apiData.seriesCount },
               { label: "Movies", val: apiData.movieCount },
               { label: "Streams", val: apiData.activeStreams },
             ].filter(({ val }) => val !== null).map(({ label, val }) => (
-              <span key={label} className="rounded-lg border border-line/45 bg-surface/80 px-2 py-0.5 text-[10px] font-semibold text-t2">
+              <span key={label} className="rounded-lg border border-line/45 bg-surface/80 px-1.5 py-[1px] text-[9px] font-semibold text-t2">
                 {label} <span className="text-t1">{val}</span>
               </span>
             ))}

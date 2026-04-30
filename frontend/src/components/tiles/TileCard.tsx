@@ -23,15 +23,15 @@ export default function TileCard({ tile, status, apiData }: Props) {
       <div className="absolute inset-y-0 left-0 w-1 bg-accent/70" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/8 via-transparent to-transparent" />
 
-      <div className="relative flex min-w-0 flex-1 items-center gap-3 p-3 pl-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line/55 bg-surface shadow-inner shadow-white/5">
-          <FaviconImg url={tile.url} name={tile.name} size={30} explicitIconUrl={tile.icon_url} />
+      <div className="relative flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 pl-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line/55 bg-surface shadow-inner shadow-white/5">
+          <FaviconImg url={tile.url} name={tile.name} size={25} explicitIconUrl={tile.icon_url} />
         </div>
 
-        <div className="min-w-0 flex-1 py-0.5">
+        <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start justify-between gap-2">
             <div className="min-w-0">
-              <div className="truncate text-[13px] font-semibold leading-5 text-t1">{tile.name}</div>
+              <div className="truncate text-[13px] font-semibold leading-4 text-t1">{tile.name}</div>
               {tile.show_address && <div className="truncate text-[10px] font-medium text-t3">{hostname}</div>}
             </div>
             <span className="mt-1 shrink-0">
@@ -39,15 +39,15 @@ export default function TileCard({ tile, status, apiData }: Props) {
             </span>
           </div>
 
-          <div className="mt-2 min-h-[20px]">
+          <div className="mt-1.5 min-h-[18px]">
             {hasMetrics ? (
-              <div className="flex min-w-0 flex-wrap gap-1.5">
+              <div className="flex min-w-0 flex-wrap gap-1">
                 {[
                   { label: "Series", val: apiData.seriesCount },
                   { label: "Movies", val: apiData.movieCount },
                   { label: "Streams", val: apiData.activeStreams },
                 ].map(({ label, val }) => (
-                  <span key={label} className="rounded-md border border-line/45 bg-surface/85 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-t3">
+                  <span key={label} className="rounded-md border border-line/45 bg-surface/85 px-1.5 py-[1px] text-[8px] font-semibold uppercase tracking-[0.08em] text-t3">
                     {label} <span className="text-t1">{val ?? "-"}</span>
                   </span>
                 ))}
@@ -57,7 +57,7 @@ export default function TileCard({ tile, status, apiData }: Props) {
                 API unavailable
               </span>
             ) : (
-              <div className="h-5" />
+              <div className="h-4" />
             )}
           </div>
         </div>

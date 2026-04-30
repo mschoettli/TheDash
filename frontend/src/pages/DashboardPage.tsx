@@ -116,6 +116,7 @@ const SECTION_COLORS: { label: string; value: string | null; dot: string }[] = [
 
 // Available column counts for sections
 const GRID_COLS_OPTIONS = [2, 3, 4, 6] as const;
+const GRID_ROW_HEIGHT = 92;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -325,7 +326,7 @@ function GridDropCell({ sectionId, col, row }: { sectionId: number; col: number;
   return (
     <div
       ref={setNodeRef}
-      style={{ gridColumn: col + 1, gridRow: row + 1, minHeight: "80px" }}
+      style={{ gridColumn: col + 1, gridRow: row + 1, minHeight: GRID_ROW_HEIGHT - 16 }}
       className={`rounded-xl border-2 border-dashed transition-all duration-100 ${
         isOver
           ? "border-accent bg-accent/15 shadow-inner shadow-accent/10"
@@ -369,7 +370,7 @@ function DraggableItem({
       style={{
         gridColumn: `${pos.col + 1} / span ${clampedW}`,
         gridRow: `${pos.row + 1} / span ${pos.h}`,
-        zIndex: isDragging ? 1 : 20,
+        zIndex: isDragging ? 1 : 10,
         opacity: isDragging ? 0.15 : 1,
         transition: "opacity 120ms",
       }}
@@ -378,7 +379,7 @@ function DraggableItem({
       {/* Drag handle */}
       {editMode && (
         <button
-          className="absolute left-2 top-2 z-30 cursor-grab rounded-lg border border-line/50 bg-surface/95 p-1.5 text-t3 shadow-sm opacity-0 transition-all group-hover:opacity-100 hover:text-accent active:cursor-grabbing"
+          className="absolute left-2 top-2 z-20 cursor-grab rounded-lg border border-line/50 bg-surface/95 p-1.5 text-t3 shadow-sm opacity-0 transition-all group-hover:opacity-100 hover:text-accent active:cursor-grabbing"
           {...attributes}
           {...listeners}
           aria-label="Drag"
@@ -389,7 +390,7 @@ function DraggableItem({
 
       {/* Size picker — visible only on hover */}
       {editMode && (
-        <div className="absolute bottom-2 left-2 z-30 flex gap-0.5 rounded-lg border border-line/50 bg-surface/95 p-1 shadow-sm backdrop-blur-sm opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="absolute bottom-2 left-2 z-20 flex gap-0.5 rounded-lg border border-line/50 bg-surface/95 p-1 shadow-sm backdrop-blur-sm opacity-0 transition-opacity group-hover:opacity-100">
           {SPAN_PRESETS.map(({ label, w, h }) => (
             <button
               key={label}
@@ -598,7 +599,7 @@ function SortableSection({
           style={{
             display: "grid",
             gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-            gridAutoRows: "120px",
+            gridAutoRows: `${GRID_ROW_HEIGHT}px`,
             gap: "12px",
           }}
         >
@@ -617,7 +618,7 @@ function SortableSection({
               style={{
                 gridColumn: `${ghost.col + 1} / span ${ghost.w}`,
                 gridRow: `${ghost.row + 1} / span ${ghost.h}`,
-                zIndex: 15,
+                zIndex: 5,
                 pointerEvents: "none",
               }}
               className="rounded-xl bg-accent/20 ring-2 ring-inset ring-accent/60"
@@ -646,7 +647,7 @@ function SortableSection({
           {/* Empty state */}
           {!section.items.length && (
             <div
-              style={{ gridColumn: `1 / span ${gridCols}`, gridRow: 1, zIndex: 25, minHeight: "80px" }}
+              style={{ gridColumn: `1 / span ${gridCols}`, gridRow: 1, zIndex: 5, minHeight: GRID_ROW_HEIGHT - 16 }}
               className="flex items-center justify-center rounded-xl text-[13px] text-t3"
             >
               {editMode ? t("dashboard.drop_here") : t("dashboard.empty_section")}

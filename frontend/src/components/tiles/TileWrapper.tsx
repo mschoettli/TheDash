@@ -117,7 +117,7 @@ export default function TileWrapper({ tile, editMode = false }: Props) {
           e.preventDefault();
           setEditOpen(true);
         }}
-        className={`absolute bottom-2 right-2 z-10 rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 shadow-sm transition-all hover:text-accent ${
+        className={`absolute bottom-2 right-2 z-20 rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 shadow-sm transition-all hover:text-accent ${
           editMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"
         }`}
         title="Bearbeiten"
