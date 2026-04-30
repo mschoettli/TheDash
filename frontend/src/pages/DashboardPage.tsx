@@ -97,9 +97,11 @@ const WIDGET_CONFIG: Record<string, { field?: string; placeholder?: string; requ
 const SPAN_PRESETS = [
   { label: "1×1", w: 1, h: 1 },
   { label: "2×1", w: 2, h: 1 },
-  { label: "3×1", w: 3, h: 1 },
-  { label: "2×2", w: 2, h: 2 },
   { label: "4×1", w: 4, h: 1 },
+  { label: "1×2", w: 1, h: 2 },
+  { label: "2×2", w: 2, h: 2 },
+  { label: "4×2", w: 4, h: 2 },
+  { label: "1×3", w: 1, h: 3 },
 ] as const;
 
 // Section accent colors
@@ -596,7 +598,7 @@ function SortableSection({
           style={{
             display: "grid",
             gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-            gridAutoRows: "160px",
+            gridAutoRows: "120px",
             gap: "12px",
           }}
         >
