@@ -1,3 +1,7 @@
+// TileCompact — dense list style
+// Pure flat row: favicon directly (no box), name, status dot.
+// No border decoration, no accent bar — maximum information density.
+
 import { Tile, TileMetrics } from "../../hooks/useTiles";
 import FaviconImg from "../ui/FaviconImg";
 import StatusDot, { OnlineStatus } from "../ui/StatusDot";
@@ -9,32 +13,27 @@ interface Props {
 }
 
 export default function TileCompact({ tile, status, apiData }: Props) {
-  const hostname = (() => {
-    try {
-      return new URL(tile.url.startsWith("http") ? tile.url : `http://${tile.url}`).hostname;
-    } catch {
-      return tile.url;
-    }
-  })();
-
   return (
-    <div className="tile-glass relative flex h-full items-center gap-2.5 overflow-hidden rounded-xl border border-line/60 px-3 py-1.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-lg hover:shadow-accent/5">
-      <div className="absolute inset-y-0 left-0 w-0.5 bg-accent/70" />
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line/50 bg-surface">
+    <div className="tile-glass relative flex h-full items-center gap-2 overflow-hidden rounded-xl border border-line/45 px-3 transition-colors duration-150 hover:border-accent/35">
+      {/* Favicon — no box/border, just the icon */}
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center opacity-90">
         <FaviconImg url={tile.url} name={tile.name} size={20} explicitIconUrl={tile.icon_url} />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-semibold leading-5 text-t1">{tile.name}</span>
-        {tile.show_address && <span className="block truncate text-[9px] font-medium text-t3">{hostname}</span>}
+
+      {/* Name — slightly muted, compact weight */}
+      <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-t1">
+        {tile.name}
       </span>
-      <span className="flex shrink-0 items-center gap-2">
-        {apiData?.status === "ok" && (
-          <span className="rounded-md border border-line/45 bg-surface px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-t2">
-            {apiData.activeStreams ?? 0}
-          </span>
-        )}
-        <StatusDot status={status} size="sm" />
-      </span>
+
+      {/* Active stream count */}
+      {apiData?.status === "ok" && apiData.activeStreams != null && (
+        <span className="shrink-0 text-[9px] font-semibold tabular-nums text-t3">
+          {apiData.activeStreams}▶
+        </span>
+      )}
+
+      {/* Status */}
+      <StatusDot status={status} size="sm" />
     </div>
   );
 }

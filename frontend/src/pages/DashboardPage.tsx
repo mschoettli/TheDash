@@ -116,7 +116,7 @@ const SECTION_COLORS: { label: string; value: string | null; dot: string }[] = [
 
 // Available column counts for sections
 const GRID_COLS_OPTIONS = [2, 3, 4, 6] as const;
-const GRID_ROW_HEIGHT = 92;
+const GRID_ROW_HEIGHT = 72;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -235,21 +235,21 @@ function WidgetContent({ widget }: { widget: WidgetInstance }) {
 
   const cards = metrics?.cards ?? [];
   return (
-    <div className="mt-3 space-y-2">
-      {label && <div className="truncate rounded-xl border border-line/45 bg-card px-3 py-1.5 text-[11px] font-medium text-t3">{label}</div>}
+    <div className="mt-2 space-y-1.5">
+      {label && <div className="truncate rounded-lg border border-line/40 bg-card px-2 py-1 text-[10px] font-medium text-t3">{label}</div>}
       {cards.length ? (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-1.5">
           {cards.slice(0, 4).map((item) => (
-            <div key={`${item.label}-${item.value}`} className="rounded-2xl border border-line/45 bg-card px-3 py-2">
-              <div className="mb-0.5 truncate text-[9px] font-semibold uppercase tracking-[0.16em] text-t3">{item.label}</div>
-              <div className="truncate text-[13px] font-semibold tabular-nums text-t1">{item.value}</div>
+            <div key={`${item.label}-${item.value}`} className="rounded-lg border border-line/45 bg-card px-2 py-1.5">
+              <div className="truncate text-[8px] font-semibold uppercase tracking-[0.14em] text-t3">{item.label}</div>
+              <div className="truncate text-[12px] font-semibold tabular-nums leading-tight text-t1">{item.value}</div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-line/40 bg-card px-3 py-2 text-[12px] text-t3">{t("widgets.no_data")}</div>
+        <div className="rounded-lg border border-line/40 bg-card px-2 py-1 text-[11px] text-t3">{t("widgets.no_data")}</div>
       )}
-      {notes && <p className="text-[12px] leading-relaxed text-t3 line-clamp-2">{notes}</p>}
+      {notes && <p className="text-[11px] leading-relaxed text-t3 line-clamp-2">{notes}</p>}
     </div>
   );
 }
@@ -261,23 +261,23 @@ function WidgetTile({ widget, editMode, onEdit, onDelete }: {
   onEdit: () => void; onDelete: () => void;
 }) {
   return (
-    <div className={`glass-panel relative h-full overflow-hidden rounded-xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10 ${editMode ? "border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}>
-      <div className="absolute inset-y-0 left-0 w-1 bg-accent/70 opacity-70" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent opacity-70" />
-      <div className="relative flex items-start justify-between gap-3 pl-1">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line/55 bg-surface shadow-inner shadow-white/5">
-            <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={30} />
+    <div className={`glass-panel relative h-full overflow-hidden rounded-xl border p-3 shadow-sm transition-colors duration-150 hover:border-accent/40 ${editMode ? "border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}>
+      <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-xl bg-accent/60" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/8 via-transparent to-transparent" />
+      <div className="relative flex items-center justify-between gap-2 pl-1">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/50 bg-surface">
+            <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={22} />
           </span>
           <div className="min-w-0">
-            <div className="truncate text-[14px] font-semibold leading-5 text-t1">{widget.title}</div>
-            <div className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-t3">{widget.type}</div>
+            <div className="truncate text-[13px] font-semibold leading-tight text-t1">{widget.title}</div>
+            <div className="truncate text-[9px] font-semibold uppercase tracking-[0.14em] text-t3">{widget.type}</div>
           </div>
         </div>
         {editMode && (
           <div className="flex shrink-0 gap-1">
-            <button onClick={onEdit} className="rounded-lg border border-line/45 bg-surface/90 p-1.5 text-t3 hover:text-accent"><Pencil size={13} /></button>
-            <button onClick={onDelete} className="rounded-lg border border-line/45 bg-surface/90 p-1.5 text-t3 hover:text-rose-500"><Trash2 size={13} /></button>
+            <button onClick={onEdit} className="rounded-md border border-line/45 bg-surface/90 p-1 text-t3 hover:text-accent"><Pencil size={12} /></button>
+            <button onClick={onDelete} className="rounded-md border border-line/45 bg-surface/90 p-1 text-t3 hover:text-rose-500"><Trash2 size={12} /></button>
           </div>
         )}
       </div>
@@ -326,7 +326,7 @@ function GridDropCell({ sectionId, col, row }: { sectionId: number; col: number;
   return (
     <div
       ref={setNodeRef}
-      style={{ gridColumn: col + 1, gridRow: row + 1, minHeight: GRID_ROW_HEIGHT - 16 }}
+      style={{ gridColumn: col + 1, gridRow: row + 1 }}
       className={`rounded-xl border-2 border-dashed transition-all duration-100 ${
         isOver
           ? "border-accent bg-accent/15 shadow-inner shadow-accent/10"
@@ -370,7 +370,7 @@ function DraggableItem({
       style={{
         gridColumn: `${pos.col + 1} / span ${clampedW}`,
         gridRow: `${pos.row + 1} / span ${pos.h}`,
-        zIndex: isDragging ? 1 : 10,
+        zIndex: isDragging ? 1 : 20,
         opacity: isDragging ? 0.15 : 1,
         transition: "opacity 120ms",
       }}
@@ -600,7 +600,7 @@ function SortableSection({
             display: "grid",
             gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
             gridAutoRows: `${GRID_ROW_HEIGHT}px`,
-            gap: "12px",
+            gap: "8px",
           }}
         >
           {/* Drop cells — only visible while an item is being dragged */}
@@ -618,7 +618,7 @@ function SortableSection({
               style={{
                 gridColumn: `${ghost.col + 1} / span ${ghost.w}`,
                 gridRow: `${ghost.row + 1} / span ${ghost.h}`,
-                zIndex: 5,
+                zIndex: 25,
                 pointerEvents: "none",
               }}
               className="rounded-xl bg-accent/20 ring-2 ring-inset ring-accent/60"
@@ -647,7 +647,7 @@ function SortableSection({
           {/* Empty state */}
           {!section.items.length && (
             <div
-              style={{ gridColumn: `1 / span ${gridCols}`, gridRow: 1, zIndex: 5, minHeight: GRID_ROW_HEIGHT - 16 }}
+              style={{ gridColumn: `1 / span ${gridCols}`, gridRow: 1, zIndex: 5 }}
               className="flex items-center justify-center rounded-xl text-[13px] text-t3"
             >
               {editMode ? t("dashboard.drop_here") : t("dashboard.empty_section")}
@@ -971,6 +971,25 @@ export default function DashboardPage() {
   const sections = sectionsDraft ?? dashboard?.sections ?? [];
   const tilesById = useMemo(() => new Map(tiles.map((t) => [t.id, t])), [tiles]);
   const widgetsById = useMemo(() => new Map(widgets.map((w) => [w.id, w])), [widgets]);
+
+  // Sync newly added items from dashboard into sectionsDraft (edit-mode only).
+  // When a tile/widget is created while edit-mode is active, the dashboard query
+  // refetches with the new item but sectionsDraft is stale — this effect merges
+  // any items that appear in the fresh dashboard data but not yet in the draft,
+  // without touching items that were already moved/resized in the draft.
+  useEffect(() => {
+    if (!sectionsDraft || !dashboard) return;
+    const draftItemIds = new Set(sectionsDraft.flatMap((s) => s.items.map((i) => i.id)));
+    const incoming = dashboard.sections.flatMap((s) => s.items).filter((i) => !draftItemIds.has(i.id));
+    if (incoming.length === 0) return;
+    setSectionsDraft((prev) => {
+      if (!prev) return null;
+      return prev.map((section) => {
+        const newItems = incoming.filter((item) => item.section_id === section.id);
+        return newItems.length ? { ...section, items: [...section.items, ...newItems] } : section;
+      });
+    });
+  }, [dashboard]);
 
   const containers = discovery?.containers ?? [];
   const suggestions = containers.filter(

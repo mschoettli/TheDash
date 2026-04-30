@@ -55,8 +55,8 @@ export function useCreateTile() {
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
+      // Only invalidate tiles — dashboard is invalidated by useCreateDashboardItem
       qc.invalidateQueries({ queryKey: KEY });
-      qc.invalidateQueries({ queryKey: DASHBOARD_KEY });
     },
   });
 }
@@ -71,8 +71,8 @@ export function useUpdateTile() {
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
+      // Tile metadata (name, style, url) lives in ["tiles"], not ["dashboard"]
       qc.invalidateQueries({ queryKey: KEY });
-      qc.invalidateQueries({ queryKey: DASHBOARD_KEY });
     },
   });
 }

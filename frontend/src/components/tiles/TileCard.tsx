@@ -1,3 +1,7 @@
+// TileCard — default style
+// Clean card: icon in box on the left, name + URL in center, status dot right.
+// No accent bar — background itself carries the "card" look.
+
 import { Tile, TileMetrics } from "../../hooks/useTiles";
 import FaviconImg from "../ui/FaviconImg";
 import StatusDot, { OnlineStatus } from "../ui/StatusDot";
@@ -16,52 +20,46 @@ export default function TileCard({ tile, status, apiData }: Props) {
       return tile.url;
     }
   })();
+
   const hasMetrics = apiData?.status === "ok";
+  const metrics = hasMetrics
+    ? [
+        { label: "Series",  val: apiData.seriesCount },
+        { label: "Movies",  val: apiData.movieCount },
+        { label: "Streams", val: apiData.activeStreams },
+      ].filter(({ val }) => val !== null)
+    : [];
 
   return (
-    <div className="tile-glass group relative flex h-full overflow-hidden rounded-xl border border-line/60 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/10">
-      <div className="absolute inset-y-0 left-0 w-1 bg-accent/70" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/8 via-transparent to-transparent" />
+    <div className="tile-glass group relative flex h-full items-center gap-2.5 overflow-hidden rounded-xl border border-line/60 px-3 shadow-sm transition-colors duration-150 hover:border-accent/40">
+      {/* Subtle tint */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-accent/5 to-transparent" />
 
-      <div className="relative flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 pl-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line/55 bg-surface shadow-inner shadow-white/5">
-          <FaviconImg url={tile.url} name={tile.name} size={25} explicitIconUrl={tile.icon_url} />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="truncate text-[13px] font-semibold leading-4 text-t1">{tile.name}</div>
-              {tile.show_address && <div className="truncate text-[10px] font-medium text-t3">{hostname}</div>}
-            </div>
-            <span className="mt-1 shrink-0">
-              <StatusDot status={status} size="sm" />
-            </span>
-          </div>
-
-          <div className="mt-1.5 min-h-[18px]">
-            {hasMetrics ? (
-              <div className="flex min-w-0 flex-wrap gap-1">
-                {[
-                  { label: "Series", val: apiData.seriesCount },
-                  { label: "Movies", val: apiData.movieCount },
-                  { label: "Streams", val: apiData.activeStreams },
-                ].map(({ label, val }) => (
-                  <span key={label} className="rounded-md border border-line/45 bg-surface/85 px-1.5 py-[1px] text-[8px] font-semibold uppercase tracking-[0.08em] text-t3">
-                    {label} <span className="text-t1">{val ?? "-"}</span>
-                  </span>
-                ))}
-              </div>
-            ) : apiData?.status === "error" ? (
-              <span className="rounded-md border border-rose-500/20 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-medium text-rose-500">
-                API unavailable
-              </span>
-            ) : (
-              <div className="h-4" />
-            )}
-          </div>
-        </div>
+      {/* Icon box */}
+      <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/50 bg-surface">
+        <FaviconImg url={tile.url} name={tile.name} size={22} explicitIconUrl={tile.icon_url} />
       </div>
+
+      {/* Text */}
+      <div className="relative min-w-0 flex-1">
+        <div className="truncate text-[13px] font-semibold leading-tight text-t1">{tile.name}</div>
+        {tile.show_address && (
+          <div className="truncate text-[10px] text-t3">{hostname}</div>
+        )}
+        {/* API metric badges — only when API data available */}
+        {metrics.length > 0 && (
+          <div className="mt-0.5 flex flex-wrap gap-1">
+            {metrics.map(({ label, val }) => (
+              <span key={label} className="rounded border border-line/40 bg-surface/80 px-1 py-px text-[8px] font-semibold text-t3">
+                {label} <span className="text-t1">{val}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Status */}
+      <StatusDot status={status} size="sm" />
     </div>
   );
 }

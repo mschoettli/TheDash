@@ -190,10 +190,12 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
             const section = sections.find((s) => s.id === sectionId);
             createDashboardItem.mutate(
               { section_id: sectionId, item_type: "tile", item_id: newTile.id, sort_order: section?.items.length ?? 0 },
-              { onSuccess: onClose, onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler") }
+              { onSuccess: onClose, onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Hinzufügen") }
             );
           } else {
-            onClose();
+            // No section available — tile created in DB, but user must create a
+            // section first to see it on the dashboard. Show a clear hint.
+            setSaveError("Kachel gespeichert — bitte zuerst eine Sektion erstellen, um sie anzuzeigen.");
           }
         },
         onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Erstellen"),
