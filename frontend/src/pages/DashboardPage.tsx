@@ -56,6 +56,7 @@ import {
   DashboardSection,
   useCreateDashboardSection,
   useDashboard,
+  useDeleteDashboardSection,
   useReorderDashboard,
 } from "../hooks/useDashboard";
 import { Tile, useTiles } from "../hooks/useTiles";
@@ -974,9 +975,12 @@ export default function DashboardPage() {
   const [dockerModalOpen, setDockerModalOpen] = useState(false);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
+  const [editSaveError, setEditSaveError] = useState<string | null>(null);
+  const [isSavingEditMode, setIsSavingEditMode] = useState(false);
 
   // ─ Draft & DnD state ────────────────────────────────────────────────────────
   const [sectionsDraft, setSectionsDraft] = useState<DashboardSection[] | null>(null);
+  const [deletedSectionIds, setDeletedSectionIds] = useState<number[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeDragData, setActiveDragData] = useState<{ w: number; h: number } | null>(null);
   const [hoveredCell, setHoveredCell] = useState<HoveredCell | null>(null);
@@ -988,6 +992,7 @@ export default function DashboardPage() {
   const { data: widgets = [] } = useWidgets();
   const { data: catalog = [] } = useWidgetCatalog();
   const createSection = useCreateDashboardSection();
+  const deleteSection = useDeleteDashboardSection();
   const reorderDashboard = useReorderDashboard();
   const deleteWidget = useDeleteWidget();
   const dockerAction = useDockerAction();
@@ -1036,28 +1041,53 @@ export default function DashboardPage() {
   // ─ Edit mode ─────────────────────────────────────────────────────────────────
   const enterEditMode = () => {
     setSectionsDraft(JSON.parse(JSON.stringify(dashboard?.sections ?? [])));
+    setDeletedSectionIds([]);
+    setEditSaveError(null);
     setEditMode(true);
   };
 
   const cancelEditMode = () => {
     setSectionsDraft(null);
+    setDeletedSectionIds([]);
+    setEditSaveError(null);
+    setIsSavingEditMode(false);
     setActiveId(null);
     setActiveDragData(null);
     setHoveredCell(null);
     setEditMode(false);
   };
 
-  const saveEditMode = () => {
+  const saveEditMode = async () => {
     const draft = sectionsDraft ?? sections;
-    reorderDashboard.mutate({
-      // Include title + layout so colors/gridCols persist ✓
-      sections: draft.map((s, i) => ({ id: s.id, sort_order: i, title: s.title, layout: s.layout })),
-      items: draft.flatMap((s) =>
-        s.items.map((item, i) => ({ id: item.id, section_id: s.id, sort_order: i, layout: item.layout }))
-      ),
-    });
-    setSectionsDraft(null);
-    setEditMode(false);
+    if (draft.length === 0 && deletedSectionIds.length > 0) {
+      setEditSaveError(t("dashboard.delete_last_section_error"));
+      return;
+    }
+
+    setIsSavingEditMode(true);
+    setEditSaveError(null);
+
+    try {
+      for (const sectionId of deletedSectionIds) {
+        await deleteSection.mutateAsync(sectionId);
+      }
+
+      await reorderDashboard.mutateAsync({
+        // Include title + layout so colors/gridCols persist.
+        sections: draft.map((s, i) => ({ id: s.id, sort_order: i, title: s.title, layout: s.layout })),
+        items: draft.flatMap((s) =>
+          s.items.map((item, i) => ({ id: item.id, section_id: s.id, sort_order: i, layout: item.layout }))
+        ),
+      });
+
+      setSectionsDraft(null);
+      setDeletedSectionIds([]);
+      setEditMode(false);
+    } catch (err) {
+      setEditSaveError(err instanceof Error ? err.message : t("dashboard.save_layout_error"));
+    } finally {
+      setIsSavingEditMode(false);
+    }
   };
 
   // ─ Draft helpers ─────────────────────────────────────────────────────────────
@@ -1100,7 +1130,16 @@ export default function DashboardPage() {
   };
 
   const deleteSectionFromDraft = (sectionId: number) => {
-    setSectionsDraft((prev) => prev?.filter((s) => s.id !== sectionId) ?? null);
+    setSectionsDraft((prev) => {
+      if (!prev) return null;
+      if (prev.length <= 1) {
+        setEditSaveError(t("dashboard.delete_last_section_error"));
+        return prev;
+      }
+      setDeletedSectionIds((ids) => ids.includes(sectionId) ? ids : [...ids, sectionId]);
+      setEditSaveError(null);
+      return prev.filter((s) => s.id !== sectionId);
+    });
   };
 
   const toggleCollapse = (id: number) => {
@@ -1305,14 +1344,22 @@ export default function DashboardPage() {
             <FolderPlus size={13} /> Sektion
           </button>
           <div className="flex-1" />
+          {editSaveError && (
+            <div className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-[12px] font-medium text-rose-500">
+              <AlertCircle size={13} />
+              {editSaveError}
+            </div>
+          )}
           <button
             onClick={saveEditMode}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-[13px] font-semibold text-emerald-500 transition-colors hover:bg-emerald-500/20"
+            disabled={isSavingEditMode}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-[13px] font-semibold text-emerald-500 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Check size={13} /> Fertig
+            <Check size={13} /> {isSavingEditMode ? t("common.saving") : "Fertig"}
           </button>
           <button
             onClick={cancelEditMode}
+            disabled={isSavingEditMode}
             className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] text-t2 transition-colors hover:text-t1"
           >
             <X size={13} /> Abbrechen

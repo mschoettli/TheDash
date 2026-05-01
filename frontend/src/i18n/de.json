@@ -82,7 +82,9 @@
     "new_card": "Neue Karte",
     "add_card": "Karte",
     "drop_here": "Hier ablegen",
-    "empty_section": "Keine Elemente in dieser Sektion"
+    "empty_section": "Keine Elemente in dieser Sektion",
+    "delete_last_section_error": "Die letzte Sektion kann nicht gelöscht werden. Erstelle zuerst eine neue Sektion.",
+    "save_layout_error": "Dashboard-Layout konnte nicht gespeichert werden."
   },
   "add": {
     "title": "Hinzufügen",
