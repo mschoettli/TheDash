@@ -1,7 +1,3 @@
-// TileCard — default style
-// Clean card: icon in box on the left, name + URL in center, status dot right.
-// No accent bar — background itself carries the "card" look.
-
 import { Tile, TileMetrics } from "../../hooks/useTiles";
 import FaviconImg from "../ui/FaviconImg";
 import StatusDot, { OnlineStatus } from "../ui/StatusDot";
@@ -12,45 +8,34 @@ interface Props {
   apiData: TileMetrics | null;
 }
 
-export default function TileCard({ tile, status, apiData }: Props) {
-  const hostname = (() => {
-    try {
-      return new URL(tile.url.startsWith("http") ? tile.url : `http://${tile.url}`).hostname;
-    } catch {
-      return tile.url;
-    }
-  })();
+function hostLabel(url: string): string {
+  try {
+    return new URL(url.startsWith("http") ? url : `http://${url}`).hostname;
+  } catch {
+    return url;
+  }
+}
 
-  const hasMetrics = apiData?.status === "ok";
-  const metrics = hasMetrics
+export default function TileCard({ tile, status, apiData }: Props) {
+  const metrics = apiData?.status === "ok"
     ? [
-        { label: "Series",  val: apiData.seriesCount },
-        { label: "Movies",  val: apiData.movieCount },
+        { label: "Series", val: apiData.seriesCount },
+        { label: "Movies", val: apiData.movieCount },
         { label: "Streams", val: apiData.activeStreams },
       ].filter(({ val }) => val !== null)
     : [];
 
   return (
-    <div className="tile-glass group relative flex h-full items-center gap-2.5 overflow-hidden rounded-xl border border-line/60 px-3 shadow-sm transition-colors duration-150 hover:border-accent/40">
-      {/* Subtle tint */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-accent/5 to-transparent" />
+    <div className="tile-glass group relative flex h-full items-center gap-3 overflow-hidden rounded-2xl border border-line/45 px-3 py-2 shadow-sm transition-colors duration-150 hover:border-accent/35">
+      <FaviconImg url={tile.url} name={tile.name} size={34} explicitIconUrl={tile.icon_url} className="shrink-0" />
 
-      {/* Icon box */}
-      <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/50 bg-surface">
-        <FaviconImg url={tile.url} name={tile.name} size={22} explicitIconUrl={tile.icon_url} />
-      </div>
-
-      {/* Text */}
-      <div className="relative min-w-0 flex-1">
-        <div className="truncate text-[13px] font-semibold leading-tight text-t1">{tile.name}</div>
-        {tile.show_address && (
-          <div className="truncate text-[10px] text-t3">{hostname}</div>
-        )}
-        {/* API metric badges — only when API data available */}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] font-semibold leading-tight tracking-[-0.01em] text-t1">{tile.name}</div>
+        {tile.show_address && <div className="mt-0.5 truncate text-[10px] font-medium text-t3">{hostLabel(tile.url)}</div>}
         {metrics.length > 0 && (
-          <div className="mt-0.5 flex flex-wrap gap-1">
+          <div className="mt-1 flex flex-wrap gap-1">
             {metrics.map(({ label, val }) => (
-              <span key={label} className="rounded border border-line/40 bg-surface/80 px-1 py-px text-[8px] font-semibold text-t3">
+              <span key={label} className="rounded-full border border-line/40 bg-surface/50 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.08em] text-t3">
                 {label} <span className="text-t1">{val}</span>
               </span>
             ))}
@@ -58,8 +43,9 @@ export default function TileCard({ tile, status, apiData }: Props) {
         )}
       </div>
 
-      {/* Status */}
-      <StatusDot status={status} size="sm" />
+      <div className="shrink-0 self-start pt-1">
+        <StatusDot status={status} size="sm" />
+      </div>
     </div>
   );
 }

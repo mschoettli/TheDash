@@ -261,16 +261,12 @@ function WidgetTile({ widget, editMode, onEdit, onDelete }: {
   onEdit: () => void; onDelete: () => void;
 }) {
   return (
-    <div className={`glass-panel relative h-full overflow-hidden rounded-xl border p-3 shadow-sm transition-colors duration-150 hover:border-accent/40 ${editMode ? "border-accent/25 ring-1 ring-accent/10" : "border-line/60"}`}>
-      <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-xl bg-accent/60" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/8 via-transparent to-transparent" />
-      <div className="relative flex items-center justify-between gap-2 pl-1">
+    <div className={`tile-glass relative h-full overflow-hidden rounded-2xl border p-3 shadow-sm transition-colors duration-150 hover:border-accent/35 ${editMode ? "border-accent/25 ring-1 ring-accent/10" : "border-line/45"}`}>
+      <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/50 bg-surface">
-            <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={22} />
-          </span>
+          <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={32} className="shrink-0" />
           <div className="min-w-0">
-            <div className="truncate text-[13px] font-semibold leading-tight text-t1">{widget.title}</div>
+            <div className="truncate text-[13px] font-semibold leading-tight tracking-[-0.01em] text-t1">{widget.title}</div>
             <div className="truncate text-[9px] font-semibold uppercase tracking-[0.14em] text-t3">{widget.type}</div>
           </div>
         </div>
@@ -281,7 +277,7 @@ function WidgetTile({ widget, editMode, onEdit, onDelete }: {
           </div>
         )}
       </div>
-      <div className="relative pl-1"><WidgetContent widget={widget} /></div>
+      <WidgetContent widget={widget} />
     </div>
   );
 }
@@ -298,18 +294,14 @@ function DragPreviewTile({ tile, widget, section }: {
     </div>
   );
   if (tile) return (
-    <div className="tile-glass flex items-center gap-3 rounded-xl border border-accent/50 px-3 py-2.5 shadow-2xl shadow-accent/20">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/55 bg-surface">
-        <FaviconImg url={tile.url} name={tile.name} size={22} explicitIconUrl={tile.icon_url} />
-      </span>
+    <div className="tile-glass flex items-center gap-3 rounded-2xl border border-accent/45 px-3 py-2.5 shadow-2xl shadow-accent/20">
+      <FaviconImg url={tile.url} name={tile.name} size={30} explicitIconUrl={tile.icon_url} className="shrink-0" />
       <span className="text-[13px] font-semibold text-t1">{tile.name}</span>
     </div>
   );
   if (widget) return (
-    <div className="glass-panel flex items-center gap-3 rounded-xl border border-accent/50 px-3 py-2.5 shadow-2xl shadow-accent/20">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/55 bg-surface">
-        <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={22} />
-      </span>
+    <div className="tile-glass flex items-center gap-3 rounded-2xl border border-accent/45 px-3 py-2.5 shadow-2xl shadow-accent/20">
+      <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={30} className="shrink-0" />
       <span className="text-[13px] font-semibold text-t1">{widget.title}</span>
     </div>
   );
@@ -663,6 +655,15 @@ function SortableSection({
 
 // ─── Widget Edit Modal ─────────────────────────────────────────────────────────
 
+function WidgetFieldGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-line/45 bg-card/55 p-4">
+      <div className="label-xs mb-3">{title}</div>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
 function WidgetEditModal({ open, onClose, widget, catalog }: {
   open: boolean; onClose: () => void;
   widget?: WidgetInstance | null; catalog: WidgetCatalogItem[];
@@ -686,6 +687,7 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
   const [saveError, setSaveError] = useState<string | null>(null);
   const config = WIDGET_CONFIG[type] ?? {};
   const isSaving = createWidget.isPending || updateWidget.isPending;
+  const fieldClass = "w-full rounded-xl border border-line/50 bg-card px-3 py-2 text-[13px] text-t1 outline-none placeholder:text-t3 focus:border-accent/50";
 
   useEffect(() => {
     if (!open) return;
@@ -723,7 +725,8 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
     if (!title.trim() || !type || (config.required && !endpoint.trim())) return;
     setSaveError(null);
     const payload = {
-      type, title: title.trim(),
+      type,
+      title: title.trim(),
       config: { endpoint: endpoint.trim(), provider, client, username: username.trim(), password: password.trim(), apiKey: apiKey.trim(), notes: notes.trim(), icon, showAddress },
       layout: widget?.layout ?? {},
       section_id: widget?.section_id ?? null,
@@ -735,101 +738,128 @@ function WidgetEditModal({ open, onClose, widget, catalog }: {
         { id: widget.id, ...payload },
         {
           onSuccess: onClose,
-          onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Speichern"),
+          onError: (err) => setSaveError(err instanceof Error ? err.message : "Save failed"),
         }
       );
     } else {
       createWidget.mutate(payload, {
         onSuccess: onClose,
-        onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Erstellen"),
+        onError: (err) => setSaveError(err instanceof Error ? err.message : "Create failed"),
       });
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={widget ? t("dashboard.edit_widget") : t("dashboard.add_widget")}>
+    <Modal open={open} onClose={onClose} title={widget ? t("dashboard.edit_widget") : t("dashboard.add_widget")} maxWidth="max-w-2xl">
       <div className="space-y-4">
-        <div>
-          <div className="label-xs mb-1.5">{t("dashboard.widget_type")}</div>
-          <select className={input} value={type} onChange={(e) => {
-            const next = catalog.find((item) => item.type === e.target.value);
-            setType(e.target.value); setTitle(next?.title ?? ""); setIconTouched(false);
-          }}>
-            {catalog.map((item) => <option key={item.type} value={item.type}>{item.title} · {item.category}</option>)}
-          </select>
-        </div>
-        <div>
-          <div className="label-xs mb-1.5">{t("dashboard.widget_title")}</div>
-          <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} />
-        </div>
-        <IconPicker value={icon} name={title} url={endpoint} onChange={(value) => { setIconTouched(true); setIcon(value); }} />
-        {config.field && (
+        <WidgetFieldGroup title={t("modal.identity")}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <div className="label-xs mb-1.5">{t("dashboard.widget_type")}</div>
+              <select className={fieldClass} value={type} onChange={(e) => {
+                const next = catalog.find((item) => item.type === e.target.value);
+                setType(e.target.value);
+                setTitle(next?.title ?? "");
+                setIcon(iconValue(detectIconKey(next?.title ?? "")));
+                setIconTouched(false);
+              }}>
+                {catalog.map((item) => <option key={item.type} value={item.type}>{item.title} · {item.category}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="label-xs mb-1.5">{t("dashboard.widget_title")}</div>
+              <input className={fieldClass} value={title} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-2xl border border-line/40 bg-surface/45 p-3">
+            <IconBadge value={icon} name={title} size={36} className="shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-semibold text-t1">{title || selected?.title}</div>
+              <div className="truncate text-[11px] text-t3">{t("modal.automatic_widget_logo")}</div>
+            </div>
+          </div>
+          <details className="rounded-2xl border border-line/40 bg-surface/35 p-3">
+            <summary className="cursor-pointer list-none text-[12px] font-semibold text-t2 transition-colors hover:text-accent">{t("modal.change_logo")}</summary>
+            <div className="mt-3">
+              <IconPicker value={icon} name={title} url={endpoint} onChange={(value) => { setIconTouched(true); setIcon(value); }} />
+            </div>
+          </details>
+        </WidgetFieldGroup>
+
+        {(config.field || type === "media" || type === "downloads") && (
+          <WidgetFieldGroup title={t("modal.integration")}>
+            {config.field && (
+              <div>
+                <div className="label-xs mb-1.5">{config.field}{config.required ? " *" : ""}</div>
+                <input className={fieldClass} value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder={config.placeholder} />
+              </div>
+            )}
+            {type === "media" && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <div className="label-xs mb-1.5">{t("dashboard.provider")}</div>
+                  <select className={fieldClass} value={provider} onChange={(e) => setProvider(e.target.value)}>
+                    <option value="jellyfin">Jellyfin</option>
+                    <option value="plex">Plex</option>
+                    <option value="emby">Emby</option>
+                  </select>
+                </div>
+                <div>
+                  <div className="label-xs mb-1.5">{t("tile.api_key")}</div>
+                  <input className={fieldClass} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={widget?.config?.hasApiKey ? t("dashboard.secret_keep") : "Token"} />
+                </div>
+              </div>
+            )}
+            {type === "downloads" && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <div className="label-xs mb-1.5">{t("dashboard.client")}</div>
+                  <select className={fieldClass} value={client} onChange={(e) => setClient(e.target.value)}>
+                    <option value="qbittorrent">qBittorrent</option>
+                    <option value="sabnzbd">SABnzbd</option>
+                  </select>
+                </div>
+                <div>
+                  <div className="label-xs mb-1.5">{t("tile.api_key")}</div>
+                  <input className={fieldClass} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={widget?.config?.hasApiKey ? t("dashboard.secret_keep") : t("dashboard.optional")} />
+                </div>
+                <div>
+                  <div className="label-xs mb-1.5">{t("dashboard.username")}</div>
+                  <input className={fieldClass} value={username} onChange={(e) => setUsername(e.target.value)} placeholder="admin" />
+                </div>
+                <div>
+                  <div className="label-xs mb-1.5">{t("dashboard.password")}</div>
+                  <input className={fieldClass} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={widget?.config?.hasPassword ? t("dashboard.secret_keep") : t("dashboard.optional")} />
+                </div>
+              </div>
+            )}
+          </WidgetFieldGroup>
+        )}
+
+        <WidgetFieldGroup title={t("modal.display")}>
+          <label className="flex items-center justify-between rounded-xl border border-line/45 bg-surface/40 px-3 py-2.5 text-[13px] font-medium text-t2">
+            <span>{t("tile.show_address")}</span>
+            <input type="checkbox" checked={showAddress} onChange={(e) => setShowAddress(e.target.checked)} />
+          </label>
           <div>
-            <div className="label-xs mb-1.5">{config.field}{config.required ? " *" : ""}</div>
-            <input className={input} value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder={config.placeholder} />
+            <div className="label-xs mb-1.5">{t("dashboard.widget_notes")}</div>
+            <textarea className={`${fieldClass} resize-none`} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
-        )}
-        {type === "media" && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <div className="label-xs mb-1.5">{t("dashboard.provider")}</div>
-              <select className={input} value={provider} onChange={(e) => setProvider(e.target.value)}>
-                <option value="jellyfin">Jellyfin</option>
-                <option value="plex">Plex</option>
-                <option value="emby">Emby</option>
-              </select>
-            </div>
-            <div>
-              <div className="label-xs mb-1.5">{t("tile.api_key")}</div>
-              <input className={input} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={widget?.config?.hasApiKey ? t("dashboard.secret_keep") : "Token"} />
-            </div>
-          </div>
-        )}
-        {type === "downloads" && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <div className="label-xs mb-1.5">{t("dashboard.client")}</div>
-              <select className={input} value={client} onChange={(e) => setClient(e.target.value)}>
-                <option value="qbittorrent">qBittorrent</option>
-                <option value="sabnzbd">SABnzbd</option>
-              </select>
-            </div>
-            <div>
-              <div className="label-xs mb-1.5">{t("tile.api_key")}</div>
-              <input className={input} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={widget?.config?.hasApiKey ? t("dashboard.secret_keep") : t("dashboard.optional")} />
-            </div>
-            <div>
-              <div className="label-xs mb-1.5">{t("dashboard.username")}</div>
-              <input className={input} value={username} onChange={(e) => setUsername(e.target.value)} placeholder="admin" />
-            </div>
-            <div>
-              <div className="label-xs mb-1.5">{t("dashboard.password")}</div>
-              <input className={input} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={widget?.config?.hasPassword ? t("dashboard.secret_keep") : t("dashboard.optional")} />
-            </div>
-          </div>
-        )}
-        <label className="flex items-center justify-between rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t2">
-          <span>{t("tile.show_address")}</span>
-          <input type="checkbox" checked={showAddress} onChange={(e) => setShowAddress(e.target.checked)} />
-        </label>
-        <div>
-          <div className="label-xs mb-1.5">{t("dashboard.widget_notes")}</div>
-          <textarea className={`${input} resize-none`} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </div>
+        </WidgetFieldGroup>
+
         {saveError && (
-          <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500">
+          <div className="flex items-center gap-2 rounded-2xl border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500">
             <AlertCircle size={13} className="shrink-0" />
             {saveError}
           </div>
         )}
-        <button onClick={save} disabled={!title.trim() || (config.required && !endpoint.trim()) || isSaving} className="w-full rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40">
-          {isSaving ? "Speichern..." : t("common.save")}
+        <button onClick={save} disabled={!title.trim() || (config.required && !endpoint.trim()) || isSaving} className="w-full rounded-xl bg-accent py-2.5 text-[13px] font-semibold text-bg transition-opacity hover:opacity-90 disabled:opacity-40">
+          {isSaving ? t("common.saving") : t("common.save")}
         </button>
       </div>
     </Modal>
   );
 }
-
 // ─── Docker Modal ──────────────────────────────────────────────────────────────
 
 function DockerModal({ open, onClose, containers, suggestions, onAdopt, onAction }: {

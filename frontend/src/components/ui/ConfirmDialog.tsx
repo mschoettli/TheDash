@@ -30,8 +30,8 @@ export default function ConfirmDialog({
   return (
     <Modal open={open} onClose={onCancel} title={title} maxWidth="max-w-md">
       <div className="space-y-4">
-        <div className="flex gap-3 rounded-xl border border-line/60 bg-card p-3">
-          <span className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${destructive ? "bg-rose-500/10 text-rose-500" : "bg-accent/10 text-accent"}`}>
+        <div className="flex gap-3 rounded-2xl border border-line/50 bg-card/70 p-4">
+          <span className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${destructive ? "bg-rose-500/10 text-rose-500" : "bg-accent/10 text-accent"}`}>
             <AlertTriangle size={18} />
           </span>
           <p className="text-[13px] leading-6 text-t2">{description}</p>

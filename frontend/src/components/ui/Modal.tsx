@@ -28,25 +28,25 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto p-4 sm:items-center"
+          className="fixed inset-0 z-[2000] flex items-start justify-center overflow-y-auto p-3 sm:p-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <div className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={onClose} />
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md" onClick={onClose} />
           <motion.div
-            className={`modal-panel relative flex max-h-[calc(100vh-2rem)] w-full ${maxWidth} flex-col overflow-hidden rounded-2xl border border-line/70 shadow-2xl`}
+            className={`modal-panel relative my-auto flex max-h-[calc(100vh-1.5rem)] w-full ${maxWidth} flex-col overflow-hidden rounded-3xl border border-line/60 shadow-2xl sm:max-h-[calc(100vh-3rem)]`}
             initial={{ opacity: 0, scale: 0.96, y: 6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 6 }}
             transition={{ duration: 0.14 }}
           >
             {title && (
-              <div className="flex shrink-0 items-center justify-between border-b border-line/60 px-5 py-3.5">
-                <h2 className="text-[15px] font-semibold text-t1">{title}</h2>
+              <div className="flex shrink-0 items-center justify-between border-b border-line/50 px-5 py-4">
+                <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-t1">{title}</h2>
                 <button
                   onClick={onClose}
-                  className="p-1.5 rounded-lg text-t3 hover:text-t1 hover:bg-line/30 transition-colors"
+                  className="rounded-full p-1.5 text-t3 transition-colors hover:bg-line/30 hover:text-t1"
                 >
                   <X size={16} />
                 </button>

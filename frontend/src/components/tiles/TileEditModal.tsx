@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, Image } from "lucide-react";
 import Modal from "../ui/Modal";
@@ -7,11 +7,33 @@ import { useCreateTile, useUpdateTile, useDeleteTile, Tile, TileProvider } from 
 import { useDashboard, useCreateDashboardItem } from "../../hooks/useDashboard";
 import IconPicker from "../ui/IconPicker";
 import IconBadge from "../ui/IconBadge";
-import { detectIconKey, iconValue, isRegistryIcon } from "../../lib/iconRegistry";
+import { detectIconKey, iconValue, isRegistryIcon, logoLabelFromValue } from "../../lib/iconRegistry";
 
 const input =
-  "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
-const selectCls = `${input} appearance-none`;
+  "w-full rounded-xl border border-line/50 bg-card px-3 py-2 text-[13px] text-t1 outline-none placeholder:text-t3 focus:border-accent/50";
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  tile?: Tile;
+  initial?: Partial<Tile>;
+  defaultSectionId?: number | null;
+}
+
+const STYLE_OPTIONS: { value: Tile["style"]; label: string }[] = [
+  { value: "card", label: "Card" },
+  { value: "compact", label: "Compact" },
+  { value: "minimal", label: "Minimal" },
+  { value: "banner", label: "Banner" },
+  { value: "metric", label: "Metric" },
+];
+
+const PROVIDER_OPTIONS: { value: TileProvider; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "jellyfin", label: "Jellyfin" },
+  { value: "plex", label: "Plex" },
+  { value: "emby", label: "Emby" },
+];
 
 function normalizeServiceUrl(value: string): string {
   const trimmed = value.trim();
@@ -28,30 +50,14 @@ function normalizeServiceUrl(value: string): string {
   }
 }
 
-interface Props {
-  open: boolean;
-  onClose: () => void;
-  tile?: Tile;
-  initial?: Partial<Tile>;
-  defaultSectionId?: number | null;
+function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-line/45 bg-card/55 p-4">
+      <div className="label-xs mb-3">{title}</div>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
 }
-
-const STYLE_OPTIONS: { value: Tile["style"]; label: string }[] = [
-  { value: "card",    label: "Card"    },
-  { value: "compact", label: "Compact" },
-  { value: "minimal", label: "Minimal" },
-  { value: "banner",  label: "Banner"  },
-  { value: "metric",  label: "Metric"  },
-];
-
-const PROVIDER_OPTIONS: { value: TileProvider; label: string }[] = [
-  { value: "none",     label: "Kein" },
-  { value: "jellyfin", label: "Jellyfin" },
-  { value: "plex",     label: "Plex" },
-  { value: "emby",     label: "Emby" },
-];
-
-// ─── Icon Picker Sub-Modal ─────────────────────────────────────────────────────
 
 function IconPickerModal({
   open,
@@ -68,36 +74,36 @@ function IconPickerModal({
   url: string;
   onChange: (v: string) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
-    <Modal open={open} onClose={onClose} title="Icon wählen" maxWidth="max-w-md">
-      <div className="space-y-3">
+    <Modal open={open} onClose={onClose} title={t("modal.change_logo")} maxWidth="max-w-md">
+      <div className="space-y-4">
         <div>
-          <div className="label-xs mb-1.5">Icon-URL / Schlüssel</div>
+          <div className="label-xs mb-1.5">{t("modal.logo_url_key")}</div>
           <input
             className={input}
             value={iconUrl}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="https://... oder logo:selfhst:jellyfin"
+            placeholder="https://... or logo:selfhst:jellyfin"
           />
         </div>
         <IconPicker
           value={isRegistryIcon(iconUrl) ? iconUrl : null}
           name={name}
           url={url}
-          onChange={(v) => { onChange(v); }}
+          onChange={onChange}
         />
         <button
           onClick={onClose}
-          className="w-full rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg hover:opacity-90 transition-opacity"
+          className="w-full rounded-xl bg-accent py-2.5 text-[13px] font-semibold text-bg transition-opacity hover:opacity-90"
         >
-          Übernehmen
+          {t("modal.apply_logo")}
         </button>
       </div>
     </Modal>
   );
 }
-
-// ─── Main Modal ────────────────────────────────────────────────────────────────
 
 export default function TileEditModal({ open, onClose, tile, initial, defaultSectionId }: Props) {
   const { t } = useTranslation();
@@ -105,19 +111,19 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
   const { data: dashboard } = useDashboard();
   const sections = dashboard?.sections ?? [];
 
-  const [name, setName]               = useState(tile?.name ?? initial?.name ?? "");
-  const [url, setUrl]                 = useState(tile?.url ?? initial?.url ?? "");
-  const [iconUrl, setIconUrl]         = useState(tile?.icon_url ?? initial?.icon_url ?? "");
+  const [name, setName] = useState(tile?.name ?? initial?.name ?? "");
+  const [url, setUrl] = useState(tile?.url ?? initial?.url ?? "");
+  const [iconUrl, setIconUrl] = useState(tile?.icon_url ?? initial?.icon_url ?? "");
   const [iconTouched, setIconTouched] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
-  const [style, setStyle]             = useState<Tile["style"]>(tile?.style ?? initial?.style ?? "card");
-  const [apiUrl, setApiUrl]           = useState(tile?.api_url ?? initial?.api_url ?? "");
-  const [apiKey, setApiKey]           = useState(tile?.api_key ?? initial?.api_key ?? "");
-  const [provider, setProvider]       = useState<TileProvider>(tile?.provider ?? initial?.provider ?? "none");
+  const [style, setStyle] = useState<Tile["style"]>(tile?.style ?? initial?.style ?? "card");
+  const [apiUrl, setApiUrl] = useState(tile?.api_url ?? initial?.api_url ?? "");
+  const [apiKey, setApiKey] = useState(tile?.api_key ?? initial?.api_key ?? "");
+  const [provider, setProvider] = useState<TileProvider>(tile?.provider ?? initial?.provider ?? "none");
   const [showAddress, setShowAddress] = useState(tile?.show_address ?? initial?.show_address ?? true);
-  const [sectionId, setSectionId]     = useState<number | null>(defaultSectionId ?? sections[0]?.id ?? null);
-  const [deleteOpen, setDeleteOpen]   = useState(false);
-  const [saveError, setSaveError]     = useState<string | null>(null);
+  const [sectionId, setSectionId] = useState<number | null>(defaultSectionId ?? sections[0]?.id ?? null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -136,7 +142,6 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
     setIconPickerOpen(false);
   }, [open]);
 
-  // Auto-resolve icon when name/url changes (create mode only)
   useEffect(() => {
     if (!open || tile || initial?.icon_url || iconTouched || (!name.trim() && !url.trim())) return;
     const controller = new AbortController();
@@ -152,17 +157,18 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
     return () => { clearTimeout(timeout); controller.abort(); };
   }, [open, tile, initial, iconTouched, iconUrl, name, url]);
 
-  // Auto-fill API URL from service URL when provider selected
   useEffect(() => {
     if (provider === "none" || apiUrl.trim()) return;
     setApiUrl(normalizeServiceUrl(url));
   }, [provider]);
 
-  const create              = useCreateTile();
-  const update              = useUpdateTile();
-  const del                 = useDeleteTile();
+  const create = useCreateTile();
+  const update = useUpdateTile();
+  const del = useDeleteTile();
   const createDashboardItem = useCreateDashboardItem();
-  const isSaving            = create.isPending || update.isPending;
+  const isSaving = create.isPending || update.isPending;
+  const previewIcon = iconUrl || iconValue(detectIconKey(name));
+  const iconLabel = logoLabelFromValue(previewIcon) ?? previewIcon;
 
   const handleSave = () => {
     setSaveError(null);
@@ -181,7 +187,7 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
     if (isEdit && tile) {
       update.mutate({ id: tile.id, ...data }, {
         onSuccess: onClose,
-        onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Speichern"),
+        onError: (err) => setSaveError(err instanceof Error ? err.message : "Save failed"),
       });
     } else {
       create.mutate(data, {
@@ -190,15 +196,13 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
             const section = sections.find((s) => s.id === sectionId);
             createDashboardItem.mutate(
               { section_id: sectionId, item_type: "tile", item_id: newTile.id, sort_order: section?.items.length ?? 0 },
-              { onSuccess: onClose, onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Hinzufügen") }
+              { onSuccess: onClose, onError: (err) => setSaveError(err instanceof Error ? err.message : "Add failed") }
             );
           } else {
-            // No section available — tile created in DB, but user must create a
-            // section first to see it on the dashboard. Show a clear hint.
-            setSaveError("Kachel gespeichert — bitte zuerst eine Sektion erstellen, um sie anzuzeigen.");
+            setSaveError("Tile saved. Create a section first to show it on the dashboard.");
           }
         },
-        onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Erstellen"),
+        onError: (err) => setSaveError(err instanceof Error ? err.message : "Create failed"),
       });
     }
   };
@@ -207,90 +211,66 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
     if (!tile) return;
     del.mutate(tile.id, {
       onSuccess: onClose,
-      onError: (err) => setSaveError(err instanceof Error ? err.message : "Fehler beim Löschen"),
+      onError: (err) => setSaveError(err instanceof Error ? err.message : "Delete failed"),
     });
   };
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title={isEdit ? t("tile.edit_title") : t("tile.add_title")} maxWidth="max-w-md">
-        <div className="space-y-3">
-
-          {/* Name + URL */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <div className="label-xs mb-1">{t("tile.name")} *</div>
-              <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="My Service" />
+      <Modal open={open} onClose={onClose} title={isEdit ? t("tile.edit_title") : t("tile.add_title")} maxWidth="max-w-2xl">
+        <div className="space-y-4">
+          <FieldGroup title={t("modal.identity")}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <div className="label-xs mb-1.5">{t("tile.name")} *</div>
+                <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Jellyfin" />
+              </div>
+              <div>
+                <div className="label-xs mb-1.5">{t("tile.url")} *</div>
+                <input className={input} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://server:8080" />
+              </div>
             </div>
-            <div>
-              <div className="label-xs mb-1">{t("tile.url")} *</div>
-              <input className={input} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://server:8080" />
-            </div>
-          </div>
 
-          {/* Icon row */}
-          <div>
-            <div className="label-xs mb-1">{t("tile.icon")}</div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/60 bg-card">
-                <IconBadge value={iconUrl || iconValue(detectIconKey(name))} name={name} size={22} />
+            <div className="flex items-center gap-3 rounded-2xl border border-line/40 bg-surface/45 p-3">
+              <IconBadge value={previewIcon} name={name} size={38} className="shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-semibold text-t1">{name || t("modal.automatic_logo")}</div>
+                <div className="truncate text-[11px] text-t3">{iconLabel}</div>
               </div>
               <button
                 type="button"
                 onClick={() => setIconPickerOpen(true)}
-                className="flex flex-1 items-center gap-2 rounded-lg border border-line/60 bg-card px-3 py-2 text-left text-[12px] text-t3 hover:border-accent/40 hover:text-t2 transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-line/50 px-3 py-2 text-[12px] font-semibold text-t2 transition-colors hover:border-accent/35 hover:text-accent"
               >
-                <Image size={13} className="shrink-0" />
-                {iconUrl ? (
-                  <span className="truncate font-mono text-[11px] text-t2">{iconUrl}</span>
-                ) : (
-                  <span>Icon auswählen…</span>
-                )}
+                <Image size={13} /> {t("modal.change_logo")}
               </button>
             </div>
-          </div>
+          </FieldGroup>
 
-          {/* Style picker */}
-          <div>
-            <div className="label-xs mb-1">{t("tile.style")}</div>
-            <div className="grid grid-cols-5 overflow-hidden rounded-lg border border-line/60">
+          <FieldGroup title={t("modal.display")}>
+            <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-line/45 bg-surface/40 p-1 sm:grid-cols-5">
               {STYLE_OPTIONS.map(({ value, label }) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setStyle(value)}
-                  className={`py-1.5 text-[12px] font-medium transition-colors ${
-                    style === value ? "bg-accent text-bg" : "text-t3 hover:bg-line/30 hover:text-t1"
+                  className={`rounded-lg px-2 py-2 text-[12px] font-semibold transition-colors ${
+                    style === value ? "bg-accent text-bg shadow-sm" : "text-t3 hover:bg-line/25 hover:text-t1"
                   }`}
                 >
                   {label}
                 </button>
               ))}
             </div>
-          </div>
 
-          {/* Show address toggle + Section selector */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowAddress((v) => !v)}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 transition-colors duration-200 ${
-                showAddress ? "border-accent bg-accent" : "border-line/60 bg-card"
-              }`}
-            >
-              <span
-                className={`inline-block h-3.5 w-3.5 translate-y-[-1px] rounded-full bg-white shadow transition-transform duration-200 ${
-                  showAddress ? "translate-x-3.5" : "translate-x-0"
-                }`}
-              />
-            </button>
-            <span className="text-[13px] text-t2">{t("tile.show_address")}</span>
-
-            {!isEdit && sections.length > 0 && (
-              <>
-                <span className="ml-auto text-[12px] text-t3">Sektion</span>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <label className="flex flex-1 items-center justify-between rounded-xl border border-line/45 bg-surface/40 px-3 py-2.5 text-[13px] font-medium text-t2">
+                {t("tile.show_address")}
+                <input type="checkbox" checked={showAddress} onChange={(e) => setShowAddress(e.target.checked)} />
+              </label>
+              {!isEdit && sections.length > 0 && (
                 <select
-                  className="rounded-lg border border-line/60 bg-card px-2 py-1 text-[12px] text-t1 outline-none focus:border-accent/50"
+                  className={`${input} sm:max-w-56`}
                   value={sectionId ?? ""}
                   onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : null)}
                 >
@@ -298,60 +278,54 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
                     <option key={s.id} value={s.id}>{s.title}</option>
                   ))}
                 </select>
-              </>
-            )}
-          </div>
-
-          {/* API Integration */}
-          <div className="rounded-lg border border-line/50 bg-surface/50">
-            <div className="flex items-center justify-between px-3 py-2">
-              <span className="label-xs">API-Integration</span>
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value as TileProvider)}
-                className="rounded-md border border-line/50 bg-card px-2 py-0.5 text-[12px] text-t1 outline-none focus:border-accent/50"
-              >
-                {PROVIDER_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+              )}
             </div>
+          </FieldGroup>
 
-            {provider !== "none" && (
-              <div className="border-t border-line/40 px-3 pb-3 pt-2.5 space-y-2">
+          <FieldGroup title={t("modal.integration")}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <div className="label-xs mb-1.5">Provider</div>
+                <select value={provider} onChange={(e) => setProvider(e.target.value as TileProvider)} className={input}>
+                  {PROVIDER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.value === "none" ? t("modal.none") : option.label}</option>
+                  ))}
+                </select>
+              </div>
+              {provider !== "none" && (
                 <div>
-                  <div className="label-xs mb-1">{t("tile.api")}</div>
+                  <div className="label-xs mb-1.5">{t("tile.api")}</div>
                   <input className={input} value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} placeholder="http://media-server:8096" />
                 </div>
-                <div>
-                  <div className="label-xs mb-1">{t("tile.api_key")}</div>
+              )}
+              {provider !== "none" && (
+                <div className="sm:col-span-2">
+                  <div className="label-xs mb-1.5">{t("tile.api_key")}</div>
                   <input className={input} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Token (optional)" />
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          </FieldGroup>
 
-          {/* Error */}
           {saveError && (
-            <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500">
+            <div className="flex items-center gap-2 rounded-2xl border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-500">
               <AlertCircle size={13} className="shrink-0" />
               {saveError}
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-2">
             <button
               onClick={handleSave}
               disabled={!name.trim() || !url.trim() || isSaving}
-              className="flex-1 rounded-lg bg-accent py-2 text-[13px] font-semibold text-bg disabled:opacity-40 hover:opacity-90 transition-opacity"
+              className="flex-1 rounded-xl bg-accent py-2.5 text-[13px] font-semibold text-bg transition-opacity hover:opacity-90 disabled:opacity-40"
             >
-              {isSaving ? "Speichern..." : t("tile.save")}
+              {isSaving ? t("common.saving") : t("tile.save")}
             </button>
             {isEdit && (
               <button
                 onClick={() => setDeleteOpen(true)}
-                className="rounded-lg border border-line px-4 py-2 text-[13px] font-medium text-t2 transition-colors hover:border-rose-400/40 hover:text-rose-400"
+                className="rounded-xl border border-line/60 px-4 py-2.5 text-[13px] font-semibold text-t2 transition-colors hover:border-rose-400/40 hover:text-rose-400"
               >
                 {t("tile.delete")}
               </button>
@@ -371,7 +345,6 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
         )}
       </Modal>
 
-      {/* Icon picker sub-modal */}
       <IconPickerModal
         open={iconPickerOpen}
         onClose={() => setIconPickerOpen(false)}

@@ -30,6 +30,9 @@
     "local_fallback": "Lokaler Fallback",
     "logo_provider": "Logo-Quelle",
     "logo_provider_hint": "Automatische Logos mit Fallback-Badge",
+    "appearance": "Darstellung",
+    "runtime": "Laufzeit",
+    "backup": "Backup",
     "export": "Einstellungen exportieren",
     "import": "Einstellungen importieren",
     "import_success": "Import erfolgreich",
@@ -268,6 +271,17 @@
     "loading": "Lädt...",
     "no_data": "Keine Daten verfügbar"
   },
+  "modal": {
+    "identity": "Basisdaten",
+    "display": "Darstellung",
+    "integration": "Integration",
+    "change_logo": "Logo ändern",
+    "automatic_logo": "Automatisches Logo",
+    "automatic_widget_logo": "Automatisches Widget-Logo",
+    "logo_url_key": "Logo-URL oder Registry-Schlüssel",
+    "apply_logo": "Logo übernehmen",
+    "none": "Kein"
+  },
   "metrics": {
     "cpu": "CPU",
     "ram": "RAM",
@@ -278,6 +292,7 @@
     "delete": "Löschen",
     "cancel": "Abbrechen",
     "done": "Fertig",
+    "saving": "Speichert...",
     "confirm_delete": "Wirklich löschen?",
     "yes": "Ja",
     "no": "Nein"

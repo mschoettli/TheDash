@@ -57,11 +57,11 @@ export default function IconPicker({ value, name, url = "", image = "", labels =
   const autoValue = autoLogo?.status === "found" && autoLogo.value ? autoLogo.value : iconValue(detectedKey);
 
   return (
-    <div className="space-y-3 rounded-xl border border-line/60 bg-surface p-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
+    <div className="space-y-3 rounded-2xl border border-line/50 bg-card/60 p-3">
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-line/40 bg-surface/50 p-2.5">
+        <div className="min-w-0">
           <div className="label-xs mb-1">{t("icons.picker")}</div>
-          <div className="text-[12px] text-t3">
+          <div className="truncate text-[12px] text-t3">
             {t("icons.auto_detected")}:{" "}
             {autoLogo?.status === "found"
               ? logoLabelFromValue(autoLogo.value) ?? autoLogo.slug
@@ -71,9 +71,9 @@ export default function IconPicker({ value, name, url = "", image = "", labels =
         <button
           type="button"
           onClick={() => onChange(autoValue)}
-          className="inline-flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-[12px] font-medium text-accent"
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-accent/25 bg-accent/10 px-3 py-2 text-[12px] font-semibold text-accent transition-colors hover:bg-accent/15"
         >
-          <IconBadge value={autoValue} name={name} size={22} />
+          <IconBadge value={autoValue} name={name} size={20} />
           {t("icons.use_auto")}
         </button>
       </div>
@@ -88,13 +88,13 @@ export default function IconPicker({ value, name, url = "", image = "", labels =
                 return (
                   <button
                     key={option.key}
-                    type="button"
-                    onClick={() => onChange(iconValue(option.key))}
-                    className={`flex h-10 items-center justify-center rounded-lg border transition-colors ${
-                      active ? "border-accent bg-accent/15 text-accent" : "border-line/60 bg-card text-t3 hover:border-accent/40 hover:text-accent"
-                    }`}
-                    title={option.label}
-                  >
+                  type="button"
+                  onClick={() => onChange(iconValue(option.key))}
+                  className={`flex h-10 items-center justify-center rounded-xl border transition-colors ${
+                    active ? "border-accent/60 bg-accent/10 text-accent shadow-sm" : "border-line/45 bg-surface/40 text-t3 hover:border-accent/35 hover:text-accent"
+                  }`}
+                  title={option.label}
+                >
                     <option.icon size={18} />
                   </button>
                 );
