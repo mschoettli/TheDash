@@ -32,6 +32,9 @@ export interface Link {
   url: string;
   icon_url: string | null;
   image_url: string | null;
+  screenshot_url: string | null;
+  screenshot_status: "pending" | "ready" | "failed" | "skipped";
+  screenshot_updated_at: string | null;
   description: string | null;
   note: string | null;
   is_favorite: 0 | 1 | boolean;
@@ -141,6 +144,15 @@ export function useDeleteLink() {
   return useMutation({
     mutationFn: (id: number) =>
       fetchJson<{ ok: true }>(`/api/links/${id}`, { method: "DELETE" }),
+    onSuccess: () => invalidateBookmarks(qc),
+  });
+}
+
+export function useRefreshLinkPreview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      fetchJson<Link>(`/api/links/${id}/preview`, { method: "POST" }),
     onSuccess: () => invalidateBookmarks(qc),
   });
 }

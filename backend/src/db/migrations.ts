@@ -38,6 +38,9 @@ export function runMigrations(): void {
       name       TEXT    NOT NULL,
       url        TEXT    NOT NULL,
       icon_url   TEXT,
+      screenshot_url TEXT,
+      screenshot_status TEXT NOT NULL DEFAULT 'skipped',
+      screenshot_updated_at TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0
     );
 
@@ -279,6 +282,18 @@ export function runMigrations(): void {
     db.exec("UPDATE links SET updated_at = COALESCE(created_at, datetime('now')) WHERE updated_at IS NULL");
   }
 
+  if (!columnExists("links", "screenshot_url")) {
+    db.exec("ALTER TABLE links ADD COLUMN screenshot_url TEXT");
+  }
+
+  if (!columnExists("links", "screenshot_status")) {
+    db.exec("ALTER TABLE links ADD COLUMN screenshot_status TEXT NOT NULL DEFAULT 'skipped'");
+  }
+
+  if (!columnExists("links", "screenshot_updated_at")) {
+    db.exec("ALTER TABLE links ADD COLUMN screenshot_updated_at TEXT");
+  }
+
   if (!columnExists("notes", "folder_id")) {
     db.exec("ALTER TABLE notes ADD COLUMN folder_id INTEGER REFERENCES note_folders(id) ON DELETE SET NULL");
   }
@@ -350,6 +365,9 @@ export function runMigrations(): void {
         sort_order  INTEGER NOT NULL DEFAULT 0,
         description TEXT,
         image_url   TEXT,
+        screenshot_url TEXT,
+        screenshot_status TEXT NOT NULL DEFAULT 'skipped',
+        screenshot_updated_at TEXT,
         note        TEXT,
         is_favorite INTEGER NOT NULL DEFAULT 0,
         is_archived INTEGER NOT NULL DEFAULT 0,
@@ -359,9 +377,11 @@ export function runMigrations(): void {
     `);
     db.exec(`
       INSERT INTO links_v2 (id, section_id, name, url, icon_url, sort_order,
-        description, image_url, note, is_favorite, is_archived, created_at, updated_at)
+        description, image_url, screenshot_url, screenshot_status, screenshot_updated_at,
+        note, is_favorite, is_archived, created_at, updated_at)
       SELECT id, section_id, name, url, icon_url, sort_order,
-        description, image_url, note, is_favorite, is_archived, created_at, updated_at
+        description, image_url, screenshot_url, screenshot_status, screenshot_updated_at,
+        note, is_favorite, is_archived, created_at, updated_at
       FROM links;
     `);
     db.exec("DROP TABLE links");

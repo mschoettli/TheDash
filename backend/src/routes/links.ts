@@ -1,6 +1,7 @@
 import { Router } from "express";
 import db from "../db/client";
 import { fetchLinkMetadata } from "../lib/metadata";
+import { captureBookmarkScreenshot, queueBookmarkScreenshot } from "../lib/previews";
 import { suggestAiTags } from "../lib/tagging";
 
 const router = Router();
@@ -142,6 +143,17 @@ function syncLinkTags(linkId: number, tags: unknown): void {
   pruneOrphanedTags();
 }
 
+function maybeQueueScreenshot(linkId: number, url: string, imageUrl: string | null | undefined): void {
+  if (imageUrl) {
+    db.prepare(
+      "UPDATE links SET screenshot_status = 'skipped', screenshot_url = NULL, screenshot_updated_at = NULL WHERE id = ?"
+    ).run(linkId);
+    return;
+  }
+
+  queueBookmarkScreenshot(linkId, url);
+}
+
 router.post("/", (req, res) => {
   const {
     section_id,
@@ -166,8 +178,8 @@ router.post("/", (req, res) => {
     const result = db
       .prepare(
         `INSERT INTO links
-          (section_id, name, url, icon_url, image_url, description, note, is_favorite, is_archived, sort_order, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+          (section_id, name, url, icon_url, image_url, screenshot_status, description, note, is_favorite, is_archived, sort_order, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
       )
       .run(
         section_id ?? null,
@@ -175,6 +187,7 @@ router.post("/", (req, res) => {
         normalizeUrl(url),
         icon_url ?? null,
         image_url ?? null,
+        image_url ? "skipped" : "pending",
         description ?? null,
         note ?? null,
         is_favorite ? 1 : 0,
@@ -186,6 +199,7 @@ router.post("/", (req, res) => {
   });
 
   const id = insert();
+  maybeQueueScreenshot(Number(id), normalizeUrl(url), image_url ?? null);
   const link = db.prepare("SELECT * FROM links WHERE id = ?").get(id) as any;
   res.status(201).json(attachTags([link])[0]);
 });
@@ -209,8 +223,8 @@ router.post("/capture", async (req, res) => {
     const result = db
       .prepare(
         `INSERT INTO links
-          (section_id, name, url, icon_url, image_url, description, sort_order, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+          (section_id, name, url, icon_url, image_url, screenshot_status, description, sort_order, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
       )
       .run(
         sectionId ?? null,
@@ -218,6 +232,7 @@ router.post("/capture", async (req, res) => {
         normalizedUrl,
         metadata.iconUrl,
         metadata.imageUrl,
+        metadata.imageUrl ? "skipped" : "pending",
         metadata.description,
         0
       );
@@ -226,6 +241,7 @@ router.post("/capture", async (req, res) => {
   });
 
   const id = insert();
+  maybeQueueScreenshot(Number(id), normalizedUrl, metadata.imageUrl);
   const link = db.prepare("SELECT * FROM links WHERE id = ?").get(id) as any;
   res.status(201).json(attachTags([link])[0]);
 });
@@ -353,6 +369,22 @@ router.post("/bulk", (req, res) => {
   res.json({ ok: true });
 });
 
+router.post("/:id/preview", async (req, res) => {
+  const link = db.prepare("SELECT * FROM links WHERE id = ?").get(req.params.id) as any;
+  if (!link) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+
+  db.prepare(
+    "UPDATE links SET screenshot_status = 'pending', screenshot_url = NULL, screenshot_updated_at = datetime('now') WHERE id = ?"
+  ).run(req.params.id);
+
+  await captureBookmarkScreenshot(Number(req.params.id), String(link.url));
+  const updated = db.prepare("SELECT * FROM links WHERE id = ?").get(req.params.id) as any;
+  res.json(attachTags([updated])[0]);
+});
+
 router.put("/:id", (req, res) => {
   const existing = db
     .prepare("SELECT * FROM links WHERE id = ?")
@@ -399,6 +431,10 @@ router.put("/:id", (req, res) => {
     if (tags !== undefined) syncLinkTags(Number(req.params.id), tags);
   })();
 
+  const updatedBeforePreview = db.prepare("SELECT * FROM links WHERE id = ?").get(req.params.id) as any;
+  if (!updatedBeforePreview.image_url && !updatedBeforePreview.screenshot_url && updatedBeforePreview.screenshot_status !== "pending") {
+    maybeQueueScreenshot(Number(req.params.id), String(updatedBeforePreview.url), null);
+  }
   const link = db.prepare("SELECT * FROM links WHERE id = ?").get(req.params.id) as any;
   res.json(attachTags([link])[0]);
 });

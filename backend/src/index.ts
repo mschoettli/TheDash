@@ -15,9 +15,11 @@ import tagsRouter from "./routes/tags";
 import dockerRouter from "./routes/docker";
 import widgetsRouter from "./routes/widgets";
 import logosRouter from "./routes/logos";
+import { getPreviewRoot } from "./lib/previews";
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
+app.use("/api/previews", express.static(getPreviewRoot(), { maxAge: "7d" }));
 
 app.use("/api/tiles", tilesRouter);
 app.use("/api/links", linksRouter);

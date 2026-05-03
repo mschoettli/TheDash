@@ -5,6 +5,7 @@ import { Link, useDeleteLink, useUpdateLink } from "../../hooks/useLinks";
 import FaviconImg from "../ui/FaviconImg";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import LinkEditModal from "./LinkEditModal";
+import BookmarkPreviewImage from "./BookmarkPreviewImage";
 
 interface BookmarkCardProps {
   link: Link;
@@ -121,7 +122,7 @@ export default function BookmarkCard({ link, dragHandle, isDragging, variant = "
     <>
       <article
         onClick={() => onOpen?.(link)}
-        className={`group relative flex items-center gap-3 overflow-hidden rounded-xl border border-line/50 bg-card px-3 py-2.5 transition-all hover:border-accent/30 hover:shadow-md hover:shadow-accent/5 ${
+        className={`group relative overflow-hidden rounded-xl border border-line/50 bg-card transition-all hover:border-accent/30 hover:shadow-md hover:shadow-accent/5 ${
           isDragging ? "opacity-40 shadow-xl" : ""
         } ${link.is_archived ? "opacity-60" : ""} ${onOpen ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-accent/40" : ""}`}
       >
@@ -131,30 +132,33 @@ export default function BookmarkCard({ link, dragHandle, isDragging, variant = "
             checked={selected}
             onChange={(e) => onSelect?.(e.target.checked)}
             onClick={(e) => e.stopPropagation()}
-            className="shrink-0"
+            className="absolute left-3 top-3 z-10 rounded border-line bg-surface/90 shadow-sm"
           />
         )}
         {/* Drag handle */}
         {dragHandle && (
-          <div className="shrink-0 cursor-grab text-t3 opacity-0 transition-opacity group-hover:opacity-70 hover:!opacity-100">
+          <div className="absolute left-3 top-12 z-10 cursor-grab rounded-lg bg-surface/80 p-1 text-t3 opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-70 hover:!opacity-100">
             {dragHandle}
           </div>
         )}
 
-        {/* Favicon */}
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line/50 bg-surface shadow-inner shadow-black/5">
-          <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={22} />
-        </div>
+        <BookmarkPreviewImage link={link} />
 
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-t3">{getHost(link.url)}</div>
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-[13px] font-semibold text-t1 leading-5">{link.name}</span>
-            {link.is_favorite && <Star size={10} className="shrink-0 text-amber-400" />}
-            {link.is_archived && <Archive size={10} className="shrink-0 text-t3" />}
+        <div className="space-y-2 p-3">
+          <div className="flex items-start gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line/50 bg-surface">
+              <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-t3">{getHost(link.url)}</div>
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-[13px] font-semibold text-t1 leading-5">{link.name}</span>
+                {link.is_favorite && <Star size={10} className="shrink-0 text-amber-400" />}
+                {link.is_archived && <Archive size={10} className="shrink-0 text-t3" />}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {link.tags.slice(0, 3).map((tag) => (
               <span key={tag.id} className="rounded-md bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold text-accent/80 leading-none">
                 {tag.name}
@@ -167,39 +171,39 @@ export default function BookmarkCard({ link, dragHandle, isDragging, variant = "
           {link.description && (
             <p className="mt-0.5 line-clamp-1 text-[11px] leading-4 text-t3">{link.description}</p>
           )}
-        </div>
 
-        {/* Hover actions */}
-        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <a
-            href={link.url} target="_blank" rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="rounded-lg p-1.5 text-t3 transition-colors hover:bg-accent hover:text-bg"
-            title={t("link.open")}
-          >
-            <ExternalLink size={13} />
-          </a>
-          <button
-            onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}
-            className="rounded-lg p-1.5 text-t3 transition-colors hover:bg-line/30 hover:text-t1"
-            title={t("link.edit")}
-          >
-            <Pencil size={13} />
-          </button>
-          <button
-            onClick={toggleFavorite}
-            className={`rounded-lg p-1.5 transition-colors hover:bg-line/30 ${link.is_favorite ? "text-amber-400" : "text-t3 hover:text-amber-400"}`}
-            title={t("link.favorite")}
-          >
-            <Star size={13} />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setDeleteOpen(true); }}
-            className="rounded-lg p-1.5 text-t3 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
-            title={t("link.delete")}
-          >
-            <Trash2 size={13} />
-          </button>
+          {/* Hover actions */}
+          <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <a
+              href={link.url} target="_blank" rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-lg p-1.5 text-t3 transition-colors hover:bg-accent hover:text-bg"
+              title={t("link.open")}
+            >
+              <ExternalLink size={13} />
+            </a>
+            <button
+              onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}
+              className="rounded-lg p-1.5 text-t3 transition-colors hover:bg-line/30 hover:text-t1"
+              title={t("link.edit")}
+            >
+              <Pencil size={13} />
+            </button>
+            <button
+              onClick={toggleFavorite}
+              className={`rounded-lg p-1.5 transition-colors hover:bg-line/30 ${link.is_favorite ? "text-amber-400" : "text-t3 hover:text-amber-400"}`}
+              title={t("link.favorite")}
+            >
+              <Star size={13} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setDeleteOpen(true); }}
+              className="rounded-lg p-1.5 text-t3 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+              title={t("link.delete")}
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
         </div>
       </article>
 

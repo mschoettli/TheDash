@@ -328,7 +328,7 @@ export default function BookmarksPage() {
     [allLinks]
   );
   const metadataFailedLinks = useMemo(
-    () => allLinks.filter((l) => !l.is_archived && !l.description && !l.image_url && !l.icon_url),
+    () => allLinks.filter((l) => !l.is_archived && !l.description && !l.image_url && !l.screenshot_url && !l.icon_url),
     [allLinks]
   );
   const defaultSectionId = displaySections[0]?.id ?? null;

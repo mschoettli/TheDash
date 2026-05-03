@@ -2,10 +2,9 @@ import { Archive, ExternalLink, Pencil, Star, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useDeleteLink, useUpdateLink } from "../../hooks/useLinks";
-import FaviconImg from "../ui/FaviconImg";
-import RemoteImage from "../ui/RemoteImage";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import LinkEditModal from "./LinkEditModal";
+import BookmarkPreviewImage from "./BookmarkPreviewImage";
 
 interface BookmarkPreviewDrawerProps {
   link: Link | null;
@@ -59,15 +58,7 @@ export default function BookmarkPreviewDrawer({ link, onClose }: BookmarkPreview
           </button>
         </div>
 
-        <RemoteImage
-          src={link.image_url}
-          className="h-52 w-full object-cover bg-card"
-          fallback={(
-            <div className="h-36 flex items-center justify-center bg-card border-b border-line/40">
-              <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={52} />
-            </div>
-          )}
-        />
+        <BookmarkPreviewImage link={link} variant="drawer" showRefresh />
 
         <div className="space-y-5 p-5">
           <div>

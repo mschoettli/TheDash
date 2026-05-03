@@ -5,20 +5,25 @@ interface RemoteImageProps {
   alt?: string;
   className?: string;
   fallback: ReactNode;
+  onError?: () => void;
 }
 
-export default function RemoteImage({ src, alt = "", className = "", fallback }: RemoteImageProps) {
+export default function RemoteImage({ src, alt = "", className = "", fallback, onError }: RemoteImageProps) {
   const [failed, setFailed] = useState(false);
 
   if (!src || failed) return <>{fallback}</>;
+  const imageSrc = src.startsWith("/") ? src : `/api/image?url=${encodeURIComponent(src)}`;
 
   return (
     <img
-      src={`/api/image?url=${encodeURIComponent(src)}`}
+      src={imageSrc}
       alt={alt}
       className={className}
       loading="lazy"
-      onError={() => setFailed(true)}
+      onError={() => {
+        setFailed(true);
+        onError?.();
+      }}
     />
   );
 }
