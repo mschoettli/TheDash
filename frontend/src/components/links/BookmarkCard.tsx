@@ -16,7 +16,6 @@ interface BookmarkCardProps {
   selected?: boolean;
   selectable?: boolean;
   onSelect?: (checked: boolean) => void;
-  onOpen?: (link: Link) => void;
 }
 
 function getHost(url: string): string {
@@ -33,12 +32,20 @@ function metaLabel(link: Link, collectionTitle?: string): string {
 
 function MoreActions({
   open,
+  selectable,
+  selected,
+  compact = false,
   onToggle,
+  onSelect,
   onEdit,
   onDelete,
 }: {
   open: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  compact?: boolean;
   onToggle: (event: React.MouseEvent) => void;
+  onSelect?: (checked: boolean) => void;
   onEdit: (event: React.MouseEvent) => void;
   onDelete: (event: React.MouseEvent) => void;
 }) {
@@ -47,6 +54,20 @@ function MoreActions({
     <div className="relative flex items-center">
       {open && (
         <div className="absolute right-10 z-20 flex items-center gap-1 rounded-full border border-line/60 bg-surface/95 p-1 shadow-lg backdrop-blur">
+          {selectable && (
+            <label
+              className="flex h-8 w-8 items-center justify-center rounded-full text-t2 transition-colors hover:bg-line/40 hover:text-accent"
+              title={t("bookmarks.selected", "selected")}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <input
+                type="checkbox"
+                checked={Boolean(selected)}
+                onChange={(event) => onSelect?.(event.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+            </label>
+          )}
           <button
             type="button"
             onClick={onEdit}
@@ -68,10 +89,10 @@ function MoreActions({
       <button
         type="button"
         onClick={onToggle}
-        className="flex h-9 w-9 items-center justify-center rounded-full border border-line/60 bg-surface/90 text-t2 shadow-sm backdrop-blur transition-colors hover:border-accent/40 hover:text-accent"
+        className={`${compact ? "h-7 w-7" : "h-9 w-9"} flex items-center justify-center rounded-full border border-line/50 bg-surface/75 text-t3 shadow-sm backdrop-blur transition-colors hover:border-accent/35 hover:bg-surface/95 hover:text-accent`}
         title={t("link.actions")}
       >
-        <MoreHorizontal size={16} />
+        <MoreHorizontal size={compact ? 13 : 16} />
       </button>
     </div>
   );
@@ -86,7 +107,6 @@ export default function BookmarkCard({
   selected = false,
   selectable = false,
   onSelect,
-  onOpen,
 }: BookmarkCardProps) {
   const { t } = useTranslation();
   const [editOpen, setEditOpen] = useState(false);
@@ -124,24 +144,19 @@ export default function BookmarkCard({
     setActionsOpen((value) => !value);
   };
 
+  const openLink = () => {
+    window.open(link.url, "_blank", "noopener,noreferrer");
+  };
+
   if (variant === "list") {
     return (
       <>
         <div
-          onClick={() => onOpen?.(link)}
+          onClick={openLink}
           className={`group flex items-center gap-3 rounded-2xl border border-line/50 bg-card px-3 py-2.5 transition-all hover:border-accent/30 hover:shadow-sm ${
             isDragging ? "opacity-40 shadow-xl" : ""
-          } ${link.is_archived ? "opacity-60" : ""} ${onOpen ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-accent/40" : ""}`}
+          } ${link.is_archived ? "opacity-60" : ""} cursor-pointer ${selected ? "ring-2 ring-accent/40" : ""}`}
         >
-          {selectable && (
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={(event) => onSelect?.(event.target.checked)}
-              onClick={(event) => event.stopPropagation()}
-              className="shrink-0"
-            />
-          )}
           {dragHandle && <div className="shrink-0 cursor-grab text-t3 hover:text-accent">{dragHandle}</div>}
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line/50 bg-surface">
             <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={22} />
@@ -170,7 +185,15 @@ export default function BookmarkCard({
           >
             {link.is_read ? <Eye size={14} /> : <EyeOff size={14} />}
           </button>
-          <MoreActions open={actionsOpen} onToggle={toggleActions} onEdit={openEdit} onDelete={openDelete} />
+          <MoreActions
+            open={actionsOpen}
+            selectable={selectable}
+            selected={selected}
+            onSelect={onSelect}
+            onToggle={toggleActions}
+            onEdit={openEdit}
+            onDelete={openDelete}
+          />
         </div>
         <LinkEditModal open={editOpen} onClose={() => setEditOpen(false)} link={link} />
         <ConfirmDialog
@@ -188,21 +211,12 @@ export default function BookmarkCard({
   return (
     <>
       <article
-        onClick={() => onOpen?.(link)}
+        onClick={openLink}
         className={`group relative overflow-hidden rounded-2xl border border-line/50 bg-card transition-all hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5 ${
           isDragging ? "opacity-40 shadow-xl" : ""
-        } ${link.is_archived ? "opacity-60" : ""} ${onOpen ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-accent/40" : ""}`}
+        } ${link.is_archived ? "opacity-60" : ""} cursor-pointer ${selected ? "ring-2 ring-accent/40" : ""}`}
       >
         <div className="relative">
-          {selectable && (
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={(event) => onSelect?.(event.target.checked)}
-              onClick={(event) => event.stopPropagation()}
-              className="absolute left-3 top-3 z-20 rounded border-line bg-surface/90 shadow-sm"
-            />
-          )}
           {dragHandle && (
             <div className="absolute left-3 top-12 z-20 cursor-grab rounded-lg bg-surface/85 p-1 text-t3 opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-80 hover:!opacity-100">
               {dragHandle}
@@ -236,7 +250,7 @@ export default function BookmarkCard({
         </div>
 
         <div className="space-y-3 p-4">
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 pb-6">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line/50 bg-surface">
               <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={24} />
             </div>
@@ -246,7 +260,19 @@ export default function BookmarkCard({
                 <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-t2">{link.description}</p>
               )}
             </div>
-            <MoreActions open={actionsOpen} onToggle={toggleActions} onEdit={openEdit} onDelete={openDelete} />
+          </div>
+
+          <div className="absolute bottom-3 right-3">
+            <MoreActions
+              open={actionsOpen}
+              selectable={selectable}
+              selected={selected}
+              compact
+              onSelect={onSelect}
+              onToggle={toggleActions}
+              onEdit={openEdit}
+              onDelete={openDelete}
+            />
           </div>
 
           {visibleTags.length > 0 && (

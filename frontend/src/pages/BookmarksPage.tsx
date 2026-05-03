@@ -46,7 +46,6 @@ import { Section, SectionsData, useCreateSection, useDeleteSection, useSections,
 import { checkLink, Link, suggestAutoTags, useBulkLinks, useReorderLinks } from "../hooks/useLinks";
 import { useTags } from "../hooks/useTags";
 import BookmarkCard from "../components/links/BookmarkCard";
-import BookmarkPreviewDrawer from "../components/links/BookmarkPreviewDrawer";
 import LinkEditModal from "../components/links/LinkEditModal";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 
@@ -226,7 +225,7 @@ function SortableSidebarSection({
 // ─── Sortable Bookmark ─────────────────────────────────────────────────────────
 
 function SortableBookmark({
-  link, view, collectionTitle, selected, selectable, onSelect, onOpen,
+  link, view, collectionTitle, selected, selectable, onSelect,
 }: {
   link: Link;
   view: ViewMode;
@@ -234,7 +233,6 @@ function SortableBookmark({
   selected: boolean;
   selectable: boolean;
   onSelect: (checked: boolean) => void;
-  onOpen: (link: Link) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `link:${link.id}`,
@@ -264,7 +262,6 @@ function SortableBookmark({
         selected={selected}
         selectable={selectable}
         onSelect={onSelect}
-        onOpen={onOpen}
       />
     </div>
   );
@@ -308,7 +305,7 @@ export default function BookmarksPage() {
   const [captureChecking, setCaptureChecking] = useState(false);
   const [captureDraft, setCaptureDraft] = useState<Partial<Link> | null>(null);
   const [linkDraft, setLinkDraft] = useState<Partial<Link> | null>(null);
-  const [previewLink, setPreviewLink] = useState<Link | null>(null);
+  const [editingLink, setEditingLink] = useState<Link | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkTagInput, setBulkTagInput] = useState("");
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -384,7 +381,7 @@ export default function BookmarksPage() {
     try {
       const result = await checkLink(url);
       if (result.exists && result.bookmark) {
-        setPreviewLink(result.bookmark);
+        setEditingLink(result.bookmark);
         setCaptureError(t("bookmarks.duplicate_found", "Dieses Lesezeichen existiert bereits."));
         return;
       }
@@ -968,7 +965,6 @@ export default function BookmarksPage() {
                       selected={selectedIds.has(link.id)}
                       selectable
                       onSelect={(checked) => toggleSelection(link.id, checked)}
-                      onOpen={setPreviewLink}
                     />
                   ))}
                 </div>
@@ -985,7 +981,6 @@ export default function BookmarksPage() {
                     selected={selectedIds.has(link.id)}
                     selectable
                     onSelect={(checked) => toggleSelection(link.id, checked)}
-                    onOpen={setPreviewLink}
                   />
                 ))}
               </div>
@@ -1016,7 +1011,11 @@ export default function BookmarksPage() {
         initial={linkDraft ?? undefined}
         defaultSectionId={linkDraft?.section_id ?? defaultSectionId}
       />
-      <BookmarkPreviewDrawer link={previewLink} onClose={() => setPreviewLink(null)} />
+      <LinkEditModal
+        open={Boolean(editingLink)}
+        onClose={() => setEditingLink(null)}
+        link={editingLink ?? undefined}
+      />
       <ConfirmDialog
         open={bulkDeleteOpen}
         title={t("link.delete_title")}

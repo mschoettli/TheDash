@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { ExternalLink } from "lucide-react";
 import Modal from "../ui/Modal";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import { fetchTagSuggestions, useCreateLink, useUpdateLink, useDeleteLink, Link, suggestAutoTags } from "../../hooks/useLinks";
 import { useSections, useCreateSection, SectionsData } from "../../hooks/useSections";
+import BookmarkPreviewImage from "./BookmarkPreviewImage";
 
 const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
 const selectCls = `${input} appearance-none`;
@@ -34,6 +36,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
   const [name, setName] = useState(link?.name ?? initial?.name ?? "");
   const [url, setUrl] = useState(link?.url ?? initial?.url ?? "");
   const [description, setDescription] = useState(link?.description ?? initial?.description ?? "");
+  const [note, setNote] = useState(link?.note ?? initial?.note ?? "");
   const [iconUrl, setIconUrl] = useState(link?.icon_url ?? initial?.icon_url ?? "");
   const [imageUrl, setImageUrl] = useState(link?.image_url ?? initial?.image_url ?? "");
   const [tagInput, setTagInput] = useState(link?.tags.map((tag) => tag.name).join(", ") ?? "");
@@ -54,6 +57,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
       setName(link?.name ?? initial?.name ?? "");
       setUrl(link?.url ?? initial?.url ?? "");
       setDescription(link?.description ?? initial?.description ?? "");
+      setNote(link?.note ?? initial?.note ?? "");
       setIconUrl(link?.icon_url ?? initial?.icon_url ?? "");
       setImageUrl(link?.image_url ?? initial?.image_url ?? "");
       setTagInput(link?.tags.map((tag) => tag.name).join(", ") ?? initial?.tags?.map((tag) => tag.name).join(", ") ?? "");
@@ -97,6 +101,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
       name,
       url,
       description: description || null,
+      note: note || null,
       icon_url: iconUrl || null,
       image_url: imageUrl || null,
       tags,
@@ -140,12 +145,31 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
   return (
     <Modal open={open} onClose={onClose} title={isEdit ? t("link.edit_title") : t("link.add_title")}>
       <div className="space-y-4">
+        {link && (
+          <div className="overflow-hidden rounded-xl border border-line/60 bg-card">
+            <BookmarkPreviewImage link={link} variant="drawer" showRefresh />
+          </div>
+        )}
+
         <Field label={`${t("link.name")} *`}>
           <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Mein Link" />
         </Field>
 
         <Field label={`${t("link.url")} *`}>
-          <input className={input} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://server:8080" />
+          <div className="flex gap-2">
+            <input className={input} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://server:8080" />
+            {url && (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-[12px] font-medium text-t2 hover:border-accent/40 hover:text-accent"
+              >
+                <ExternalLink size={13} />
+                {t("link.open")}
+              </a>
+            )}
+          </div>
         </Field>
 
         <Field label={t("link.icon")}>
@@ -154,6 +178,10 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
 
         <Field label={t("link.description")}>
           <textarea className={`${input} resize-none`} rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("link.description_placeholder")} />
+        </Field>
+
+        <Field label={t("link.note")}>
+          <textarea className={`${input} resize-none`} rows={5} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Private notes for this bookmark..." />
         </Field>
 
         <Field label={t("link.preview_image")}>
