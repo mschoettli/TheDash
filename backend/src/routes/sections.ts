@@ -5,6 +5,15 @@ import { attachTags } from "./links";
 const router = Router();
 
 router.get("/", (_req, res) => {
+  db.prepare(
+    `UPDATE links
+     SET screenshot_status = 'failed',
+         screenshot_updated_at = datetime('now'),
+         updated_at = datetime('now')
+     WHERE screenshot_status = 'pending'
+       AND COALESCE(screenshot_updated_at, updated_at, created_at) < datetime('now', '-2 minutes')`
+  ).run();
+
   const sections = db
     .prepare("SELECT * FROM sections ORDER BY sort_order ASC, id ASC")
     .all() as Array<{ id: number; title: string; description: string | null; color: string | null; icon: string | null; sort_order: number }>;

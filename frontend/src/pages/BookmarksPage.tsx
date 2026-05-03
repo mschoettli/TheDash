@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
@@ -284,7 +284,7 @@ function DragPreview({ link }: { link: Link }) {
 
 export default function BookmarksPage() {
   const { t } = useTranslation();
-  const { data: sectionsData, isLoading } = useSections();
+  const { data: sectionsData, isLoading, refetch: refetchSections } = useSections();
   const sections = (sectionsData as SectionsData | undefined)?.sections;
   const unsectionedLinks = (sectionsData as SectionsData | undefined)?.unsectionedLinks ?? [];
   const { data: allTags } = useTags();
@@ -330,6 +330,10 @@ export default function BookmarksPage() {
     () => [...displaySections.flatMap((s) => s.links), ...unsectionedLinks],
     [displaySections, unsectionedLinks]
   );
+  const hasPendingPreviews = useMemo(
+    () => allLinks.some((link) => link.screenshot_status === "pending"),
+    [allLinks]
+  );
   const favoriteLinks = useMemo(() => allLinks.filter((l) => l.is_favorite && !l.is_archived), [allLinks]);
   const archiveLinks = useMemo(() => allLinks.filter((l) => l.is_archived), [allLinks]);
   const unreadLinks = useMemo(() => allLinks.filter((l) => !l.is_read && !l.is_archived), [allLinks]);
@@ -348,6 +352,14 @@ export default function BookmarksPage() {
     [allTags]
   );
   const defaultSectionId = displaySections[0]?.id ?? null;
+
+  useEffect(() => {
+    if (!hasPendingPreviews) return;
+    const interval = window.setInterval(() => {
+      refetchSections();
+    }, 2500);
+    return () => window.clearInterval(interval);
+  }, [hasPendingPreviews, refetchSections]);
   const sectionTitleById = useMemo(() => new Map(displaySections.map((s) => [s.id, s.title])), [displaySections]);
 
   const visibleLinks = useMemo(() => {
