@@ -5,7 +5,6 @@ import {
   Bookmark,
   CheckSquare,
   GripVertical,
-  Inbox,
   LayoutGrid,
   List,
   Plus,
@@ -51,7 +50,7 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ActiveSection = "inbox" | "all" | "favorites" | "archive" | "unsectioned" | "untagged" | "recent" | "metadata_failed" | number;
+type ActiveSection = "all" | "favorites" | "archive" | "unsectioned" | "untagged" | "recent" | "metadata_failed" | number;
 type ViewMode = "grid" | "list";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -285,10 +284,11 @@ export default function BookmarksPage() {
   const bulkLinks = useBulkLinks();
 
   // ─ UI state ─────────────────────────────────────────────────────────────────
-  const [activeSection, setActiveSection] = useState<ActiveSection>("inbox");
+  const [activeSection, setActiveSection] = useState<ActiveSection>("all");
   const [view, setView] = useState<ViewMode>("grid");
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [tagsOpen, setTagsOpen] = useState(false);
   const [captureUrl, setCaptureUrl] = useState("");
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [captureChecking, setCaptureChecking] = useState(false);
@@ -321,7 +321,6 @@ export default function BookmarksPage() {
   );
   const favoriteLinks = useMemo(() => allLinks.filter((l) => l.is_favorite && !l.is_archived), [allLinks]);
   const archiveLinks = useMemo(() => allLinks.filter((l) => l.is_archived), [allLinks]);
-  const inboxLinks = useMemo(() => unsectionedLinks.filter((l) => !l.is_archived), [unsectionedLinks]);
   const untaggedLinks = useMemo(() => allLinks.filter((l) => !l.is_archived && l.tags.length === 0), [allLinks]);
   const recentLinks = useMemo(
     () => [...allLinks].filter((l) => !l.is_archived).sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))).slice(0, 30),
@@ -331,13 +330,16 @@ export default function BookmarksPage() {
     () => allLinks.filter((l) => !l.is_archived && !l.description && !l.image_url && !l.screenshot_url && !l.icon_url),
     [allLinks]
   );
+  const topTags = useMemo(
+    () => [...(allTags ?? [])].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 5),
+    [allTags]
+  );
   const defaultSectionId = displaySections[0]?.id ?? null;
   const sectionTitleById = useMemo(() => new Map(displaySections.map((s) => [s.id, s.title])), [displaySections]);
 
   const visibleLinks = useMemo(() => {
     let base: Link[];
-    if (activeSection === "inbox") base = inboxLinks;
-    else if (activeSection === "all") base = allLinks.filter((l) => !l.is_archived);
+    if (activeSection === "all") base = allLinks.filter((l) => !l.is_archived);
     else if (activeSection === "favorites") base = favoriteLinks;
     else if (activeSection === "archive") base = archiveLinks;
     else if (activeSection === "unsectioned") base = unsectionedLinks.filter((l) => !l.is_archived);
@@ -349,7 +351,7 @@ export default function BookmarksPage() {
       const tagMatch = activeTag ? l.tags.some((t) => t.name === activeTag) : true;
       return tagMatch && matchesSearch(l, query, l.section_id ? sectionTitleById.get(l.section_id) ?? "" : "");
     });
-  }, [activeSection, activeTag, allLinks, archiveLinks, displaySections, favoriteLinks, inboxLinks, metadataFailedLinks, query, recentLinks, sectionTitleById, unsectionedLinks, untaggedLinks]);
+  }, [activeSection, activeTag, allLinks, archiveLinks, displaySections, favoriteLinks, metadataFailedLinks, query, recentLinks, sectionTitleById, unsectionedLinks, untaggedLinks]);
 
   // ─ Active drag item ─────────────────────────────────────────────────────────
   const activeLinkId = activeId?.startsWith("link:") ? Number(activeId.split(":")[1]) : null;
@@ -592,66 +594,9 @@ export default function BookmarksPage() {
               <h1 className="text-lg font-semibold text-t1">{t("bookmarks.title")}</h1>
             </div>
 
-            {/* Smart views */}
-            <div className="label-xs mb-2 px-3">{t("bookmarks.smart_views", "Smart Views")}</div>
-            {[
-              {
-                id: "inbox" as const, icon: <Inbox size={14} />, label: t("bookmarks.inbox", "Inbox"),
-                count: inboxLinks.length,
-              },
-              {
-                id: "all" as const, icon: <Bookmark size={14} />, label: t("bookmarks.view_all", "All"),
-                count: allLinks.filter((l) => !l.is_archived).length,
-              },
-              {
-                id: "favorites" as const, icon: <Star size={14} />, label: t("link.favorite"),
-                count: favoriteLinks.length,
-              },
-              {
-                id: "archive" as const, icon: <Archive size={14} />, label: t("link.archive"),
-                count: archiveLinks.length,
-              },
-              {
-                id: "untagged" as const, icon: <Tags size={14} />, label: t("bookmarks.untagged", "Nicht getaggt"),
-                count: untaggedLinks.length,
-              },
-              {
-                id: "recent" as const, icon: <Sparkles size={14} />, label: t("bookmarks.recent", "Zuletzt hinzugefügt"),
-                count: recentLinks.length,
-              },
-              {
-                id: "metadata_failed" as const, icon: <X size={14} />, label: t("bookmarks.metadata_failed", "Metadaten fehlen"),
-                count: metadataFailedLinks.length,
-              },
-            ].map(({ id, icon, label, count }) => (
-              <button
-                key={id}
-                onClick={() => setActiveSection(id)}
-                className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-all ${
-                  activeSection === id
-                    ? "bg-accent/15 font-semibold text-accent"
-                    : "text-t2 hover:bg-line/20 hover:text-t1"
-                }`}
-              >
-                <span className={activeSection === id ? "text-accent" : "text-t3"}>{icon}</span>
-                <span className="flex-1 text-left">{label}</span>
-                <span className={`text-[11px] ${activeSection === id ? "text-accent/70" : "text-t3"}`}>{count}</span>
-              </button>
-            ))}
-
-            {/* Unsectioned */}
-            {unsectionedLinks.length > 0 && (
-              <UnsectionedSidebarItem
-                count={unsectionedLinks.filter((l) => !l.is_archived).length}
-                isActive={activeSection === "unsectioned"}
-                isDropOver={dropOverUnsectioned}
-                onSelect={() => setActiveSection("unsectioned")}
-              />
-            )}
-
             {/* User collections */}
             {displaySections.length > 0 && (
-              <div className="label-xs mb-2 mt-4 px-3">{t("bookmarks.collections", "Collections")}</div>
+              <div className="label-xs mb-2 px-3">{t("bookmarks.collections", "Collections")}</div>
             )}
             <SortableContext
               items={displaySections.map((s) => `section:${s.id}`)}
@@ -705,26 +650,91 @@ export default function BookmarksPage() {
               </button>
             )}
 
+            {/* Smart views */}
+            <div className="label-xs mb-2 mt-4 px-3">{t("bookmarks.smart_views", "Smart Views")}</div>
+            {[
+              {
+                id: "all" as const, icon: <Bookmark size={14} />, label: t("bookmarks.view_all", "All"),
+                count: allLinks.filter((l) => !l.is_archived).length,
+              },
+              {
+                id: "favorites" as const, icon: <Star size={14} />, label: t("link.favorite"),
+                count: favoriteLinks.length,
+              },
+              {
+                id: "archive" as const, icon: <Archive size={14} />, label: t("link.archive"),
+                count: archiveLinks.length,
+              },
+              {
+                id: "untagged" as const, icon: <Tags size={14} />, label: t("bookmarks.untagged", "Nicht getaggt"),
+                count: untaggedLinks.length,
+              },
+              {
+                id: "recent" as const, icon: <Sparkles size={14} />, label: t("bookmarks.recent", "Zuletzt hinzugefügt"),
+                count: recentLinks.length,
+              },
+              {
+                id: "metadata_failed" as const, icon: <X size={14} />, label: t("bookmarks.metadata_failed", "Metadaten fehlen"),
+                count: metadataFailedLinks.length,
+              },
+            ].map(({ id, icon, label, count }) => (
+              <button
+                key={id}
+                onClick={() => setActiveSection(id)}
+                className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-all ${
+                  activeSection === id
+                    ? "bg-accent/15 font-semibold text-accent"
+                    : "text-t2 hover:bg-line/20 hover:text-t1"
+                }`}
+              >
+                <span className={activeSection === id ? "text-accent" : "text-t3"}>{icon}</span>
+                <span className="flex-1 text-left">{label}</span>
+                <span className={`text-[11px] ${activeSection === id ? "text-accent/70" : "text-t3"}`}>{count}</span>
+              </button>
+            ))}
+
+            {/* Unsectioned */}
+            {unsectionedLinks.length > 0 && (
+              <UnsectionedSidebarItem
+                count={unsectionedLinks.filter((l) => !l.is_archived).length}
+                isActive={activeSection === "unsectioned"}
+                isDropOver={dropOverUnsectioned}
+                onSelect={() => setActiveSection("unsectioned")}
+              />
+            )}
+
             {allTags && allTags.length > 0 && (
               <>
-                <div className="label-xs mb-2 mt-4 px-3">{t("link.tags")}</div>
-                <div className="max-h-56 space-y-0.5 overflow-y-auto pr-1">
-                  {allTags.slice(0, 24).map((tag) => (
-                    <button
-                      key={tag.id}
-                      onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
-                      className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-[12px] transition-all ${
-                        activeTag === tag.name
-                          ? "bg-accent/15 font-semibold text-accent"
-                          : "text-t2 hover:bg-line/20 hover:text-t1"
-                      }`}
-                    >
-                      <Tags size={12} className={activeTag === tag.name ? "text-accent" : "text-t3"} />
-                      <span className="min-w-0 flex-1 truncate text-left">{tag.name}</span>
-                      <span className="text-[10px] text-t3">{tag.count}</span>
-                    </button>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setTagsOpen((value) => !value)}
+                  className="mt-4 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-t3 transition-colors hover:bg-line/20 hover:text-t1"
+                >
+                  <Tags size={13} />
+                  <span className="flex-1 text-left">{t("link.tags")}</span>
+                  <span className="rounded-full border border-line/50 px-2 py-0.5 text-[10px] normal-case tracking-normal">
+                    {activeTag ? activeTag : allTags.length}
+                  </span>
+                </button>
+                {tagsOpen && (
+                  <div className="mt-1 max-h-56 space-y-0.5 overflow-y-auto pr-1">
+                    {allTags.slice(0, 24).map((tag) => (
+                      <button
+                        key={tag.id}
+                        onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
+                        className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-[12px] transition-all ${
+                          activeTag === tag.name
+                            ? "bg-accent/15 font-semibold text-accent"
+                            : "text-t2 hover:bg-line/20 hover:text-t1"
+                        }`}
+                      >
+                        <Tags size={12} className={activeTag === tag.name ? "text-accent" : "text-t3"} />
+                        <span className="min-w-0 flex-1 truncate text-left">{tag.name}</span>
+                        <span className="text-[10px] text-t3">{tag.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -820,12 +830,12 @@ export default function BookmarksPage() {
                 defaultValue=""
                 onChange={(e) => {
                   if (!e.target.value) return;
-                  runBulk("move", { section_id: e.target.value === "inbox" ? null : Number(e.target.value) });
+                  runBulk("move", { section_id: e.target.value === "unsectioned" ? null : Number(e.target.value) });
                   e.currentTarget.value = "";
                 }}
               >
                 <option value="">{t("bookmarks.move_to", "Verschieben nach...")}</option>
-                <option value="inbox">{t("bookmarks.inbox", "Inbox")}</option>
+                <option value="unsectioned">{t("bookmarks.unsectioned", "Unsortiert")}</option>
                 {displaySections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
               </select>
               <input
@@ -866,7 +876,7 @@ export default function BookmarksPage() {
               >
                 {t("bookmarks.all_tags")} <span className="opacity-60">{visibleLinks.length}</span>
               </button>
-              {allTags.map((tag) => (
+              {topTags.map((tag) => (
                 <button
                   key={tag.id}
                   onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}

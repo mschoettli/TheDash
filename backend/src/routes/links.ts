@@ -415,7 +415,7 @@ router.put("/:id", (req, res) => {
            is_favorite=?, is_archived=?, sort_order=?, updated_at=datetime('now')
        WHERE id=?`
     ).run(
-      section_id ?? existing.section_id,
+      section_id !== undefined ? section_id : existing.section_id,
       name ?? existing.name,
       url !== undefined ? normalizeUrl(url) : existing.url,
       icon_url !== undefined ? icon_url : existing.icon_url,

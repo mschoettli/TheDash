@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, Bookmark, FileText, Settings } from "lucide-react";
+import { LayoutDashboard, Bookmark, FileText, Settings, Clock3 } from "lucide-react";
 import { useMetricsStore } from "../../store/useMetricsStore";
 import MetricBar from "../metrics/MetricBar";
 import SettingsModal from "../settings/SettingsModal";
@@ -85,15 +85,17 @@ export default function Header() {
           </div>
 
           {/* Datetime */}
-          <div className="hidden sm:flex items-center gap-2 text-[13px] text-t2 shrink-0 tabular-nums border-l border-line/50 pl-4">
-            <span>
+          <div className="time-pill hidden sm:flex">
+            <Clock3 size={13} className="time-pill__icon" />
+            <span className="time-pill__date">
               {now.toLocaleDateString(undefined, {
                 weekday: "short",
                 day: "numeric",
                 month: "short",
               })}
             </span>
-            <span className="font-mono text-t3">
+            <span className="time-pill__divider" />
+            <span className="time-pill__time">
               {now.toLocaleTimeString(undefined, {
                 hour: "2-digit",
                 minute: "2-digit",

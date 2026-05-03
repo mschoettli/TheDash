@@ -1,4 +1,4 @@
-import { Archive, ExternalLink, GripVertical, Pencil, Star, Trash2 } from "lucide-react";
+import { Archive, ExternalLink, Pencil, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useDeleteLink, useUpdateLink } from "../../hooks/useLinks";
@@ -145,6 +145,38 @@ export default function BookmarkCard({ link, dragHandle, isDragging, variant = "
         <BookmarkPreviewImage link={link} />
 
         <div className="space-y-2 p-3">
+          <div className="pointer-events-none absolute right-2 top-[6.5rem] z-10 flex items-center gap-0.5 rounded-lg border border-line/50 bg-surface/90 p-1 opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+            <a
+              href={link.url} target="_blank" rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-md p-1.5 text-t3 transition-colors hover:bg-accent hover:text-bg"
+              title={t("link.open")}
+            >
+              <ExternalLink size={13} />
+            </a>
+            <button
+              onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}
+              className="rounded-md p-1.5 text-t3 transition-colors hover:bg-line/30 hover:text-t1"
+              title={t("link.edit")}
+            >
+              <Pencil size={13} />
+            </button>
+            <button
+              onClick={toggleFavorite}
+              className={`rounded-md p-1.5 transition-colors hover:bg-line/30 ${link.is_favorite ? "text-amber-400" : "text-t3 hover:text-amber-400"}`}
+              title={t("link.favorite")}
+            >
+              <Star size={13} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setDeleteOpen(true); }}
+              className="rounded-md p-1.5 text-t3 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+              title={t("link.delete")}
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+
           <div className="flex items-start gap-2.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line/50 bg-surface">
               <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={20} />
@@ -171,39 +203,6 @@ export default function BookmarkCard({ link, dragHandle, isDragging, variant = "
           {link.description && (
             <p className="mt-0.5 line-clamp-1 text-[11px] leading-4 text-t3">{link.description}</p>
           )}
-
-          {/* Hover actions */}
-          <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-            <a
-              href={link.url} target="_blank" rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-lg p-1.5 text-t3 transition-colors hover:bg-accent hover:text-bg"
-              title={t("link.open")}
-            >
-              <ExternalLink size={13} />
-            </a>
-            <button
-              onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}
-              className="rounded-lg p-1.5 text-t3 transition-colors hover:bg-line/30 hover:text-t1"
-              title={t("link.edit")}
-            >
-              <Pencil size={13} />
-            </button>
-            <button
-              onClick={toggleFavorite}
-              className={`rounded-lg p-1.5 transition-colors hover:bg-line/30 ${link.is_favorite ? "text-amber-400" : "text-t3 hover:text-amber-400"}`}
-              title={t("link.favorite")}
-            >
-              <Star size={13} />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setDeleteOpen(true); }}
-              className="rounded-lg p-1.5 text-t3 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
-              title={t("link.delete")}
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
         </div>
       </article>
 

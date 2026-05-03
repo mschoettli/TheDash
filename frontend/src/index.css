@@ -307,3 +307,75 @@ body {
   text-transform: uppercase;
   color: rgb(var(--t2));
 }
+
+/* ─── Header time pill ───────────────────────────────────────────────────────── */
+.time-pill {
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2rem;
+  padding: 0.32rem 0.65rem;
+  border: 1px solid rgb(var(--line) / 0.58);
+  border-radius: 9999px;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.78), rgb(255 255 255 / 0.46)),
+    rgb(var(--surface) / 0.62);
+  color: rgb(var(--t2));
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.08), inset 0 1px 0 rgb(255 255 255 / 0.64);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.time-pill__icon {
+  color: rgb(var(--accent));
+  opacity: 0.88;
+}
+
+.time-pill__date {
+  white-space: nowrap;
+}
+
+.time-pill__divider {
+  height: 0.85rem;
+  width: 1px;
+  background: rgb(var(--line) / 0.78);
+}
+
+.time-pill__time {
+  color: rgb(var(--t1));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+}
+
+.dark .time-pill {
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.025)),
+    rgb(var(--surface) / 0.96);
+  border-color: rgb(var(--line) / 0.46);
+  box-shadow: 0 12px 30px rgb(2 6 23 / 0.30), inset 0 1px 0 rgb(255 255 255 / 0.06);
+  backdrop-filter: none;
+}
+
+.dark .time-pill__divider {
+  background: rgb(var(--line) / 0.56);
+}
+
+:root[data-theme-preset="dashy"] .time-pill {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0.055)),
+    rgb(var(--surface) / 0.42);
+  border-color: rgb(255 255 255 / 0.16);
+  box-shadow:
+    0 14px 34px rgb(2 8 23 / 0.34),
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 0 0 1px rgb(var(--accent) / 0.06);
+  backdrop-filter: blur(18px) saturate(150%);
+}
+
+:root[data-theme-preset="dashy"] .time-pill__divider {
+  background: rgb(255 255 255 / 0.18);
+}
