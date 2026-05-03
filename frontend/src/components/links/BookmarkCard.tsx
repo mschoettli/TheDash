@@ -115,7 +115,7 @@ export default function BookmarkCard({
   const updateLink = useUpdateLink();
   const deleteLink = useDeleteLink();
   const host = getHost(link.url);
-  const visibleTags = link.tags.slice(0, 5);
+  const visibleTags = link.tags.slice(0, 3);
 
   const toggleFavorite = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -212,7 +212,7 @@ export default function BookmarkCard({
     <>
       <article
         onClick={openLink}
-        className={`group relative overflow-hidden rounded-2xl border border-line/50 bg-card transition-all hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5 ${
+        className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line/50 bg-card transition-all hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5 ${
           isDragging ? "opacity-40 shadow-xl" : ""
         } ${link.is_archived ? "opacity-60" : ""} cursor-pointer ${selected ? "ring-2 ring-accent/40" : ""}`}
       >
@@ -249,8 +249,8 @@ export default function BookmarkCard({
           </div>
         </div>
 
-        <div className="space-y-2 p-4">
-          <div className="flex items-start gap-3 pb-6">
+        <div className="relative flex min-h-[9.25rem] flex-1 flex-col p-4">
+          <div className="flex items-start gap-3 pb-4">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line/50 bg-surface">
               <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={24} />
             </div>
@@ -276,9 +276,9 @@ export default function BookmarkCard({
           </div>
 
           {visibleTags.length > 0 && (
-            <div className="mr-9 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
+            <div className="mr-9 mt-auto flex min-w-0 items-center gap-1.5 whitespace-nowrap">
               {visibleTags.map((tag) => (
-                <span key={tag.id} className="shrink-0 rounded-full bg-accent/10 px-2 py-1 text-[10px] font-semibold text-accent/90 leading-none">
+                <span key={tag.id} className="max-w-[7.5rem] shrink rounded-full bg-accent/10 px-2 py-1 text-[10px] font-semibold text-accent/90 leading-none truncate">
                   {tag.name}
                 </span>
               ))}
