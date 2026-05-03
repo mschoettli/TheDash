@@ -39,9 +39,12 @@ export default function Header() {
         <div className="h-14 px-4 md:px-6 flex items-center gap-5">
 
           {/* Logo */}
-          <span className="text-[15px] font-bold tracking-tight text-t1 shrink-0">
-            The<span className="text-accent">Dash</span>
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <img src="/favicon.svg" alt="TheDash" className="w-6 h-6" />
+            <span className="text-[15px] font-bold tracking-tight text-t1">
+              The<span className="text-accent">Dash</span>
+            </span>
+          </div>
 
           {/* Nav */}
           <nav className="hidden md:flex items-center gap-0.5">
