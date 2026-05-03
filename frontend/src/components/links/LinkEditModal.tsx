@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { ExternalLink } from "lucide-react";
+import { Check, ChevronDown, ExternalLink } from "lucide-react";
 import Modal from "../ui/Modal";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import { fetchTagSuggestions, useCreateLink, useUpdateLink, useDeleteLink, Link, suggestAutoTags } from "../../hooks/useLinks";
@@ -8,7 +8,6 @@ import { useSections, useCreateSection, SectionsData } from "../../hooks/useSect
 import BookmarkPreviewImage from "./BookmarkPreviewImage";
 
 const input = "w-full rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t1 outline-none focus:border-accent/50 placeholder:text-t3";
-const selectCls = `${input} appearance-none`;
 
 interface Props {
   open: boolean;
@@ -25,6 +24,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </div>
   );
+}
+
+function sectionValueLabel(
+  value: number | null | "new",
+  sections: SectionsData["sections"] | undefined,
+  t: ReturnType<typeof useTranslation>["t"]
+) {
+  if (value === null) return t("link.no_section", "Keine Sektion");
+  if (value === "new") return t("link.new_section");
+  return sections?.find((section) => section.id === value)?.title ?? t("link.no_section", "Keine Sektion");
 }
 
 export default function LinkEditModal({ open, onClose, link, initial, defaultSectionId }: Props) {
@@ -50,6 +59,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
     link !== undefined ? (link.section_id ?? null) : (initial?.section_id ?? defaultSectionId ?? null)
   );
   const [newSectionTitle, setNewSectionTitle] = useState("");
+  const [sectionMenuOpen, setSectionMenuOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
@@ -73,6 +83,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
           : (initial?.section_id ?? defaultSectionId ?? null)
       );
       setNewSectionTitle("");
+      setSectionMenuOpen(false);
       setDeleteOpen(false);
     }
   }, [open, link, initial, defaultSectionId, sections]);
@@ -201,20 +212,45 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
         </Field>
 
         <Field label={t("link.section")}>
-          <select
-            className={selectCls}
-            value={sectionId === null ? "none" : sectionId === "new" ? "new" : String(sectionId)}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === "none") setSectionId(null);
-              else if (v === "new") setSectionId("new");
-              else setSectionId(Number(v));
-            }}
-          >
-            <option value="none">{t("link.no_section", "Keine Sektion")}</option>
-            {sections?.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
-            <option value="new">{t("link.new_section")}</option>
-          </select>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setSectionMenuOpen((value) => !value)}
+              className="flex w-full items-center justify-between rounded-lg border border-line/60 bg-card px-3 py-2 text-left text-[13px] text-t1 outline-none transition-colors hover:border-accent/40 focus:border-accent/50"
+            >
+              <span className="truncate">{sectionValueLabel(sectionId, sections, t)}</span>
+              <ChevronDown size={15} className={`shrink-0 text-t3 transition-transform ${sectionMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+            {sectionMenuOpen && (
+              <div className="absolute z-[80] mt-1 max-h-56 w-full overflow-auto rounded-xl border border-line/70 bg-surface p-1 shadow-xl shadow-black/20">
+                {[
+                  { value: null, label: t("link.no_section", "Keine Sektion") },
+                  ...(sections ?? []).map((section) => ({ value: section.id, label: section.title })),
+                  { value: "new" as const, label: t("link.new_section") },
+                ].map((option) => {
+                  const selected = option.value === sectionId;
+                  return (
+                    <button
+                      key={option.value === null ? "none" : String(option.value)}
+                      type="button"
+                      onClick={() => {
+                        setSectionId(option.value);
+                        setSectionMenuOpen(false);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
+                        selected
+                          ? "bg-accent/12 text-accent"
+                          : "text-t2 hover:bg-accent/8 hover:text-t1"
+                      }`}
+                    >
+                      <span className="truncate">{option.label}</span>
+                      {selected && <Check size={14} />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </Field>
 
         {sectionId === "new" && (
