@@ -39,6 +39,7 @@ export interface Link {
   note: string | null;
   is_favorite: 0 | 1 | boolean;
   is_archived: 0 | 1 | boolean;
+  is_read: 0 | 1 | boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -162,7 +163,7 @@ export function useBulkLinks() {
   return useMutation({
     mutationFn: (data: {
       ids: number[];
-      action: "archive" | "favorite" | "move" | "add_tags" | "remove_tags" | "delete";
+      action: "archive" | "favorite" | "read" | "move" | "add_tags" | "remove_tags" | "delete";
       payload?: Record<string, unknown>;
     }) =>
       fetchJson<{ ok: true }>("/api/links/bulk", {

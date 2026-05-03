@@ -165,6 +165,7 @@ router.post("/", (req, res) => {
     note,
     is_favorite,
     is_archived,
+    is_read,
     sort_order,
     tags,
   } = req.body;
@@ -178,8 +179,8 @@ router.post("/", (req, res) => {
     const result = db
       .prepare(
         `INSERT INTO links
-          (section_id, name, url, icon_url, image_url, screenshot_status, description, note, is_favorite, is_archived, sort_order, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+          (section_id, name, url, icon_url, image_url, screenshot_status, description, note, is_favorite, is_archived, is_read, sort_order, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
       )
       .run(
         section_id ?? null,
@@ -192,6 +193,7 @@ router.post("/", (req, res) => {
         note ?? null,
         is_favorite ? 1 : 0,
         is_archived ? 1 : 0,
+        is_read ? 1 : 0,
         sort_order ?? 0
       );
     syncLinkTags(Number(result.lastInsertRowid), tags);
@@ -325,7 +327,7 @@ router.post("/bulk", (req, res) => {
     return;
   }
 
-  if (!["archive", "favorite", "move", "add_tags", "remove_tags", "delete"].includes(action)) {
+  if (!["archive", "favorite", "read", "move", "add_tags", "remove_tags", "delete"].includes(action)) {
     res.status(400).json({ error: "unsupported bulk action" });
     return;
   }
@@ -338,6 +340,9 @@ router.post("/bulk", (req, res) => {
     } else if (action === "favorite") {
       db.prepare(`UPDATE links SET is_favorite = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`)
         .run(payload.favorite ? 1 : 0, ...ids);
+    } else if (action === "read") {
+      db.prepare(`UPDATE links SET is_read = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`)
+        .run(payload.read ? 1 : 0, ...ids);
     } else if (action === "move") {
       const sectionId = payload.section_id == null ? null : Number(payload.section_id);
       db.prepare(`UPDATE links SET section_id = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`)
@@ -404,6 +409,7 @@ router.put("/:id", (req, res) => {
     note,
     is_favorite,
     is_archived,
+    is_read,
     sort_order,
     tags,
   } = req.body;
@@ -412,7 +418,7 @@ router.put("/:id", (req, res) => {
     db.prepare(
       `UPDATE links
        SET section_id=?, name=?, url=?, icon_url=?, image_url=?, description=?, note=?,
-           is_favorite=?, is_archived=?, sort_order=?, updated_at=datetime('now')
+           is_favorite=?, is_archived=?, is_read=?, sort_order=?, updated_at=datetime('now')
        WHERE id=?`
     ).run(
       section_id !== undefined ? section_id : existing.section_id,
@@ -424,6 +430,7 @@ router.put("/:id", (req, res) => {
       note !== undefined ? note : existing.note,
       is_favorite !== undefined ? (is_favorite ? 1 : 0) : existing.is_favorite,
       is_archived !== undefined ? (is_archived ? 1 : 0) : existing.is_archived,
+      is_read !== undefined ? (is_read ? 1 : 0) : existing.is_read,
       sort_order ?? existing.sort_order,
       req.params.id
     );

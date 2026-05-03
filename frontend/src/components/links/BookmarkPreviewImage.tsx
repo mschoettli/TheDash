@@ -45,7 +45,7 @@ export default function BookmarkPreviewImage({
     refreshPreview.mutate(link.id);
   }, [link.id, refreshPreview, shouldRequestScreenshot]);
 
-  const heightClass = variant === "drawer" ? "h-52" : "h-24";
+  const heightClass = variant === "drawer" ? "h-52" : "h-40";
   const fallback = (
     <div className={`${heightClass} flex items-center justify-center border-b border-line/40 bg-card/70`}>
       <div className="flex flex-col items-center gap-2 text-center">

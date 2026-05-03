@@ -1,4 +1,4 @@
-import { Archive, ExternalLink, Pencil, Star, Trash2, X } from "lucide-react";
+import { Archive, ExternalLink, Eye, EyeOff, Pencil, Star, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useDeleteLink, useUpdateLink } from "../../hooks/useLinks";
@@ -68,7 +68,7 @@ export default function BookmarkPreviewDrawer({ link, onClose }: BookmarkPreview
             )}
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <a
               href={link.url}
               target="_blank"
@@ -94,6 +94,12 @@ export default function BookmarkPreviewDrawer({ link, onClose }: BookmarkPreview
               className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[13px] transition-colors ${link.is_archived ? "border-accent/30 bg-accent/10 text-accent" : "border-line text-t2 hover:border-accent/30"}`}
             >
               <Archive size={13} /> {t("link.archive_short")}
+            </button>
+            <button
+              onClick={() => updateLink.mutate({ id: link.id, is_read: !link.is_read })}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[13px] transition-colors ${link.is_read ? "border-line text-t2 hover:border-accent/30" : "border-accent/30 bg-accent/10 text-accent"}`}
+            >
+              {link.is_read ? <Eye size={13} /> : <EyeOff size={13} />} {link.is_read ? t("link.read") : t("link.unread")}
             </button>
           </div>
 

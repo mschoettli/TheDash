@@ -112,8 +112,8 @@ router.post("/import", (req, res) => {
       db.prepare(
         `INSERT INTO links
           (id, section_id, name, url, icon_url, image_url, screenshot_url, screenshot_status,
-           screenshot_updated_at, description, note, is_favorite, is_archived, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           screenshot_updated_at, description, note, is_favorite, is_archived, is_read, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         l.id,
         l.section_id,
@@ -128,6 +128,7 @@ router.post("/import", (req, res) => {
         l.note ?? null,
         l.is_favorite ? 1 : 0,
         l.is_archived ? 1 : 0,
+        l.is_read ? 1 : 0,
         l.sort_order,
         l.created_at ?? new Date().toISOString(),
         l.updated_at ?? new Date().toISOString()

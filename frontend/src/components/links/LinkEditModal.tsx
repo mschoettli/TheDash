@@ -42,6 +42,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
   const [suggestingTags, setSuggestingTags] = useState(false);
   const [isFavorite, setIsFavorite] = useState(Boolean(link?.is_favorite ?? initial?.is_favorite));
   const [isArchived, setIsArchived] = useState(Boolean(link?.is_archived ?? initial?.is_archived));
+  const [isRead, setIsRead] = useState(Boolean(link?.is_read ?? initial?.is_read));
   const [sectionId, setSectionId] = useState<number | null | "new">(
     link !== undefined ? (link.section_id ?? null) : (initial?.section_id ?? defaultSectionId ?? null)
   );
@@ -61,6 +62,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
       setSuggestingTags(false);
       setIsFavorite(Boolean(link?.is_favorite ?? initial?.is_favorite));
       setIsArchived(Boolean(link?.is_archived ?? initial?.is_archived));
+      setIsRead(Boolean(link?.is_read ?? initial?.is_read));
       setSectionId(
         link !== undefined
           ? (link.section_id ?? null)
@@ -100,6 +102,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
       tags,
       is_favorite: isFavorite,
       is_archived: isArchived,
+      is_read: isRead,
       sort_order: link?.sort_order ?? 0,
     };
     if (isEdit && link) updateLink.mutate({ id: link.id, ...data }, { onSuccess: onClose });
@@ -192,7 +195,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
           </Field>
         )}
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <label className="flex items-center gap-2 rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t2">
             <input type="checkbox" checked={isFavorite} onChange={(e) => setIsFavorite(e.target.checked)} />
             {t("link.favorite")}
@@ -200,6 +203,10 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
           <label className="flex items-center gap-2 rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t2">
             <input type="checkbox" checked={isArchived} onChange={(e) => setIsArchived(e.target.checked)} />
             {t("link.archive")}
+          </label>
+          <label className="flex items-center gap-2 rounded-lg border border-line/60 bg-card px-3 py-2 text-[13px] text-t2">
+            <input type="checkbox" checked={isRead} onChange={(e) => setIsRead(e.target.checked)} />
+            {t("link.read")}
           </label>
         </div>
 

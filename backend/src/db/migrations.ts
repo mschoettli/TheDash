@@ -272,6 +272,10 @@ export function runMigrations(): void {
     db.exec("ALTER TABLE links ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0");
   }
 
+  if (!columnExists("links", "is_read")) {
+    db.exec("ALTER TABLE links ADD COLUMN is_read INTEGER NOT NULL DEFAULT 0");
+  }
+
   if (!columnExists("links", "created_at")) {
     db.exec("ALTER TABLE links ADD COLUMN created_at TEXT");
     db.exec("UPDATE links SET created_at = datetime('now') WHERE created_at IS NULL");
@@ -371,6 +375,7 @@ export function runMigrations(): void {
         note        TEXT,
         is_favorite INTEGER NOT NULL DEFAULT 0,
         is_archived INTEGER NOT NULL DEFAULT 0,
+        is_read     INTEGER NOT NULL DEFAULT 0,
         created_at  TEXT,
         updated_at  TEXT
       );
@@ -378,10 +383,10 @@ export function runMigrations(): void {
     db.exec(`
       INSERT INTO links_v2 (id, section_id, name, url, icon_url, sort_order,
         description, image_url, screenshot_url, screenshot_status, screenshot_updated_at,
-        note, is_favorite, is_archived, created_at, updated_at)
+        note, is_favorite, is_archived, is_read, created_at, updated_at)
       SELECT id, section_id, name, url, icon_url, sort_order,
         description, image_url, screenshot_url, screenshot_status, screenshot_updated_at,
-        note, is_favorite, is_archived, created_at, updated_at
+        note, is_favorite, is_archived, COALESCE(is_read, 0), created_at, updated_at
       FROM links;
     `);
     db.exec("DROP TABLE links");
