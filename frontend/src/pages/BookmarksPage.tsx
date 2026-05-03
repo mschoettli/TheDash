@@ -955,7 +955,7 @@ export default function BookmarksPage() {
                 items={visibleLinks.map((l) => `link:${l.id}`)}
                 strategy={view === "list" ? verticalListSortingStrategy : rectSortingStrategy}
               >
-                <div className={view === "list" ? "space-y-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"}>
+                <div className={view === "list" ? "space-y-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"}>
                   {visibleLinks.map((link) => (
                     <SortableBookmark
                       key={link.id}
@@ -971,7 +971,7 @@ export default function BookmarksPage() {
               </SortableContext>
             ) : (
               /* Non-reorderable views (All, Favorites, Archive) — just grid */
-              <div className={view === "list" ? "space-y-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"}>
+              <div className={view === "list" ? "space-y-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"}>
                 {visibleLinks.map((link) => (
                   <BookmarkCard
                     key={link.id}

@@ -172,18 +172,18 @@ export default function BookmarkCard({
           <button
             type="button"
             onClick={toggleFavorite}
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line/60 transition-colors ${link.is_favorite ? "bg-amber-400/15 text-amber-400" : "text-t3 hover:text-amber-400"}`}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line/60 text-t3 transition-colors hover:text-amber-400"
             title={t("link.favorite")}
           >
-            <Star size={14} />
+            <Star size={14} className={link.is_favorite ? "text-amber-400" : ""} />
           </button>
           <button
             type="button"
             onClick={toggleRead}
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line/60 transition-colors ${link.is_read ? "text-t3 hover:text-accent" : "bg-accent/15 text-accent"}`}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line/60 text-t3 transition-colors hover:text-accent"
             title={link.is_read ? t("link.mark_unread") : t("link.mark_read")}
           >
-            {link.is_read ? <Eye size={14} /> : <EyeOff size={14} />}
+            {link.is_read ? <Eye size={14} className="text-emerald-400" /> : <EyeOff size={14} className="text-rose-400" />}
           </button>
           <MoreActions
             open={actionsOpen}
@@ -218,7 +218,7 @@ export default function BookmarkCard({
       >
         <div className="relative">
           {dragHandle && (
-            <div className="absolute left-3 top-12 z-20 cursor-grab rounded-lg bg-surface/85 p-1 text-t3 opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-80 hover:!opacity-100">
+            <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2 cursor-grab rounded-lg bg-surface/85 p-1 text-t3 opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-80 hover:!opacity-100">
               {dragHandle}
             </div>
           )}
@@ -233,23 +233,23 @@ export default function BookmarkCard({
             <button
               type="button"
               onClick={toggleFavorite}
-              className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-sm backdrop-blur transition-colors hover:text-amber-300 ${link.is_favorite ? "text-amber-300" : ""}`}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-sm backdrop-blur transition-colors hover:text-amber-300"
               title={t("link.favorite")}
             >
-              <Star size={15} />
+              <Star size={15} className={link.is_favorite ? "text-amber-300" : ""} />
             </button>
             <button
               type="button"
               onClick={toggleRead}
-              className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-sm backdrop-blur transition-colors hover:text-accent ${!link.is_read ? "text-accent" : ""}`}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-sm backdrop-blur transition-colors hover:text-accent"
               title={link.is_read ? t("link.mark_unread") : t("link.mark_read")}
             >
-              {link.is_read ? <Eye size={15} /> : <EyeOff size={15} />}
+              {link.is_read ? <Eye size={15} className="text-emerald-300" /> : <EyeOff size={15} className="text-rose-300" />}
             </button>
           </div>
         </div>
 
-        <div className="space-y-3 p-4">
+        <div className="space-y-2 p-4">
           <div className="flex items-start gap-3 pb-6">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line/50 bg-surface">
               <FaviconImg url={link.url} name={link.name} explicitIconUrl={link.icon_url} size={24} />
@@ -276,14 +276,14 @@ export default function BookmarkCard({
           </div>
 
           {visibleTags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="mr-9 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
               {visibleTags.map((tag) => (
-                <span key={tag.id} className="rounded-full bg-accent/10 px-2 py-1 text-[10px] font-semibold text-accent/90 leading-none">
+                <span key={tag.id} className="shrink-0 rounded-full bg-accent/10 px-2 py-1 text-[10px] font-semibold text-accent/90 leading-none">
                   {tag.name}
                 </span>
               ))}
               {link.tags.length > visibleTags.length && (
-                <span className="rounded-full border border-line/50 px-2 py-1 text-[10px] font-semibold text-t3 leading-none">
+                <span className="shrink-0 rounded-full border border-line/50 px-2 py-1 text-[10px] font-semibold text-t3 leading-none">
                   +{link.tags.length - visibleTags.length}
                 </span>
               )}
