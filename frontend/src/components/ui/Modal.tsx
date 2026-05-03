@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
@@ -24,11 +25,20 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
     if (open && bodyRef.current) bodyRef.current.scrollTop = 0;
   }, [open]);
 
-  return (
+  useEffect(() => {
+    if (!open) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [open]);
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[2000] flex items-start justify-center overflow-y-auto p-3 sm:p-6"
+          className="fixed inset-0 z-[10000] flex items-start justify-center overflow-y-auto p-3 sm:p-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -56,6 +66,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

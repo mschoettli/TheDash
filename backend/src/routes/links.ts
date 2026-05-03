@@ -13,8 +13,18 @@ export interface TagRow {
 }
 
 function normalizeUrl(url: string): string {
-  if (/^https?:\/\//i.test(url)) return url;
-  return `https://${url}`;
+  const withScheme = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  try {
+    const parsed = new URL(withScheme);
+    parsed.hash = "";
+    if ((parsed.protocol === "https:" && parsed.port === "443") || (parsed.protocol === "http:" && parsed.port === "80")) {
+      parsed.port = "";
+    }
+    parsed.hostname = parsed.hostname.toLowerCase();
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return withScheme;
+  }
 }
 
 function fallbackTitle(url: string): string {
@@ -220,6 +230,34 @@ router.post("/capture", async (req, res) => {
   res.status(201).json(attachTags([link])[0]);
 });
 
+router.get("/check", async (req, res) => {
+  const url = String(req.query?.url ?? "").trim();
+  if (!url) {
+    res.status(400).json({ error: "url required" });
+    return;
+  }
+
+  const normalizedUrl = normalizeUrl(url);
+  const existingRows = db.prepare("SELECT * FROM links").all() as any[];
+  const existing = existingRows.find((link) => normalizeUrl(String(link.url)) === normalizedUrl);
+  const metadata = await fetchLinkMetadata(normalizedUrl);
+  const title = metadata.title ?? fallbackTitle(normalizedUrl);
+  const autoTags = suggestTags({ url: normalizedUrl, title, description: metadata.description ?? undefined });
+
+  res.json({
+    exists: Boolean(existing),
+    bookmark: existing ? attachTags([existing])[0] : null,
+    metadata: {
+      title,
+      description: metadata.description,
+      image_url: metadata.imageUrl,
+      icon_url: metadata.iconUrl,
+      url: normalizedUrl,
+    },
+    auto_tags: autoTags,
+  });
+});
+
 router.post("/tag-suggestions", async (req, res) => {
   const url = String(req.body?.url ?? "").trim();
   const title = String(req.body?.title ?? "").trim();
@@ -256,6 +294,60 @@ router.put("/reorder/batch", (req, res) => {
         update.run(sectionId, sortOrder, id);
       }
     });
+  })();
+
+  res.json({ ok: true });
+});
+
+router.post("/bulk", (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
+  const action = String(req.body?.action ?? "");
+  const payload = req.body?.payload ?? {};
+
+  if (!ids.length) {
+    res.status(400).json({ error: "ids required" });
+    return;
+  }
+
+  if (!["archive", "favorite", "move", "add_tags", "remove_tags", "delete"].includes(action)) {
+    res.status(400).json({ error: "unsupported bulk action" });
+    return;
+  }
+
+  const placeholders = ids.map(() => "?").join(",");
+  db.transaction(() => {
+    if (action === "archive") {
+      db.prepare(`UPDATE links SET is_archived = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`)
+        .run(payload.archived ? 1 : 0, ...ids);
+    } else if (action === "favorite") {
+      db.prepare(`UPDATE links SET is_favorite = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`)
+        .run(payload.favorite ? 1 : 0, ...ids);
+    } else if (action === "move") {
+      const sectionId = payload.section_id == null ? null : Number(payload.section_id);
+      db.prepare(`UPDATE links SET section_id = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`)
+        .run(sectionId, ...ids);
+    } else if (action === "add_tags" || action === "remove_tags") {
+      const tagNames = Array.isArray(payload.tags)
+        ? payload.tags.map((tag: unknown) => String(tag).trim()).filter(Boolean)
+        : [];
+      const insertTag = db.prepare("INSERT OR IGNORE INTO tags (name, source) VALUES (?, 'manual')");
+      const selectTag = db.prepare("SELECT id FROM tags WHERE name = ?");
+      const insertLinkTag = db.prepare("INSERT OR IGNORE INTO link_tags (link_id, tag_id) VALUES (?, ?)");
+      const deleteLinkTag = db.prepare("DELETE FROM link_tags WHERE link_id = ? AND tag_id = ?");
+      for (const name of tagNames) {
+        insertTag.run(name);
+        const row = selectTag.get(name) as { id: number } | undefined;
+        if (!row) continue;
+        for (const id of ids) {
+          if (action === "add_tags") insertLinkTag.run(id, row.id);
+          else deleteLinkTag.run(id, row.id);
+        }
+      }
+      pruneOrphanedTags();
+    } else if (action === "delete") {
+      db.prepare(`DELETE FROM links WHERE id IN (${placeholders})`).run(...ids);
+      pruneOrphanedTags();
+    }
   })();
 
   res.json({ ok: true });

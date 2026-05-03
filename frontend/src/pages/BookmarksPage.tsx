@@ -3,13 +3,17 @@ import { useTranslation } from "react-i18next";
 import {
   Archive,
   Bookmark,
+  CheckSquare,
   GripVertical,
+  Inbox,
   LayoutGrid,
   List,
   Plus,
   Search,
   Send,
+  Sparkles,
   Star,
+  Tags,
   Trash2,
   X,
 } from "lucide-react";
@@ -38,26 +42,39 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Section, SectionsData, useCreateSection, useDeleteSection, useSections, useUpdateSection } from "../hooks/useSections";
-import { Link, suggestAutoTags, useReorderLinks } from "../hooks/useLinks";
+import { checkLink, Link, suggestAutoTags, useBulkLinks, useReorderLinks } from "../hooks/useLinks";
 import { useTags } from "../hooks/useTags";
 import BookmarkCard from "../components/links/BookmarkCard";
+import BookmarkPreviewDrawer from "../components/links/BookmarkPreviewDrawer";
 import LinkEditModal from "../components/links/LinkEditModal";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ActiveSection = "all" | "favorites" | "archive" | "unsectioned" | number;
+type ActiveSection = "inbox" | "all" | "favorites" | "archive" | "unsectioned" | "untagged" | "recent" | "metadata_failed" | number;
 type ViewMode = "grid" | "list";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function matchesSearch(link: Link, query: string): boolean {
+function matchesSearch(link: Link, query: string, collectionTitle = ""): boolean {
   const v = query.trim().toLowerCase();
   if (!v) return true;
-  return [link.name, link.url, link.description ?? "", link.note ?? "", ...link.tags.map((t) => t.name)]
-    .join(" ")
-    .toLowerCase()
-    .includes(v);
+  const tokens = v.split(/\s+/).filter(Boolean);
+  return tokens.every((token) => {
+    const [operator, ...rest] = token.split(":");
+    const value = rest.join(":");
+    if (operator === "tag" && value) return link.tags.some((tag) => tag.name.toLowerCase().includes(value));
+    if ((operator === "collection" || operator === "section") && value) return collectionTitle.toLowerCase().includes(value);
+    if (operator === "is" && value === "favorite") return Boolean(link.is_favorite);
+    if (operator === "is" && value === "archived") return Boolean(link.is_archived);
+    if (operator === "is" && value === "untagged") return link.tags.length === 0;
+    if (operator === "url" && value) return link.url.toLowerCase().includes(value);
+    if (operator === "title" && value) return link.name.toLowerCase().includes(value);
+    return [link.name, link.url, link.description ?? "", link.note ?? "", collectionTitle, ...link.tags.map((t) => t.name)]
+      .join(" ")
+      .toLowerCase()
+      .includes(token);
+  });
 }
 
 // ─── Unsectioned Sidebar Item ─────────────────────────────────────────────────
@@ -198,10 +215,14 @@ function SortableSidebarSection({
 // ─── Sortable Bookmark ─────────────────────────────────────────────────────────
 
 function SortableBookmark({
-  link, view,
+  link, view, selected, selectable, onSelect, onOpen,
 }: {
   link: Link;
   view: ViewMode;
+  selected: boolean;
+  selectable: boolean;
+  onSelect: (checked: boolean) => void;
+  onOpen: (link: Link) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `link:${link.id}`,
@@ -211,6 +232,7 @@ function SortableBookmark({
 
   const handle = (
     <button
+      onClick={(event) => event.stopPropagation()}
       className="flex h-7 w-7 cursor-grab items-center justify-center rounded-lg border border-line/50 bg-surface/90 text-t3 shadow-sm transition-colors hover:text-accent active:cursor-grabbing"
       {...attributes}
       {...listeners}
@@ -221,7 +243,16 @@ function SortableBookmark({
 
   return (
     <div ref={setNodeRef} style={style}>
-      <BookmarkCard link={link} variant={view} dragHandle={handle} isDragging={isDragging} />
+      <BookmarkCard
+        link={link}
+        variant={view}
+        dragHandle={handle}
+        isDragging={isDragging}
+        selected={selected}
+        selectable={selectable}
+        onSelect={onSelect}
+        onOpen={onOpen}
+      />
     </div>
   );
 }
@@ -251,15 +282,22 @@ export default function BookmarksPage() {
   const updateSection = useUpdateSection();
   const deleteSection = useDeleteSection();
   const reorderLinks = useReorderLinks();
+  const bulkLinks = useBulkLinks();
 
   // ─ UI state ─────────────────────────────────────────────────────────────────
-  const [activeSection, setActiveSection] = useState<ActiveSection>("all");
+  const [activeSection, setActiveSection] = useState<ActiveSection>("inbox");
   const [view, setView] = useState<ViewMode>("grid");
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [captureUrl, setCaptureUrl] = useState("");
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const [captureChecking, setCaptureChecking] = useState(false);
   const [captureDraft, setCaptureDraft] = useState<Partial<Link> | null>(null);
   const [linkDraft, setLinkDraft] = useState<Partial<Link> | null>(null);
+  const [previewLink, setPreviewLink] = useState<Link | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkTagInput, setBulkTagInput] = useState("");
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [addingSectionTitle, setAddingSectionTitle] = useState("");
   const [addingSectionOpen, setAddingSectionOpen] = useState(false);
   const addSectionInputRef = useRef<HTMLInputElement>(null);
@@ -283,40 +321,103 @@ export default function BookmarksPage() {
   );
   const favoriteLinks = useMemo(() => allLinks.filter((l) => l.is_favorite && !l.is_archived), [allLinks]);
   const archiveLinks = useMemo(() => allLinks.filter((l) => l.is_archived), [allLinks]);
+  const inboxLinks = useMemo(() => unsectionedLinks.filter((l) => !l.is_archived), [unsectionedLinks]);
+  const untaggedLinks = useMemo(() => allLinks.filter((l) => !l.is_archived && l.tags.length === 0), [allLinks]);
+  const recentLinks = useMemo(
+    () => [...allLinks].filter((l) => !l.is_archived).sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))).slice(0, 30),
+    [allLinks]
+  );
+  const metadataFailedLinks = useMemo(
+    () => allLinks.filter((l) => !l.is_archived && !l.description && !l.image_url && !l.icon_url),
+    [allLinks]
+  );
   const defaultSectionId = displaySections[0]?.id ?? null;
+  const sectionTitleById = useMemo(() => new Map(displaySections.map((s) => [s.id, s.title])), [displaySections]);
 
   const visibleLinks = useMemo(() => {
     let base: Link[];
-    if (activeSection === "all") base = allLinks.filter((l) => !l.is_archived);
+    if (activeSection === "inbox") base = inboxLinks;
+    else if (activeSection === "all") base = allLinks.filter((l) => !l.is_archived);
     else if (activeSection === "favorites") base = favoriteLinks;
     else if (activeSection === "archive") base = archiveLinks;
     else if (activeSection === "unsectioned") base = unsectionedLinks.filter((l) => !l.is_archived);
+    else if (activeSection === "untagged") base = untaggedLinks;
+    else if (activeSection === "recent") base = recentLinks;
+    else if (activeSection === "metadata_failed") base = metadataFailedLinks;
     else base = displaySections.find((s) => s.id === activeSection)?.links ?? [];
     return base.filter((l) => {
       const tagMatch = activeTag ? l.tags.some((t) => t.name === activeTag) : true;
-      return tagMatch && matchesSearch(l, query);
+      return tagMatch && matchesSearch(l, query, l.section_id ? sectionTitleById.get(l.section_id) ?? "" : "");
     });
-  }, [activeSection, activeTag, allLinks, archiveLinks, displaySections, favoriteLinks, unsectionedLinks, query]);
+  }, [activeSection, activeTag, allLinks, archiveLinks, displaySections, favoriteLinks, inboxLinks, metadataFailedLinks, query, recentLinks, sectionTitleById, unsectionedLinks, untaggedLinks]);
 
   // ─ Active drag item ─────────────────────────────────────────────────────────
   const activeLinkId = activeId?.startsWith("link:") ? Number(activeId.split(":")[1]) : null;
   const activeLink = activeLinkId ? allLinks.find((l) => l.id === activeLinkId) : null;
 
   // ─ URL Capture ──────────────────────────────────────────────────────────────
-  const handleCapture = () => {
+  const handleCapture = async () => {
     if (!captureUrl.trim()) return;
     const url = captureUrl.trim();
-    let name = url;
-    try { name = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, ""); }
-    catch { name = url; }
-    const captureSectionId = typeof activeSection === "number" ? activeSection : defaultSectionId;
-    setCaptureDraft({
-      section_id: captureSectionId,
-      url, name,
-      tags: suggestAutoTags(url, name).map((tag, i) => ({
-        id: -i - 1, name: tag, source: "auto" as const, created_at: new Date().toISOString(),
-      })),
-    } as Partial<Link>);
+    setCaptureChecking(true);
+    setCaptureError(null);
+    try {
+      const result = await checkLink(url);
+      if (result.exists && result.bookmark) {
+        setPreviewLink(result.bookmark);
+        setCaptureError(t("bookmarks.duplicate_found", "Dieses Lesezeichen existiert bereits."));
+        return;
+      }
+      const captureSectionId = typeof activeSection === "number" ? activeSection : null;
+      setCaptureDraft({
+        section_id: captureSectionId,
+        url: result.metadata.url,
+        name: result.metadata.title,
+        description: result.metadata.description,
+        image_url: result.metadata.image_url,
+        icon_url: result.metadata.icon_url,
+        tags: result.auto_tags.map((tag, i) => ({
+          id: -i - 1,
+          name: tag.name,
+          source: tag.source,
+          created_at: new Date().toISOString(),
+        })),
+      } as Partial<Link>);
+    } catch (err) {
+      let name = url;
+      try { name = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, ""); }
+      catch { name = url; }
+      setCaptureDraft({
+        section_id: null,
+        url, name,
+        tags: suggestAutoTags(url, name).map((tag, i) => ({
+          id: -i - 1, name: tag, source: "auto" as const, created_at: new Date().toISOString(),
+        })),
+      } as Partial<Link>);
+      setCaptureError(err instanceof Error ? err.message : t("bookmarks.capture_error", "Prüfung fehlgeschlagen."));
+    } finally {
+      setCaptureChecking(false);
+    }
+  };
+
+  const toggleSelection = (id: number, checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const runBulk = (
+    action: "archive" | "favorite" | "move" | "add_tags" | "remove_tags" | "delete",
+    payload: Record<string, unknown> = {}
+  ) => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    bulkLinks.mutate({ ids, action, payload }, { onSuccess: clearSelection });
   };
 
   // ─ Section operations ────────────────────────────────────────────────────────
@@ -491,9 +592,13 @@ export default function BookmarksPage() {
               <h1 className="text-lg font-semibold text-t1">{t("bookmarks.title")}</h1>
             </div>
 
-            {/* Smart collections */}
-            <div className="label-xs mb-2 px-3">{t("bookmarks.collections", "Collections")}</div>
+            {/* Smart views */}
+            <div className="label-xs mb-2 px-3">{t("bookmarks.smart_views", "Smart Views")}</div>
             {[
+              {
+                id: "inbox" as const, icon: <Inbox size={14} />, label: t("bookmarks.inbox", "Inbox"),
+                count: inboxLinks.length,
+              },
               {
                 id: "all" as const, icon: <Bookmark size={14} />, label: t("bookmarks.view_all", "All"),
                 count: allLinks.filter((l) => !l.is_archived).length,
@@ -505,6 +610,18 @@ export default function BookmarksPage() {
               {
                 id: "archive" as const, icon: <Archive size={14} />, label: t("link.archive"),
                 count: archiveLinks.length,
+              },
+              {
+                id: "untagged" as const, icon: <Tags size={14} />, label: t("bookmarks.untagged", "Nicht getaggt"),
+                count: untaggedLinks.length,
+              },
+              {
+                id: "recent" as const, icon: <Sparkles size={14} />, label: t("bookmarks.recent", "Zuletzt hinzugefügt"),
+                count: recentLinks.length,
+              },
+              {
+                id: "metadata_failed" as const, icon: <X size={14} />, label: t("bookmarks.metadata_failed", "Metadaten fehlen"),
+                count: metadataFailedLinks.length,
               },
             ].map(({ id, icon, label, count }) => (
               <button
@@ -532,9 +649,9 @@ export default function BookmarksPage() {
               />
             )}
 
-            {/* User sections */}
+            {/* User collections */}
             {displaySections.length > 0 && (
-              <div className="label-xs mb-2 mt-4 px-3">{t("bookmarks.sections", "Sections")}</div>
+              <div className="label-xs mb-2 mt-4 px-3">{t("bookmarks.collections", "Collections")}</div>
             )}
             <SortableContext
               items={displaySections.map((s) => `section:${s.id}`)}
@@ -587,6 +704,29 @@ export default function BookmarksPage() {
                 <Plus size={12} /> {t("bookmarks.add_section")}
               </button>
             )}
+
+            {allTags && allTags.length > 0 && (
+              <>
+                <div className="label-xs mb-2 mt-4 px-3">{t("link.tags")}</div>
+                <div className="max-h-56 space-y-0.5 overflow-y-auto pr-1">
+                  {allTags.slice(0, 24).map((tag) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
+                      className={`flex w-full items-center gap-2 rounded-xl px-3 py-1.5 text-[12px] transition-all ${
+                        activeTag === tag.name
+                          ? "bg-accent/15 font-semibold text-accent"
+                          : "text-t2 hover:bg-line/20 hover:text-t1"
+                      }`}
+                    >
+                      <Tags size={12} className={activeTag === tag.name ? "text-accent" : "text-t3"} />
+                      <span className="min-w-0 flex-1 truncate text-left">{tag.name}</span>
+                      <span className="text-[10px] text-t3">{tag.count}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </aside>
 
@@ -610,9 +750,10 @@ export default function BookmarksPage() {
                   <button onClick={() => setCaptureUrl("")} className="text-t3 hover:text-t1"><X size={13} /></button>
                   <button
                     onClick={handleCapture}
-                    className="shrink-0 rounded-lg bg-accent px-3 py-1 text-[12px] font-semibold text-bg hover:opacity-90"
+                    disabled={captureChecking}
+                    className="shrink-0 rounded-lg bg-accent px-3 py-1 text-[12px] font-semibold text-bg hover:opacity-90 disabled:opacity-40"
                   >
-                    {t("bookmarks.capture")}
+                    {captureChecking ? t("link.suggesting_tags") : t("bookmarks.capture")}
                   </button>
                 </>
               )}
@@ -656,6 +797,61 @@ export default function BookmarksPage() {
               </button>
             </div>
           </div>
+
+          {captureError && (
+            <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[12px] font-medium text-amber-500">
+              {captureError}
+            </div>
+          )}
+
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-accent/25 bg-accent/10 px-3 py-2">
+              <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-accent">
+                <CheckSquare size={14} /> {selectedIds.size} {t("bookmarks.selected", "ausgewählt")}
+              </span>
+              <button onClick={() => runBulk("favorite", { favorite: true })} className="rounded-lg border border-line/50 bg-card px-2.5 py-1.5 text-[12px] text-t2 hover:text-amber-400">
+                {t("link.favorite")}
+              </button>
+              <button onClick={() => runBulk("archive", { archived: true })} className="rounded-lg border border-line/50 bg-card px-2.5 py-1.5 text-[12px] text-t2 hover:text-accent">
+                {t("link.archive")}
+              </button>
+              <select
+                className="rounded-lg border border-line/50 bg-card px-2.5 py-1.5 text-[12px] text-t2 outline-none"
+                defaultValue=""
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  runBulk("move", { section_id: e.target.value === "inbox" ? null : Number(e.target.value) });
+                  e.currentTarget.value = "";
+                }}
+              >
+                <option value="">{t("bookmarks.move_to", "Verschieben nach...")}</option>
+                <option value="inbox">{t("bookmarks.inbox", "Inbox")}</option>
+                {displaySections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
+              </select>
+              <input
+                value={bulkTagInput}
+                onChange={(e) => setBulkTagInput(e.target.value)}
+                className="min-w-32 rounded-lg border border-line/50 bg-card px-2.5 py-1.5 text-[12px] text-t1 outline-none placeholder:text-t3"
+                placeholder={t("link.tags")}
+              />
+              <button
+                onClick={() => {
+                  const tags = bulkTagInput.split(",").map((tag) => tag.trim()).filter(Boolean);
+                  if (tags.length) runBulk("add_tags", { tags });
+                  setBulkTagInput("");
+                }}
+                className="rounded-lg border border-line/50 bg-card px-2.5 py-1.5 text-[12px] text-t2 hover:text-accent"
+              >
+                + Tags
+              </button>
+              <button onClick={() => setBulkDeleteOpen(true)} className="rounded-lg border border-rose-500/25 bg-card px-2.5 py-1.5 text-[12px] text-rose-500 hover:bg-rose-500/10">
+                {t("common.delete")}
+              </button>
+              <button onClick={clearSelection} className="ml-auto rounded-lg px-2.5 py-1.5 text-[12px] text-t3 hover:text-t1">
+                {t("common.cancel")}
+              </button>
+            </div>
+          )}
 
           {/* Tag filter */}
           {allTags && allTags.length > 0 && (
@@ -719,7 +915,15 @@ export default function BookmarksPage() {
               >
                 <div className={view === "list" ? "space-y-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"}>
                   {visibleLinks.map((link) => (
-                    <SortableBookmark key={link.id} link={link} view={view} />
+                    <SortableBookmark
+                      key={link.id}
+                      link={link}
+                      view={view}
+                      selected={selectedIds.has(link.id)}
+                      selectable
+                      onSelect={(checked) => toggleSelection(link.id, checked)}
+                      onOpen={setPreviewLink}
+                    />
                   ))}
                 </div>
               </SortableContext>
@@ -727,7 +931,15 @@ export default function BookmarksPage() {
               /* Non-reorderable views (All, Favorites, Archive) — just grid */
               <div className={view === "list" ? "space-y-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"}>
                 {visibleLinks.map((link) => (
-                  <BookmarkCard key={link.id} link={link} variant={view} />
+                  <BookmarkCard
+                    key={link.id}
+                    link={link}
+                    variant={view}
+                    selected={selectedIds.has(link.id)}
+                    selectable
+                    onSelect={(checked) => toggleSelection(link.id, checked)}
+                    onOpen={setPreviewLink}
+                  />
                 ))}
               </div>
             )
@@ -756,6 +968,15 @@ export default function BookmarksPage() {
         onClose={() => setLinkDraft(null)}
         initial={linkDraft ?? undefined}
         defaultSectionId={linkDraft?.section_id ?? defaultSectionId}
+      />
+      <BookmarkPreviewDrawer link={previewLink} onClose={() => setPreviewLink(null)} />
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        title={t("link.delete_title")}
+        description={t("bookmarks.bulk_delete_description", { count: selectedIds.size })}
+        onCancel={() => setBulkDeleteOpen(false)}
+        onConfirm={() => { runBulk("delete"); setBulkDeleteOpen(false); }}
+        isPending={bulkLinks.isPending}
       />
     </DndContext>
   );

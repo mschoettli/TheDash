@@ -7,6 +7,11 @@ import { useCreateTile, useUpdateTile, useDeleteTile, Tile, TileProvider } from 
 import { useDashboard, useCreateDashboardItem } from "../../hooks/useDashboard";
 import IconPicker from "../ui/IconPicker";
 import IconBadge from "../ui/IconBadge";
+import TileCard from "./TileCard";
+import TileCompact from "./TileCompact";
+import TileMinimal from "./TileMinimal";
+import TileBanner from "./TileBanner";
+import TileMetric from "./TileMetric";
 import { detectIconKey, iconValue, isRegistryIcon, logoLabelFromValue } from "../../lib/iconRegistry";
 
 const input =
@@ -56,6 +61,29 @@ function FieldGroup({ title, children }: { title: string; children: ReactNode })
       <div className="label-xs mb-3">{title}</div>
       <div className="space-y-3">{children}</div>
     </section>
+  );
+}
+
+function TileLivePreview({ tile, title }: { tile: Tile; title: string }) {
+  const props = { tile, status: "online" as const, apiData: null };
+
+  return (
+    <div className="rounded-2xl border border-line/45 bg-surface/35 p-3">
+      <div className="label-xs mb-2">{title}</div>
+      <div className="h-[92px]">
+        {tile.style === "compact" ? (
+          <TileCompact {...props} />
+        ) : tile.style === "minimal" ? (
+          <TileMinimal {...props} />
+        ) : tile.style === "banner" ? (
+          <TileBanner {...props} />
+        ) : tile.style === "metric" ? (
+          <TileMetric {...props} />
+        ) : (
+          <TileCard {...props} />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -169,6 +197,19 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
   const isSaving = create.isPending || update.isPending;
   const previewIcon = iconUrl || iconValue(detectIconKey(name));
   const iconLabel = logoLabelFromValue(previewIcon) ?? previewIcon;
+  const previewTile: Tile = {
+    id: tile?.id ?? 0,
+    name: name.trim() || "My Service",
+    url: url.trim() || "http://server:8080",
+    icon_url: previewIcon,
+    style,
+    api_url: apiUrl || null,
+    api_key: apiKey || null,
+    provider,
+    show_address: showAddress,
+    sort_order: tile?.sort_order ?? 0,
+    created_at: tile?.created_at ?? new Date().toISOString(),
+  };
 
   const handleSave = () => {
     setSaveError(null);
@@ -219,6 +260,8 @@ export default function TileEditModal({ open, onClose, tile, initial, defaultSec
     <>
       <Modal open={open} onClose={onClose} title={isEdit ? t("tile.edit_title") : t("tile.add_title")} maxWidth="max-w-2xl">
         <div className="space-y-4">
+          <TileLivePreview tile={previewTile} title={t("modal.live_preview")} />
+
           <FieldGroup title={t("modal.identity")}>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>

@@ -7,7 +7,7 @@ const router = Router();
 router.get("/", (_req, res) => {
   const sections = db
     .prepare("SELECT * FROM sections ORDER BY sort_order ASC, id ASC")
-    .all() as Array<{ id: number; title: string; sort_order: number }>;
+    .all() as Array<{ id: number; title: string; description: string | null; color: string | null; icon: string | null; sort_order: number }>;
   const links = db
     .prepare("SELECT * FROM links ORDER BY sort_order ASC, id ASC")
     .all() as Array<{ id: number; section_id: number | null }>;
@@ -23,14 +23,14 @@ router.get("/", (_req, res) => {
 });
 
 router.post("/", (req, res) => {
-  const { title, sort_order } = req.body;
+  const { title, description, color, icon, sort_order } = req.body;
   if (!title) {
     res.status(400).json({ error: "title required" });
     return;
   }
   const result = db
-    .prepare("INSERT INTO sections (title, sort_order) VALUES (?, ?)")
-    .run(title, sort_order ?? 0);
+    .prepare("INSERT INTO sections (title, description, color, icon, sort_order) VALUES (?, ?, ?, ?, ?)")
+    .run(title, description ?? null, color ?? null, icon ?? null, sort_order ?? 0);
   const section = db
     .prepare("SELECT * FROM sections WHERE id = ?")
     .get(result.lastInsertRowid);
@@ -38,7 +38,7 @@ router.post("/", (req, res) => {
 });
 
 router.put("/:id", (req, res) => {
-  const { title, sort_order } = req.body;
+  const { title, description, color, icon, sort_order } = req.body;
   const existing = db
     .prepare("SELECT * FROM sections WHERE id = ?")
     .get(req.params.id) as any;
@@ -46,8 +46,11 @@ router.put("/:id", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  db.prepare("UPDATE sections SET title=?, sort_order=? WHERE id=?").run(
+  db.prepare("UPDATE sections SET title=?, description=?, color=?, icon=?, sort_order=? WHERE id=?").run(
     title ?? existing.title,
+    description !== undefined ? description : existing.description,
+    color !== undefined ? color : existing.color,
+    icon !== undefined ? icon : existing.icon,
     sort_order ?? existing.sort_order,
     req.params.id
   );

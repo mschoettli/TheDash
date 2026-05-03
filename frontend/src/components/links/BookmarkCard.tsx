@@ -11,6 +11,10 @@ interface BookmarkCardProps {
   dragHandle?: React.ReactNode;
   isDragging?: boolean;
   variant?: "grid" | "list";
+  selected?: boolean;
+  selectable?: boolean;
+  onSelect?: (checked: boolean) => void;
+  onOpen?: (link: Link) => void;
 }
 
 function getHost(url: string): string {
@@ -18,7 +22,7 @@ function getHost(url: string): string {
   catch { return url; }
 }
 
-export default function BookmarkCard({ link, dragHandle, isDragging, variant = "grid" }: BookmarkCardProps) {
+export default function BookmarkCard({ link, dragHandle, isDragging, variant = "grid", selected = false, selectable = false, onSelect, onOpen }: BookmarkCardProps) {
   const { t } = useTranslation();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -39,10 +43,20 @@ export default function BookmarkCard({ link, dragHandle, isDragging, variant = "
     return (
       <>
         <div
+          onClick={() => onOpen?.(link)}
           className={`group flex items-center gap-3 rounded-xl border border-line/50 bg-card px-3 py-2.5 transition-all hover:border-accent/30 hover:shadow-sm ${
             isDragging ? "opacity-40 shadow-xl" : ""
-          } ${link.is_archived ? "opacity-60" : ""}`}
+          } ${link.is_archived ? "opacity-60" : ""} ${onOpen ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-accent/40" : ""}`}
         >
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={(e) => onSelect?.(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0"
+            />
+          )}
           {dragHandle && <div className="shrink-0 cursor-grab text-t3 hover:text-accent">{dragHandle}</div>}
 
           <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line/50 bg-surface">
@@ -50,13 +64,13 @@ export default function BookmarkCard({ link, dragHandle, isDragging, variant = "
           </div>
 
           <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-t3 truncate">{getHost(link.url)}</div>
             <div className="flex items-center gap-2">
               <span className="truncate text-[13px] font-semibold text-t1">{link.name}</span>
               {link.is_favorite && <Star size={10} className="shrink-0 text-amber-400" />}
               {link.is_archived && <Archive size={10} className="shrink-0 text-t3" />}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[11px] text-t3 truncate">{getHost(link.url)}</span>
               {link.tags.slice(0, 3).map((tag) => (
                 <span key={tag.id} className="rounded-md bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold text-accent/80">{tag.name}</span>
               ))}
@@ -68,7 +82,7 @@ export default function BookmarkCard({ link, dragHandle, isDragging, variant = "
               className="rounded-lg p-1.5 text-t3 transition-colors hover:bg-line/30 hover:text-accent" title={t("link.open")}>
               <ExternalLink size={13} />
             </a>
-            <button onClick={() => setEditOpen(true)}
+            <button onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}
               className="rounded-lg p-1.5 text-t3 transition-colors hover:bg-line/30 hover:text-accent" title={t("link.edit")}>
               <Pencil size={13} />
             </button>
@@ -106,10 +120,20 @@ export default function BookmarkCard({ link, dragHandle, isDragging, variant = "
   return (
     <>
       <article
+        onClick={() => onOpen?.(link)}
         className={`group relative flex items-center gap-3 overflow-hidden rounded-xl border border-line/50 bg-card px-3 py-2.5 transition-all hover:border-accent/30 hover:shadow-md hover:shadow-accent/5 ${
           isDragging ? "opacity-40 shadow-xl" : ""
-        } ${link.is_archived ? "opacity-60" : ""}`}
+        } ${link.is_archived ? "opacity-60" : ""} ${onOpen ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-accent/40" : ""}`}
       >
+        {selectable && (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => onSelect?.(e.target.checked)}
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0"
+          />
+        )}
         {/* Drag handle */}
         {dragHandle && (
           <div className="shrink-0 cursor-grab text-t3 opacity-0 transition-opacity group-hover:opacity-70 hover:!opacity-100">
@@ -124,13 +148,13 @@ export default function BookmarkCard({ link, dragHandle, isDragging, variant = "
 
         {/* Content */}
         <div className="min-w-0 flex-1">
+          <div className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-t3">{getHost(link.url)}</div>
           <div className="flex items-center gap-1.5">
             <span className="truncate text-[13px] font-semibold text-t1 leading-5">{link.name}</span>
             {link.is_favorite && <Star size={10} className="shrink-0 text-amber-400" />}
             {link.is_archived && <Archive size={10} className="shrink-0 text-t3" />}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-            <span className="text-[11px] text-t3 truncate max-w-[120px]">{getHost(link.url)}</span>
             {link.tags.slice(0, 3).map((tag) => (
               <span key={tag.id} className="rounded-md bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold text-accent/80 leading-none">
                 {tag.name}

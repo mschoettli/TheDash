@@ -12,6 +12,19 @@ export interface TagSuggestion {
   source: "auto" | "ai";
 }
 
+export interface LinkCheckResult {
+  exists: boolean;
+  bookmark: Link | null;
+  metadata: {
+    title: string;
+    description: string | null;
+    image_url: string | null;
+    icon_url: string | null;
+    url: string;
+  };
+  auto_tags: TagSuggestion[];
+}
+
 export interface Link {
   id: number;
   section_id: number | null;
@@ -74,6 +87,10 @@ export function useCaptureLink() {
   });
 }
 
+export async function checkLink(url: string): Promise<LinkCheckResult> {
+  return fetchJson<LinkCheckResult>(`/api/links/check?${new URLSearchParams({ url }).toString()}`);
+}
+
 export function suggestAutoTags(url: string, title?: string, description?: string): string[] {
   const values = new Set<string>();
   const isIpLike = (value: string) => /^\d+$/.test(value) || /^\d{1,3}(\.\d{1,3}){3}$/.test(value);
@@ -124,6 +141,23 @@ export function useDeleteLink() {
   return useMutation({
     mutationFn: (id: number) =>
       fetchJson<{ ok: true }>(`/api/links/${id}`, { method: "DELETE" }),
+    onSuccess: () => invalidateBookmarks(qc),
+  });
+}
+
+export function useBulkLinks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      ids: number[];
+      action: "archive" | "favorite" | "move" | "add_tags" | "remove_tags" | "delete";
+      payload?: Record<string, unknown>;
+    }) =>
+      fetchJson<{ ok: true }>("/api/links/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
     onSuccess: () => invalidateBookmarks(qc),
   });
 }

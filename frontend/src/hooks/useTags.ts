@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 export interface TagSummary {
   id: number;
   name: string;
-  source: "manual" | "auto";
+  source: "manual" | "auto" | "ai";
   created_at: string;
   count: number;
 }

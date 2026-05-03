@@ -4,6 +4,9 @@ import type { Link } from "./useLinks";
 export interface Section {
   id: number;
   title: string;
+  description: string | null;
+  color: string | null;
+  icon: string | null;
   sort_order: number;
   links: Link[];
 }
@@ -33,7 +36,7 @@ export function useSections() {
 export function useCreateSection() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { title: string }) =>
+    mutationFn: (data: { title: string; description?: string | null; color?: string | null; icon?: string | null }) =>
       fetchJson<Section>("/api/sections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -46,7 +49,7 @@ export function useCreateSection() {
 export function useUpdateSection() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: number; title?: string; sort_order?: number }) =>
+    mutationFn: ({ id, ...data }: { id: number; title?: string; description?: string | null; color?: string | null; icon?: string | null; sort_order?: number }) =>
       fetchJson<Section>(`/api/sections/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

@@ -26,6 +26,9 @@ export function runMigrations(): void {
     CREATE TABLE IF NOT EXISTS sections (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       title      TEXT    NOT NULL,
+      description TEXT,
+      color      TEXT,
+      icon       TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0
     );
 
@@ -233,6 +236,18 @@ export function runMigrations(): void {
   }
 
   db.exec("UPDATE tiles SET provider = 'none' WHERE provider IS NULL OR provider = ''");
+
+  if (!columnExists("sections", "description")) {
+    db.exec("ALTER TABLE sections ADD COLUMN description TEXT");
+  }
+
+  if (!columnExists("sections", "color")) {
+    db.exec("ALTER TABLE sections ADD COLUMN color TEXT");
+  }
+
+  if (!columnExists("sections", "icon")) {
+    db.exec("ALTER TABLE sections ADD COLUMN icon TEXT");
+  }
 
   if (!columnExists("links", "description")) {
     db.exec("ALTER TABLE links ADD COLUMN description TEXT");

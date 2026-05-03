@@ -15,9 +15,10 @@ export type { OnlineStatus };
 interface Props {
   tile: Tile;
   editMode?: boolean;
+  onEdit?: (tile: Tile) => void;
 }
 
-export default function TileWrapper({ tile, editMode = false }: Props) {
+export default function TileWrapper({ tile, editMode = false, onEdit }: Props) {
   const globalStyle = useSettingsStore((s) => s.widgetStyle);
   const effectiveStyle = tile.style ?? globalStyle;
 
@@ -115,7 +116,8 @@ export default function TileWrapper({ tile, editMode = false }: Props) {
       <button
         onClick={(e) => {
           e.preventDefault();
-          setEditOpen(true);
+          if (onEdit) onEdit(tile);
+          else setEditOpen(true);
         }}
         className={`absolute bottom-2 right-2 z-20 rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 shadow-sm transition-all hover:text-accent ${
           editMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"
@@ -124,7 +126,7 @@ export default function TileWrapper({ tile, editMode = false }: Props) {
       >
         <Pencil size={13} />
       </button>
-      <TileEditModal open={editOpen} onClose={() => setEditOpen(false)} tile={tile} />
+      {!onEdit && <TileEditModal open={editOpen} onClose={() => setEditOpen(false)} tile={tile} />}
     </div>
   );
 }

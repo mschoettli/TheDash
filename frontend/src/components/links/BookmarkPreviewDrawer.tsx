@@ -46,7 +46,7 @@ export default function BookmarkPreviewDrawer({ link, onClose }: BookmarkPreview
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/40">
+    <div className="fixed inset-0 z-[9000] flex justify-end bg-black/45 backdrop-blur-sm">
       <button className="flex-1 cursor-default" onClick={onClose} aria-label="Close preview" />
       <aside className="h-full w-full max-w-lg overflow-y-auto border-l border-line/60 bg-surface shadow-2xl">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line/40 bg-surface/95 px-4 py-3 backdrop-blur">

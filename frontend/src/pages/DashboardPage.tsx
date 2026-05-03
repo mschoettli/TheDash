@@ -334,7 +334,7 @@ function GridDropCell({ sectionId, col, row }: { sectionId: number; col: number;
 function DraggableItem({
   item, pos, gridCols, editMode,
   tile, widget,
-  onEditWidget, onDeleteWidget, onSizeChange,
+  onEditTile, onEditWidget, onDeleteWidget, onSizeChange,
 }: {
   item: DashboardItem;
   pos: ItemPos;
@@ -342,6 +342,7 @@ function DraggableItem({
   editMode: boolean;
   tile?: Tile;
   widget?: WidgetInstance;
+  onEditTile: (tile: Tile) => void;
   onEditWidget: (w: WidgetInstance) => void;
   onDeleteWidget: (w: WidgetInstance) => void;
   onSizeChange: (itemId: number, w: number, h: number) => void;
@@ -401,7 +402,7 @@ function DraggableItem({
       {/* Content */}
       <div className="h-full">
         {item.item_type === "tile" && tile ? (
-          <TileWrapper tile={tile} editMode={editMode} />
+          <TileWrapper tile={tile} editMode={editMode} onEdit={onEditTile} />
         ) : widget ? (
           <WidgetTile
             widget={widget}
@@ -420,7 +421,7 @@ function DraggableItem({
 function SortableSection({
   section, tilesById, widgetsById, editMode,
   isCollapsed, onToggleCollapse,
-  onEditWidget, onDeleteWidget, onSizeChange,
+  onEditTile, onEditWidget, onDeleteWidget, onSizeChange,
   onUpdateLayout, onChangeGridCols, onRename, onDelete,
   hoveredCell, activeDragSize, activeItemId,
   isLast,
@@ -431,6 +432,7 @@ function SortableSection({
   editMode: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  onEditTile: (tile: Tile) => void;
   onEditWidget: (w: WidgetInstance) => void;
   onDeleteWidget: (w: WidgetInstance) => void;
   onSizeChange: (itemId: number, w: number, h: number) => void;
@@ -630,6 +632,7 @@ function SortableSection({
                 editMode={editMode}
                 tile={item.item_type === "tile" ? tilesById.get(item.item_id) : undefined}
                 widget={item.item_type === "widget" ? widgetsById.get(item.item_id) : undefined}
+                onEditTile={onEditTile}
                 onEditWidget={onEditWidget}
                 onDeleteWidget={onDeleteWidget}
                 onSizeChange={onSizeChange}
@@ -967,6 +970,7 @@ export default function DashboardPage() {
   const [editMode, setEditMode] = useState(false);
   const [appModalOpen, setAppModalOpen] = useState(false);
   const [draftApp, setDraftApp] = useState<Partial<Tile> | null>(null);
+  const [editingTile, setEditingTile] = useState<Tile | null>(null);
   const [defaultSectionId, setDefaultSectionId] = useState<number | null>(null);
   const [widgetModalOpen, setWidgetModalOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
@@ -1033,9 +1037,23 @@ export default function DashboardPage() {
 
   // ─ Modal helpers ─────────────────────────────────────────────────────────────
   const openAppModal = (initial?: Partial<Tile>, sectionId?: number | null) => {
+    setEditingTile(null);
     setDraftApp(initial ?? null);
     setDefaultSectionId(sectionId ?? sections[0]?.id ?? null);
     setAppModalOpen(true);
+  };
+
+  const openTileEditModal = (tile: Tile) => {
+    setDraftApp(null);
+    setEditingTile(tile);
+    setDefaultSectionId(null);
+    setAppModalOpen(true);
+  };
+
+  const closeAppModal = () => {
+    setAppModalOpen(false);
+    setDraftApp(null);
+    setEditingTile(null);
   };
 
   // ─ Edit mode ─────────────────────────────────────────────────────────────────
@@ -1386,6 +1404,7 @@ export default function DashboardPage() {
               editMode={editMode}
               isCollapsed={collapsedSections.has(section.id)}
               onToggleCollapse={() => toggleCollapse(section.id)}
+              onEditTile={openTileEditModal}
               onEditWidget={(w) => { setEditingWidget(w); setWidgetModalOpen(true); }}
               onDeleteWidget={setDeleteWidgetTarget}
               onSizeChange={(itemId, w, h) => updateItemLayout(itemId, { w, h })}
@@ -1419,7 +1438,8 @@ export default function DashboardPage() {
       {/* Modals */}
       <TileEditModal
         open={appModalOpen}
-        onClose={() => setAppModalOpen(false)}
+        onClose={closeAppModal}
+        tile={editingTile ?? undefined}
         initial={draftApp ?? undefined}
         defaultSectionId={defaultSectionId}
       />
