@@ -222,7 +222,7 @@ export default function LinkEditModal({ open, onClose, link, initial, defaultSec
               <ChevronDown size={15} className={`shrink-0 text-t3 transition-transform ${sectionMenuOpen ? "rotate-180" : ""}`} />
             </button>
             {sectionMenuOpen && (
-              <div className="absolute z-[80] mt-1 max-h-56 w-full overflow-auto rounded-xl border border-line/70 bg-surface p-1 shadow-xl shadow-black/20">
+              <div className="mt-1 max-h-48 w-full overflow-auto rounded-xl border border-line/70 bg-surface p-1 shadow-sm">
                 {[
                   { value: null, label: t("link.no_section", "Keine Sektion") },
                   ...(sections ?? []).map((section) => ({ value: section.id, label: section.title })),
