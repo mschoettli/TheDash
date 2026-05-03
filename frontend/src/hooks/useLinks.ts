@@ -65,6 +65,12 @@ function invalidateBookmarks(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: TAGS_KEY });
 }
 
+function refreshBookmarksAfterCreate(qc: ReturnType<typeof useQueryClient>) {
+  invalidateBookmarks(qc);
+  window.setTimeout(() => invalidateBookmarks(qc), 1200);
+  window.setTimeout(() => invalidateBookmarks(qc), 3500);
+}
+
 export function useCreateLink() {
   const qc = useQueryClient();
   return useMutation({
@@ -74,7 +80,7 @@ export function useCreateLink() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       }),
-    onSuccess: () => invalidateBookmarks(qc),
+    onSuccess: () => refreshBookmarksAfterCreate(qc),
   });
 }
 
@@ -87,7 +93,7 @@ export function useCaptureLink() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       }),
-    onSuccess: () => invalidateBookmarks(qc),
+    onSuccess: () => refreshBookmarksAfterCreate(qc),
   });
 }
 
