@@ -11,7 +11,7 @@ router.get("/", (_req, res) => {
          screenshot_updated_at = datetime('now'),
          updated_at = datetime('now')
      WHERE screenshot_status = 'pending'
-       AND COALESCE(screenshot_updated_at, updated_at, created_at) < datetime('now', '-2 minutes')`
+       AND COALESCE(screenshot_updated_at, updated_at, created_at) < datetime('now', '-30 seconds')`
   ).run();
 
   const sections = db
