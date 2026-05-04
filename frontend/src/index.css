@@ -379,3 +379,339 @@ body {
 :root[data-theme-preset="dashy"] .time-pill__divider {
   background: rgb(255 255 255 / 0.18);
 }
+
+/* ─── Workspace: productive, brighter command surfaces ─────────────────────── */
+.workspace-page {
+  --workspace-project: 37 99 235;
+  --workspace-task: 8 145 178;
+  --workspace-wiki: 124 58 237;
+  --workspace-note: 217 119 6;
+  --workspace-danger: 225 29 72;
+  --workspace-warn: 217 119 6;
+}
+
+.workspace-panel,
+.workspace-drawer-section {
+  border: 1px solid rgb(var(--line) / 0.62);
+  border-radius: 1.25rem;
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.82), rgb(255 255 255 / 0.58)),
+    rgb(var(--card) / 0.84);
+  box-shadow: 0 14px 38px rgb(15 23 42 / 0.07);
+  backdrop-filter: blur(18px) saturate(1.18);
+}
+
+.workspace-panel {
+  padding: 1rem;
+}
+
+.workspace-drawer-section {
+  padding: 1rem;
+}
+
+.dark .workspace-panel,
+.dark .workspace-drawer-section {
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.025)),
+    rgb(35 42 58 / 0.96);
+  border-color: rgb(109 124 148 / 0.42);
+  box-shadow: 0 16px 44px rgb(2 6 23 / 0.34);
+}
+
+:root[data-theme-preset="dashy"] .workspace-panel,
+:root[data-theme-preset="dashy"] .workspace-drawer-section {
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.135), rgb(255 255 255 / 0.06)),
+    rgb(var(--surface) / 0.55);
+  border-color: rgb(255 255 255 / 0.15);
+  box-shadow: 0 18px 54px rgb(2 8 23 / 0.38), inset 0 1px 0 rgb(255 255 255 / 0.13);
+}
+
+.workspace-stat,
+.workspace-object-card,
+.workspace-create-card,
+.workspace-date-card,
+.workspace-timeline-row,
+.workspace-task-card,
+.workspace-board-column {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(var(--line) / 0.62);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.88), rgb(255 255 255 / 0.62)),
+    rgb(var(--card) / 0.9);
+  box-shadow: 0 10px 28px rgb(15 23 42 / 0.065);
+}
+
+.dark .workspace-stat,
+.dark .workspace-object-card,
+.dark .workspace-create-card,
+.dark .workspace-date-card,
+.dark .workspace-timeline-row,
+.dark .workspace-task-card,
+.dark .workspace-board-column {
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.025)),
+    rgb(37 45 62 / 0.98);
+  border-color: rgb(109 124 148 / 0.40);
+}
+
+:root[data-theme-preset="dashy"] .workspace-stat,
+:root[data-theme-preset="dashy"] .workspace-object-card,
+:root[data-theme-preset="dashy"] .workspace-create-card,
+:root[data-theme-preset="dashy"] .workspace-date-card,
+:root[data-theme-preset="dashy"] .workspace-timeline-row,
+:root[data-theme-preset="dashy"] .workspace-task-card,
+:root[data-theme-preset="dashy"] .workspace-board-column {
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0.055)),
+    rgb(var(--card) / 0.58);
+  border-color: rgb(255 255 255 / 0.15);
+}
+
+.workspace-stat,
+.workspace-object-card,
+.workspace-create-card,
+.workspace-date-card {
+  border-radius: 1.25rem;
+  padding: 1rem;
+  text-align: left;
+  transition: transform 180ms, border-color 180ms, box-shadow 180ms;
+}
+
+.workspace-object-card:hover,
+.workspace-create-card:hover,
+.workspace-date-card:hover {
+  transform: translateY(-2px);
+  border-color: rgb(var(--accent) / 0.38);
+  box-shadow: 0 16px 36px rgb(15 23 42 / 0.11);
+}
+
+.workspace-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.workspace-stat::before,
+.workspace-object-card::before,
+.workspace-create-card::before,
+.workspace-date-card::before,
+.workspace-timeline-row::before,
+.workspace-board-column::before,
+.workspace-drawer-section::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: rgb(var(--workspace-project));
+}
+
+.workspace-tone-project { --tone: var(--workspace-project); }
+.workspace-tone-task { --tone: var(--workspace-task); }
+.workspace-tone-wiki { --tone: var(--workspace-wiki); }
+.workspace-tone-note { --tone: var(--workspace-note); }
+.workspace-tone-danger { --tone: var(--workspace-danger); }
+.workspace-tone-warn { --tone: var(--workspace-warn); }
+
+.workspace-tone-project::before { background: rgb(var(--workspace-project)); }
+.workspace-tone-task::before { background: rgb(var(--workspace-task)); }
+.workspace-tone-wiki::before { background: rgb(var(--workspace-wiki)); }
+.workspace-tone-note::before { background: rgb(var(--workspace-note)); }
+.workspace-tone-danger::before { background: rgb(var(--workspace-danger)); }
+.workspace-tone-warn::before { background: rgb(var(--workspace-warn)); }
+
+.workspace-stat-icon {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.9rem;
+  background: rgb(var(--tone, var(--workspace-project)) / 0.12);
+  color: rgb(var(--tone, var(--workspace-project)));
+}
+
+.workspace-type-label,
+.workspace-section-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgb(var(--tone, var(--accent)));
+}
+
+.workspace-tag {
+  border-radius: 9999px;
+  background: rgb(var(--accent) / 0.12);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.63rem;
+  font-weight: 700;
+  color: rgb(var(--accent));
+}
+
+.workspace-task-card {
+  display: flex;
+  gap: 0.5rem;
+  border-radius: 0.9rem;
+  padding: 0.75rem;
+}
+
+.workspace-board-column {
+  min-height: 360px;
+  border-radius: 1.25rem;
+  padding: 0.75rem;
+}
+
+.workspace-timeline-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 120px;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.9rem;
+  padding: 0.8rem;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.workspace-mindmap {
+  position: relative;
+  min-height: 560px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--line) / 0.62);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(circle at 50% 8%, rgb(var(--accent) / 0.12), transparent 18rem),
+    rgb(var(--card) / 0.74);
+  padding: 1.5rem;
+}
+
+.workspace-command-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: 1px solid rgb(var(--line) / 0.62);
+  border-radius: 1.25rem;
+  background: rgb(var(--card) / 0.78);
+  padding: 0.75rem;
+}
+
+@media (min-width: 1280px) {
+  .workspace-command-bar {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.workspace-search {
+  display: flex;
+  min-width: 260px;
+  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgb(var(--line) / 0.62);
+  border-radius: 0.9rem;
+  background: rgb(var(--surface) / 0.78);
+  padding: 0.55rem 0.75rem;
+}
+
+.workspace-tab,
+.workspace-filter-chip,
+.workspace-secondary-button,
+.workspace-danger-button,
+.workspace-primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition: background-color 180ms, color 180ms, border-color 180ms, opacity 180ms;
+}
+
+.workspace-tab,
+.workspace-filter-chip,
+.workspace-secondary-button {
+  border: 1px solid rgb(var(--line) / 0.62);
+  background: rgb(var(--surface) / 0.66);
+  color: rgb(var(--t2));
+  padding: 0.55rem 0.75rem;
+}
+
+.workspace-tab:hover,
+.workspace-filter-chip:hover,
+.workspace-secondary-button:hover {
+  border-color: rgb(var(--accent) / 0.35);
+  color: rgb(var(--t1));
+}
+
+.workspace-tab-active,
+.workspace-primary-button {
+  border: 1px solid rgb(var(--accent) / 0.38);
+  background: rgb(var(--accent));
+  color: rgb(var(--bg));
+  padding: 0.55rem 0.85rem;
+}
+
+.workspace-danger-button {
+  border: 1px solid rgb(244 63 94 / 0.30);
+  background: rgb(244 63 94 / 0.10);
+  color: rgb(244 63 94);
+  padding: 0.55rem 0.85rem;
+}
+
+.workspace-input,
+.workspace-textarea {
+  width: 100%;
+  border: 1px solid rgb(var(--line) / 0.66);
+  border-radius: 0.85rem;
+  background: rgb(var(--surface) / 0.88);
+  color: rgb(var(--t1));
+  outline: none;
+}
+
+.workspace-input {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.workspace-textarea {
+  resize: vertical;
+  padding: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.workspace-input:focus,
+.workspace-textarea:focus,
+.workspace-search:focus-within {
+  border-color: rgb(var(--accent) / 0.55);
+  box-shadow: 0 0 0 3px rgb(var(--accent) / 0.13);
+}
+
+.workspace-drawer {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  top: 3.5rem;
+  z-index: 90;
+  display: flex;
+  width: 100%;
+  max-width: 540px;
+  flex-direction: column;
+  border-left: 1px solid rgb(var(--line) / 0.70);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.92), rgb(255 255 255 / 0.74)),
+    rgb(var(--surface));
+  box-shadow: -26px 0 70px rgb(15 23 42 / 0.18);
+  backdrop-filter: blur(22px) saturate(1.18);
+}
+
+.dark .workspace-drawer {
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.025)),
+    rgb(28 35 49);
+  box-shadow: -26px 0 80px rgb(2 6 23 / 0.56);
+}
