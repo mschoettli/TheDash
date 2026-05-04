@@ -467,11 +467,11 @@ export function runMigrations(): void {
     );
 
   const defaultColumns = [
-    { title: "Backlog", kind: "backlog", color: "#64748b", order: 0 },
-    { title: "Todo", kind: "todo", color: "#3b82f6", order: 1 },
-    { title: "Doing", kind: "doing", color: "#06b6d4", order: 2 },
-    { title: "Blocked", kind: "blocked", color: "#f43f5e", order: 3 },
-    { title: "Done", kind: "done", color: "#22c55e", order: 4 },
+    { title: "TheDash Box", kind: "backlog", color: "#64748b", order: 0 },
+    { title: "Offen", kind: "todo", color: "#3b82f6", order: 1 },
+    { title: "In Arbeit", kind: "doing", color: "#06b6d4", order: 2 },
+    { title: "Blockiert", kind: "blocked", color: "#f43f5e", order: 3 },
+    { title: "Erledigt", kind: "done", color: "#22c55e", order: 4 },
   ];
   const columnCount = db
     .prepare("SELECT COUNT(*) AS count FROM workspace_board_columns WHERE board_id = ?")

@@ -10,11 +10,11 @@ const PRIORITIES = new Set(["low", "medium", "high", "urgent"]);
 const LEGACY_STATUSES = new Set(["backlog", "todo", "doing", "blocked", "done"]);
 const OBJECT_TYPES = new Set(["project", "task", "wiki", "note"]);
 const DEFAULT_COLUMNS = [
-  { title: "Backlog", kind: "backlog", color: "#64748b" },
-  { title: "Todo", kind: "todo", color: "#3b82f6" },
-  { title: "Doing", kind: "doing", color: "#06b6d4" },
-  { title: "Blocked", kind: "blocked", color: "#f43f5e" },
-  { title: "Done", kind: "done", color: "#22c55e" },
+  { title: "TheDash Box", kind: "backlog", color: "#64748b" },
+  { title: "Offen", kind: "todo", color: "#3b82f6" },
+  { title: "In Arbeit", kind: "doing", color: "#06b6d4" },
+  { title: "Blockiert", kind: "blocked", color: "#f43f5e" },
+  { title: "Erledigt", kind: "done", color: "#22c55e" },
 ];
 
 type WorkspaceType = "project" | "task" | "wiki" | "note";
@@ -62,6 +62,22 @@ function normalizeLegacyStatus(value: unknown, fallback = "todo"): string {
 function normalizeHex(value: unknown, fallback = "#06b6d4"): string {
   const color = String(value ?? "").trim();
   return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback;
+}
+
+function localizeDefaultColumnTitles() {
+  const titleByKind: Record<string, string> = {
+    backlog: "TheDash Box",
+    todo: "Offen",
+    doing: "In Arbeit",
+    blocked: "Blockiert",
+    done: "Erledigt",
+  };
+  const legacyTitles = new Set(["Backlog", "Todo", "Doing", "Blocked", "Done"]);
+  const rows = db.prepare("SELECT id, title, kind FROM workspace_board_columns WHERE kind IN ('backlog', 'todo', 'doing', 'blocked', 'done')").all() as any[];
+  const update = db.prepare("UPDATE workspace_board_columns SET title = ?, updated_at = datetime('now') WHERE id = ?");
+  rows.forEach((row) => {
+    if (legacyTitles.has(row.title) && titleByKind[row.kind]) update.run(titleByKind[row.kind], row.id);
+  });
 }
 
 function getLabelsForTask(taskId: number) {
@@ -210,7 +226,7 @@ function ensureDefaultBoard(): number {
 function getFallbackColumn(boardId: number): any {
   let column = db.prepare("SELECT * FROM workspace_board_columns WHERE board_id = ? AND is_archived = 0 ORDER BY sort_order ASC, id ASC LIMIT 1").get(boardId) as any;
   if (!column) {
-    const result = db.prepare("INSERT INTO workspace_board_columns (board_id, title, color, kind, sort_order) VALUES (?, 'Todo', '#3b82f6', 'todo', 0)").run(boardId);
+    const result = db.prepare("INSERT INTO workspace_board_columns (board_id, title, color, kind, sort_order) VALUES (?, 'Offen', '#3b82f6', 'todo', 0)").run(boardId);
     column = db.prepare("SELECT * FROM workspace_board_columns WHERE id = ?").get(result.lastInsertRowid);
   }
   return column;
@@ -267,6 +283,7 @@ function replaceTaskChecklists(taskId: number, checklists: unknown) {
 }
 
 router.get("/overview", (_req, res) => {
+  localizeDefaultColumnTitles();
   const boardId = ensureDefaultBoard();
   const projects = getProjects();
   const tasks = getTasks();
@@ -346,7 +363,7 @@ router.post("/boards/:boardId/columns", (req, res) => {
 router.put("/boards/:boardId/columns/:id", (req, res) => {
   const existing = db.prepare("SELECT * FROM workspace_board_columns WHERE id = ? AND board_id = ?").get(req.params.id, req.params.boardId) as any;
   if (!existing) return res.status(404).json({ error: "not found" });
-  db.prepare("UPDATE workspace_board_columns SET title = ?, color = ?, kind = ?, sort_order = ?, is_archived = ?, updated_at = datetime('now') WHERE id = ?").run(req.body?.title ?? existing.title, req.body?.color ?? existing.color, req.body?.kind ?? existing.kind, req.body?.sort_order ?? existing.sort_order, req.body?.is_archived !== undefined ? (req.body.is_archived ? 1 : 0) : existing.is_archived, req.params.id);
+  db.prepare("UPDATE workspace_board_columns SET title = ?, color = ?, kind = ?, sort_order = ?, is_archived = ?, updated_at = datetime('now') WHERE id = ?").run(req.body?.title ?? existing.title, req.body?.color !== undefined ? normalizeHex(req.body.color, existing.color) : existing.color, req.body?.kind ?? existing.kind, req.body?.sort_order ?? existing.sort_order, req.body?.is_archived !== undefined ? (req.body.is_archived ? 1 : 0) : existing.is_archived, req.params.id);
   res.json(db.prepare("SELECT * FROM workspace_board_columns WHERE id = ?").get(req.params.id));
 });
 

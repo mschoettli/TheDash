@@ -4,6 +4,7 @@ import MDEditor from "@uiw/react-md-editor";
 import { AlertCircle, Archive, CheckCircle2, Code, Eye, Heading2, ListChecks, Loader2, Pin, RotateCcw, Sparkles, Table2, Tags } from "lucide-react";
 import { fetchNoteTagSuggestions, Note, NoteFolder, useUpdateNote } from "../../hooks/useNotes";
 import { useSettingsStore } from "../../store/useSettingsStore";
+import { MarkdownHelpButton } from "../ui/MarkdownHelp";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -195,6 +196,7 @@ export default function NoteEditor({ note, folder }: Props) {
           <span className="inline-flex items-center gap-1 rounded-lg border border-accent/20 bg-accent/10 px-2 py-1 text-[11px] text-accent/80">
             <Eye size={12} /> Live Preview
           </span>
+          <MarkdownHelpButton />
         </div>
       </div>
 

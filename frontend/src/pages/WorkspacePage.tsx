@@ -1,12 +1,15 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import MDEditor from "@uiw/react-md-editor";
 import {
   Archive,
   BarChart3,
+  BookOpen,
   Blocks,
   CalendarDays,
   CheckSquare,
   Circle,
+  Edit3,
   FileText,
   FolderKanban,
   GripHorizontal,
@@ -41,6 +44,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
+import { MarkdownHelpButton } from "../components/ui/MarkdownHelp";
 import {
   useCreateWorkspaceBoard,
   useCreateWorkspaceColumn,
@@ -127,6 +131,23 @@ function stripMarkdown(value: string): string {
     .replace(/[*_`>#-]/g, "")
     .replace(/\n+/g, " ")
     .trim();
+}
+
+function extractWikiLinks(value: string): string[] {
+  return Array.from(value.matchAll(/\[\[([^\]]+)\]\]/g))
+    .map((match) => match[1]?.split("|")[0]?.trim())
+    .filter(Boolean);
+}
+
+function normalizeWikiTitle(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function markdownWithWikiAnchors(value: string): string {
+  return value.replace(/\[\[([^\]]+)\]\]/g, (_match, raw) => {
+    const [target, label] = String(raw).split("|").map((part) => part.trim());
+    return `[${label || target}](#wiki:${encodeURIComponent(target)})`;
+  });
 }
 
 function parseTags(value: string): string[] {
@@ -325,7 +346,7 @@ function SortableColumn({
         sortable.setNodeRef(node);
         droppable.setNodeRef(node);
       }}
-      style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition }}
+      style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition, borderTopColor: column.color ?? undefined }}
       className={`workspace-board-column min-w-[290px] ${columnTone(column)} ${sortable.isDragging ? "opacity-50" : ""} ${droppable.isOver ? "ring-2 ring-accent/40" : ""}`}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -441,6 +462,9 @@ function WorkspaceDrawer({
   const workspaceTags = overview?.workspace_tags ?? [];
   const dependencies = overview?.dependencies ?? [];
   const backlinks = backlinksQuery.data ?? [];
+  const wikiPages = overview?.wiki ?? [];
+  const outgoingWikiLinks = Array.from(new Set(extractWikiLinks(draft.body)));
+  const missingWikiLinks = outgoingWikiLinks.filter((link) => !wikiPages.some((page) => normalizeWikiTitle(page.title) === normalizeWikiTitle(link)));
   const isExisting = Boolean(draft.id);
   const isTask = draft.type === "task";
   const isWorkItem = draft.type === "project" || draft.type === "task";
@@ -614,6 +638,16 @@ function WorkspaceDrawer({
     setAssistantResult(result);
   };
 
+  const openOrCreateWikiLink = async (title: string) => {
+    const existing = wikiPages.find((page) => normalizeWikiTitle(page.title) === normalizeWikiTitle(title));
+    if (existing) {
+      setDraft(makeDraft("wiki", existing, activeBoardId));
+      return;
+    }
+    const created = await createWiki.mutateAsync({ title, body: `# ${title}\n` });
+    setDraft(makeDraft("wiki", created, activeBoardId));
+  };
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
@@ -631,7 +665,13 @@ function WorkspaceDrawer({
             <h3 className="workspace-section-title">{t("workspace.basics")}</h3>
             <div className="mt-3 grid gap-3">
               <label><span className="label-xs mb-1.5 block">{t("workspace.title_field")}</span><input value={draft.title} onChange={(e) => patchDraft({ title: e.target.value })} className="workspace-input" /></label>
-              <label><span className="label-xs mb-1.5 block">{t("workspace.markdown")}</span><textarea value={draft.body} onChange={(e) => patchDraft({ body: e.target.value })} className="workspace-textarea min-h-[180px]" placeholder={t("workspace.markdown_placeholder")} /></label>
+              <label>
+                <span className="mb-1.5 flex items-center justify-between gap-3">
+                  <span className="label-xs">{t("workspace.markdown")}</span>
+                  <MarkdownHelpButton />
+                </span>
+                <textarea value={draft.body} onChange={(e) => patchDraft({ body: e.target.value })} className="workspace-textarea min-h-[180px]" placeholder={t("workspace.markdown_placeholder")} />
+              </label>
             </div>
           </section>
 
@@ -786,6 +826,8 @@ function WorkspaceDrawer({
           <section className="grid gap-3 sm:grid-cols-2">
             <div className="workspace-drawer-section"><h3 className="workspace-section-title">{t("workspace.outline")}</h3>{outline.length ? outline.map((heading) => <div key={heading} className="truncate text-[12px] text-t2">{heading.replace(/^#+\s+/, "")}</div>) : <div className="text-[12px] text-t3">{t("workspace.no_headings")}</div>}</div>
             <div className="workspace-drawer-section"><h3 className="workspace-section-title">{t("workspace.backlinks")}</h3>{backlinks.length ? backlinks.map((item) => <button key={`${item.type}:${item.id}`} onClick={() => setDraft(makeDraft(item.type, item, activeBoardId))} className="block max-w-full truncate text-[12px] text-t2 hover:text-accent">{t(`workspace.type_${item.type}`)}: {item.title}</button>) : <div className="text-[12px] text-t3">{t("workspace.no_backlinks")}</div>}</div>
+            <div className="workspace-drawer-section"><h3 className="workspace-section-title">{t("workspace.outgoing_links")}</h3>{outgoingWikiLinks.length ? outgoingWikiLinks.map((link) => <button key={link} onClick={() => void openOrCreateWikiLink(link)} className="block max-w-full truncate text-[12px] text-t2 hover:text-accent">[[{link}]]</button>) : <div className="text-[12px] text-t3">{t("workspace.no_outgoing_links")}</div>}</div>
+            <div className="workspace-drawer-section"><h3 className="workspace-section-title">{t("workspace.missing_links")}</h3>{missingWikiLinks.length ? missingWikiLinks.map((link) => <button key={link} onClick={() => void openOrCreateWikiLink(link)} className="block max-w-full truncate text-[12px] text-amber-500 hover:text-accent">+ [[{link}]]</button>) : <div className="text-[12px] text-t3">{t("workspace.no_missing_links")}</div>}</div>
           </section>
         </div>
 
@@ -797,6 +839,132 @@ function WorkspaceDrawer({
       </aside>
 
       <ConfirmDialog open={deleteOpen} title={t("workspace.delete_title")} description={t("workspace.delete_description", { title: draft.title || t("workspace.untitled") })} onCancel={() => setDeleteOpen(false)} onConfirm={remove} isPending={saveState === "saving"} />
+    </>
+  );
+}
+
+function TaskDetailDrawer({
+  task,
+  overview,
+  onClose,
+  onEdit,
+}: {
+  task: WorkspaceTask;
+  overview: ReturnType<typeof useWorkspaceOverview>["data"];
+  onClose: () => void;
+  onEdit: (task: WorkspaceTask) => void;
+}) {
+  const { t } = useTranslation();
+  const updateTask = useUpdateWorkspaceTask();
+  const [body, setBody] = useState(task.body);
+  const [checklists, setChecklists] = useState(task.checklists);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const project = overview?.projects.find((item) => item.id === task.project_id);
+  const column = overview?.columns.find((item) => item.id === task.column_id);
+
+  useEffect(() => {
+    setBody(task.body);
+    setChecklists(task.checklists);
+    setSaveState("idle");
+  }, [task.id, task.body, task.checklists]);
+
+  const persist = async (patch: Partial<WorkspaceTask>) => {
+    setSaveState("saving");
+    try {
+      const saved = await updateTask.mutateAsync({ id: task.id, ...patch });
+      setBody(saved.body);
+      setChecklists(saved.checklists);
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+    }
+  };
+
+  const toggleChecklistItem = (checklistIndex: number, itemIndex: number) => {
+    const next = checklists.map((checklist, currentChecklistIndex) =>
+      currentChecklistIndex === checklistIndex
+        ? {
+            ...checklist,
+            items: checklist.items.map((item, currentItemIndex) =>
+              currentItemIndex === itemIndex ? { ...item, is_done: !item.is_done } : item
+            ),
+          }
+        : checklist
+    );
+    setChecklists(next);
+    void persist({ checklists: next });
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <aside className="workspace-drawer z-50">
+        <div className="flex items-start justify-between gap-4 border-b border-line/60 p-5">
+          <div className="min-w-0">
+            <div className="workspace-type-label workspace-tone-task">{t("workspace.type_task")}</div>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight text-t1">{task.title}</h2>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-t3">
+              {column && <span className="workspace-meta-pill">{column.title}</span>}
+              {project && <span className="workspace-meta-pill">{project.title}</span>}
+              <span className={`rounded-full border px-2 py-0.5 font-semibold ${priorityClass(task.priority)}`}>{t(`workspace.priority_${task.priority}`)}</span>
+              {task.due_date && <span className="workspace-meta-pill">{formatDate(task.due_date)}</span>}
+            </div>
+          </div>
+          <button onClick={onClose} className="rounded-full p-2 text-t3 hover:bg-line/20 hover:text-t1"><X size={18} /></button>
+        </div>
+        <div className="flex-1 space-y-4 overflow-y-auto p-5">
+          <section className="workspace-drawer-section workspace-tone-task">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="workspace-section-title">{t("workspace.markdown")}</h3>
+              <MarkdownHelpButton />
+            </div>
+            <div className="rounded-2xl border border-line/60 bg-surface/70 p-3">
+              <MDEditor.Markdown source={markdownWithWikiAnchors(body) || t("workspace.no_content")} className="workspace-markdown-preview" />
+            </div>
+            <textarea
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+              className="workspace-textarea mt-3 min-h-[140px]"
+              placeholder={t("workspace.markdown_placeholder")}
+            />
+            <button onClick={() => void persist({ body })} className="workspace-secondary-button mt-3">
+              {saveState === "saving" ? t("workspace.saving") : t("workspace.save_markdown")}
+            </button>
+          </section>
+
+          <section className="workspace-drawer-section workspace-tone-note">
+            <h3 className="workspace-section-title">{t("workspace.checklist")}</h3>
+            <div className="mt-3 space-y-3">
+              {checklists.map((checklist, checklistIndex) => (
+                <div key={`${checklist.title}-${checklistIndex}`} className="rounded-xl border border-line/60 bg-surface/70 p-3">
+                  <div className="mb-2 text-[13px] font-semibold text-t1">{checklist.title}</div>
+                  <div className="space-y-1.5">
+                    {checklist.items.map((item, itemIndex) => (
+                      <button key={`${item.title}-${itemIndex}`} onClick={() => toggleChecklistItem(checklistIndex, itemIndex)} className="flex w-full items-center gap-2 rounded-lg bg-card px-3 py-2 text-left text-[13px] text-t2">
+                        <CheckSquare size={14} className={item.is_done ? "text-emerald-400" : "text-t3"} />
+                        <span className={item.is_done ? "line-through opacity-60" : ""}>{item.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {!checklists.length && <div className="text-sm text-t3">{t("workspace.no_checklists")}</div>}
+            </div>
+          </section>
+
+          <section className="workspace-drawer-section">
+            <h3 className="workspace-section-title">{t("workspace.tags")}</h3>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {[...task.labels.map((label) => label.name), ...task.tag_records.map((tag) => tag.name), ...task.tags].map((label) => <span key={label} className="workspace-tag">{label}</span>)}
+              {!task.labels.length && !task.tag_records.length && !task.tags.length && <span className="text-[12px] text-t3">{t("workspace.no_tags")}</span>}
+            </div>
+          </section>
+        </div>
+        <div className="flex items-center gap-2 border-t border-line/60 p-4">
+          <span className="min-w-0 flex-1 text-[12px] text-t3">{saveState === "saved" ? t("workspace.saved") : saveState === "error" ? t("workspace.save_error") : ""}</span>
+          <button onClick={() => onEdit(task)} className="workspace-primary-button"><Edit3 size={14} />{t("workspace.edit_task")}</button>
+        </div>
+      </aside>
     </>
   );
 }
@@ -827,6 +995,7 @@ export default function WorkspacePage() {
   const [deleteColumnTarget, setDeleteColumnTarget] = useState<WorkspaceBoardColumn | null>(null);
   const [deleteBoardTarget, setDeleteBoardTarget] = useState<WorkspaceBoard | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [taskDetail, setTaskDetail] = useState<WorkspaceTask | null>(null);
 
   const boards = overview?.boards ?? [];
   const projects = overview?.projects ?? [];
@@ -841,6 +1010,14 @@ export default function WorkspacePage() {
   const allObjects = useMemo<WorkspaceObject[]>(() => [...projects, ...tasks, ...wiki, ...notes], [projects, tasks, wiki, notes]);
   const filteredObjects = useFilteredObjects(allObjects, query, projects);
   const activeDragTask = activeDragId?.startsWith("task:") ? tasks.find((task) => `task:${task.id}` === activeDragId) : null;
+
+  const openObject = (item: WorkspaceObject) => {
+    if (item.type === "task") {
+      setTaskDetail(item);
+      return;
+    }
+    setDraft(makeDraft(item.type, item, boardId));
+  };
 
   useEffect(() => {
     if (!activeBoardId && overview?.active_board_id) setActiveBoardId(overview.active_board_id);
@@ -941,7 +1118,7 @@ export default function WorkspacePage() {
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="workspace-panel">
           <div className="mb-3 flex items-center justify-between"><h2 className="text-[15px] font-semibold text-t1">{t("workspace.feed")}</h2><span className="text-[11px] text-t3">{filteredObjects.length}</span></div>
-          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">{filteredObjects.slice(0, 9).map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={(target) => setDraft(makeDraft(target.type, target, boardId))} />)}</div>
+          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">{filteredObjects.slice(0, 9).map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={openObject} />)}</div>
         </div>
         <div className="space-y-4">
           <div className="workspace-panel">
@@ -950,7 +1127,7 @@ export default function WorkspacePage() {
           </div>
           <div className="workspace-panel">
             <h2 className="mb-3 text-[15px] font-semibold text-t1">{t("workspace.due_soon")}</h2>
-            <div className="space-y-2">{tasks.filter((task) => task.due_date && task.status !== "done").slice(0, 6).map((task) => <button key={task.id} onClick={() => setDraft(makeDraft("task", task, boardId))} className="flex w-full items-center justify-between rounded-lg bg-surface px-3 py-2 text-left text-sm text-t2 hover:text-accent"><span className="truncate">{task.title}</span><span className="text-[11px] text-t3">{formatDate(task.due_date)}</span></button>)}{!tasks.some((task) => task.due_date && task.status !== "done") && <p className="text-sm text-t3">{t("workspace.no_due_tasks")}</p>}</div>
+            <div className="space-y-2">{tasks.filter((task) => task.due_date && task.status !== "done").slice(0, 6).map((task) => <button key={task.id} onClick={() => setTaskDetail(task)} className="flex w-full items-center justify-between rounded-lg bg-surface px-3 py-2 text-left text-sm text-t2 hover:text-accent"><span className="truncate">{task.title}</span><span className="text-[11px] text-t3">{formatDate(task.due_date)}</span></button>)}{!tasks.some((task) => task.due_date && task.status !== "done") && <p className="text-sm text-t3">{t("workspace.no_due_tasks")}</p>}</div>
           </div>
         </div>
       </section>
@@ -973,7 +1150,7 @@ export default function WorkspacePage() {
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveDragId(null)}>
         <SortableContext items={boardColumns.map((column) => `column:${column.id}`)} strategy={horizontalListSortingStrategy}>
           <div className="flex min-h-[520px] gap-3 overflow-x-auto pb-4">
-            {boardColumns.map((column) => <SortableColumn key={column.id} column={column} tasks={boardTasks.filter((task) => task.column_id === column.id).sort((a, b) => a.sort_order - b.sort_order)} projects={projects} onOpen={(item) => setDraft(makeDraft(item.type, item, boardId))} onAddTask={() => quickCreate("task", column.id)} onEditColumn={setEditingColumn} onDeleteColumn={setDeleteColumnTarget} />)}
+            {boardColumns.map((column) => <SortableColumn key={column.id} column={column} tasks={boardTasks.filter((task) => task.column_id === column.id).sort((a, b) => a.sort_order - b.sort_order)} projects={projects} onOpen={openObject} onAddTask={() => quickCreate("task", column.id)} onEditColumn={setEditingColumn} onDeleteColumn={setDeleteColumnTarget} />)}
           </div>
         </SortableContext>
         <DragOverlay>{activeDragTask ? <div className="workspace-task-card w-[260px] shadow-xl"><GripVertical size={14} /><div className="font-semibold text-t1">{activeDragTask.title}</div></div> : null}</DragOverlay>
@@ -985,29 +1162,112 @@ export default function WorkspacePage() {
     <div className="overflow-hidden rounded-2xl border border-line/60 bg-card">
       <table className="w-full min-w-[980px] text-left text-sm">
         <thead className="bg-surface text-[11px] uppercase tracking-[0.14em] text-t3"><tr><th className="px-4 py-3">{t("workspace.title_field")}</th><th>{t("workspace.board")}</th><th>{t("workspace.column")}</th><th>{t("workspace.priority")}</th><th>{t("workspace.project")}</th><th>{t("workspace.due_date")}</th><th>{t("workspace.labels")}</th></tr></thead>
-        <tbody>{tasks.map((task) => <tr key={task.id} onClick={() => setDraft(makeDraft("task", task, boardId))} className="cursor-pointer border-t border-line/50 hover:bg-surface/70"><td className="px-4 py-3 font-medium text-t1">{task.title}</td><td className="text-t2">{boards.find((board) => board.id === task.board_id)?.title ?? "-"}</td><td className="text-t2">{overview?.columns.find((column) => column.id === task.column_id)?.title ?? "-"}</td><td><span className={`rounded-full border px-2 py-1 text-[11px] ${priorityClass(task.priority)}`}>{t(`workspace.priority_${task.priority}`)}</span></td><td className="text-t2">{projects.find((project) => project.id === task.project_id)?.title ?? "-"}</td><td className="text-t2">{formatDate(task.due_date)}</td><td className="text-t3">{task.labels.slice(0, 3).map((label) => label.name).join(", ")}</td></tr>)}</tbody>
+        <tbody>{tasks.map((task) => <tr key={task.id} onClick={() => setTaskDetail(task)} className="cursor-pointer border-t border-line/50 hover:bg-surface/70"><td className="px-4 py-3 font-medium text-t1">{task.title}</td><td className="text-t2">{boards.find((board) => board.id === task.board_id)?.title ?? "-"}</td><td className="text-t2">{overview?.columns.find((column) => column.id === task.column_id)?.title ?? "-"}</td><td><span className={`rounded-full border px-2 py-1 text-[11px] ${priorityClass(task.priority)}`}>{t(`workspace.priority_${task.priority}`)}</span></td><td className="text-t2">{projects.find((project) => project.id === task.project_id)?.title ?? "-"}</td><td className="text-t2">{formatDate(task.due_date)}</td><td className="text-t3">{task.labels.slice(0, 3).map((label) => label.name).join(", ")}</td></tr>)}</tbody>
       </table>
     </div>
   );
 
   const renderCalendar = () => {
     const dated = [...projects, ...tasks].filter((item) => item.due_date).sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)));
-    return <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{dated.map((item) => <button key={`${item.type}:${item.id}`} onClick={() => setDraft(makeDraft(item.type, item, boardId))} className={`workspace-date-card ${typeTone(item.type)}`}><div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-t3"><CalendarDays size={13} />{formatDate(item.due_date)}</div><div className="mt-2 text-[15px] font-semibold text-t1">{item.title}</div></button>)}</div>;
+    return <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{dated.map((item) => <button key={`${item.type}:${item.id}`} onClick={() => openObject(item)} className={`workspace-date-card ${typeTone(item.type)}`}><div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-t3"><CalendarDays size={13} />{formatDate(item.due_date)}</div><div className="mt-2 text-[15px] font-semibold text-t1">{item.title}</div></button>)}</div>;
   };
 
   const renderTimeline = () => {
     const items = [...projects, ...tasks].filter((item) => item.start_date || item.due_date).sort((a, b) => String(a.start_date ?? a.due_date).localeCompare(String(b.start_date ?? b.due_date)));
-    return <div className="workspace-panel space-y-3">{items.map((item) => <button key={`${item.type}:${item.id}`} onClick={() => setDraft(makeDraft(item.type, item, boardId))} className={`workspace-timeline-row ${typeTone(item.type)}`}><span className="text-t3">{formatDate(item.start_date)}</span><span className="font-semibold text-t1">{item.title}</span><span className="text-right text-t3">{formatDate(item.due_date)}</span></button>)}<div className="pt-2 text-[12px] text-t3">{t("workspace.dependencies")}: {dependencies.length}</div></div>;
+    return <div className="workspace-panel space-y-3">{items.map((item) => <button key={`${item.type}:${item.id}`} onClick={() => openObject(item)} className={`workspace-timeline-row ${typeTone(item.type)}`}><span className="text-t3">{formatDate(item.start_date)}</span><span className="font-semibold text-t1">{item.title}</span><span className="text-right text-t3">{formatDate(item.due_date)}</span></button>)}<div className="pt-2 text-[12px] text-t3">{t("workspace.dependencies")}: {dependencies.length}</div></div>;
   };
 
-  const renderMindmap = () => (
-    <div className="workspace-mindmap">
-      <div className="absolute left-1/2 top-8 -translate-x-1/2 rounded-2xl border border-accent/30 bg-accent/10 px-5 py-3 text-sm font-semibold text-accent">{t("workspace.title")}</div>
-      <div className="grid h-full grid-cols-3 gap-8 pt-24"><div className="space-y-3"><h3 className="label-xs">{t("workspace.projects")}</h3>{projects.slice(0, 8).map((item) => <ObjectCard key={item.id} item={item} onOpen={(target) => setDraft(makeDraft(target.type, target, boardId))} />)}</div><div className="space-y-3"><h3 className="label-xs">{t("workspace.tasks")}</h3>{tasks.slice(0, 10).map((item) => <ObjectCard key={item.id} item={item} onOpen={(target) => setDraft(makeDraft(target.type, target, boardId))} />)}</div><div className="space-y-3"><h3 className="label-xs">{t("workspace.wiki_notes")}</h3>{[...wiki, ...notes].slice(0, 8).map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={(target) => setDraft(makeDraft(target.type, target, boardId))} />)}</div></div>
-    </div>
-  );
+  const renderWikiLibrary = () => {
+    const allWikiLinks = allObjects.flatMap((item) => extractWikiLinks(objectBody(item)));
+    const existingTitles = new Set(wiki.map((page) => normalizeWikiTitle(page.title)));
+    const missingLinks = Array.from(new Set(allWikiLinks.filter((link) => !existingTitles.has(normalizeWikiTitle(link)))));
+    const orphanPages = wiki.filter((page) => !allObjects.some((item) => item.type !== "wiki" || item.id !== page.id ? extractWikiLinks(objectBody(item)).some((link) => normalizeWikiTitle(link) === normalizeWikiTitle(page.title)) : false));
+    const createMissingWiki = async (title: string) => {
+      const created = await createWiki.mutateAsync({ title, body: `# ${title}\n` });
+      setDraft(makeDraft("wiki", created, boardId));
+    };
 
-  const renderCards = (items: WorkspaceObject[]) => <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{items.map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={(target) => setDraft(makeDraft(target.type, target, boardId))} />)}</div>;
+    return (
+      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+        <div className="space-y-3">
+          <div className="workspace-panel flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-[17px] font-semibold text-t1">{t("workspace.wiki_library")}</h2>
+              <p className="mt-1 text-sm text-t3">{t("workspace.wiki_library_description")}</p>
+            </div>
+            <button onClick={() => quickCreate("wiki")} className="workspace-primary-button"><Plus size={13} />{t("workspace.new_wiki")}</button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">{wiki.map((item) => <ObjectCard key={item.id} item={item} onOpen={openObject} />)}</div>
+        </div>
+        <aside className="space-y-3">
+          <div className="workspace-panel">
+            <h3 className="workspace-section-title">{t("workspace.missing_links")}</h3>
+            <div className="mt-3 space-y-2">
+              {missingLinks.slice(0, 10).map((link) => <button key={link} onClick={() => void createMissingWiki(link)} className="flex w-full items-center justify-between rounded-xl bg-surface px-3 py-2 text-left text-[13px] text-t2 hover:text-accent"><span className="truncate">[[{link}]]</span><Plus size={13} /></button>)}
+              {!missingLinks.length && <p className="text-sm text-t3">{t("workspace.no_missing_links")}</p>}
+            </div>
+          </div>
+          <div className="workspace-panel">
+            <h3 className="workspace-section-title">{t("workspace.orphan_pages")}</h3>
+            <div className="mt-3 space-y-2">
+              {orphanPages.slice(0, 8).map((page) => <button key={page.id} onClick={() => openObject(page)} className="block w-full truncate rounded-xl bg-surface px-3 py-2 text-left text-[13px] text-t2 hover:text-accent">{page.title}</button>)}
+              {!orphanPages.length && <p className="text-sm text-t3">{t("workspace.no_orphan_pages")}</p>}
+            </div>
+          </div>
+          <div className="workspace-panel">
+            <h3 className="workspace-section-title">{t("workspace.templates")}</h3>
+            <div className="mt-3 grid gap-2">
+              {["runbook", "service_doc", "incident", "how_to", "project_wiki"].map((template) => <button key={template} onClick={() => setDraft(makeDraft("wiki", { id: 0, type: "wiki", title: t(`workspace.template_${template}`), body: `# ${t(`workspace.template_${template}`)}\n\n## ${t("workspace.overview")}\n`, tags: [], custom_fields: {}, created_at: "", updated_at: "" }, boardId))} className="workspace-secondary-button justify-center">{t(`workspace.template_${template}`)}</button>)}
+            </div>
+          </div>
+        </aside>
+      </div>
+    );
+  };
+
+  const renderMindmap = () => {
+    const node = (id: string, label: string, x: number, y: number, type: WorkspaceObjectType | "root", onClick?: () => void) => ({ id, label, x, y, type, onClick });
+    const projectNodes = projects.slice(0, 4).map((item, index) => node(`project:${item.id}`, item.title, 16, 210 + index * 72, "project", () => openObject(item)));
+    const taskNodes = tasks.slice(0, 6).map((item, index) => node(`task:${item.id}`, item.title, 49, 160 + index * 58, "task", () => setTaskDetail(item)));
+    const wikiNodes = wiki.slice(0, 4).map((item, index) => node(`wiki:${item.id}`, item.title, 78, 205 + index * 70, "wiki", () => openObject(item)));
+    const noteNodes = notes.slice(0, 3).map((item, index) => node(`note:${item.id}`, item.title, 78, 495 + index * 58, "note", () => openObject(item)));
+    const branchNodes = [
+      node("branch:projects", t("workspace.projects"), 16, 95, "project"),
+      node("branch:tasks", t("workspace.tasks"), 49, 95, "task"),
+      node("branch:wiki", t("workspace.wiki"), 78, 95, "wiki"),
+      node("branch:notes", t("workspace.notes"), 78, 430, "note"),
+    ];
+    const nodes = [node("root", t("workspace.title"), 49, 30, "root"), ...branchNodes, ...projectNodes, ...taskNodes, ...wikiNodes, ...noteNodes];
+    const nodeById = new Map(nodes.map((item) => [item.id, item]));
+    const lines = [
+      ...branchNodes.map((item) => ["root", item.id]),
+      ...projectNodes.map((item) => ["branch:projects", item.id]),
+      ...taskNodes.map((item) => [item.label && tasks.find((task) => `task:${task.id}` === item.id)?.project_id ? `project:${tasks.find((task) => `task:${task.id}` === item.id)?.project_id}` : "branch:tasks", item.id]),
+      ...wikiNodes.map((item) => ["branch:wiki", item.id]),
+      ...noteNodes.map((item) => ["branch:notes", item.id]),
+      ...dependencies.map((dep) => [`${dep.source_type}:${dep.source_id}`, `${dep.target_type}:${dep.target_id}`]),
+    ].filter(([from, to]) => nodeById.has(from) && nodeById.has(to));
+
+    return (
+      <div className="workspace-mindmap">
+        <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
+          {lines.map(([from, to], index) => {
+            const a = nodeById.get(from)!;
+            const b = nodeById.get(to)!;
+            return <line key={`${from}-${to}-${index}`} x1={`${a.x}%`} y1={a.y} x2={`${b.x}%`} y2={b.y} className="workspace-mindmap-line" />;
+          })}
+        </svg>
+        {nodes.map((item) => (
+          <button key={item.id} onClick={item.onClick} disabled={!item.onClick} className={`workspace-mindmap-node ${item.type === "root" ? "workspace-mindmap-root" : typeTone(item.type as WorkspaceObjectType)}`} style={{ left: `${item.x}%`, top: item.y }}>
+            {item.type === "root" ? <Network size={15} /> : <BookOpen size={13} />}
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const renderCards = (items: WorkspaceObject[]) => <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{items.map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={openObject} />)}</div>;
 
   const content =
     activeTab === "dashboard" ? renderDashboard() :
@@ -1017,7 +1277,7 @@ export default function WorkspacePage() {
     activeTab === "timeline" ? renderTimeline() :
     activeTab === "mindmap" ? renderMindmap() :
     activeTab === "projects" ? renderCards(projects) :
-    activeTab === "wiki" ? renderCards(wiki) :
+    activeTab === "wiki" ? renderWikiLibrary() :
     <Suspense fallback={<div className="workspace-panel text-sm text-t2">{t("workspace.loading_notes")}</div>}><NotesPage /></Suspense>;
 
   if (isLoading) return <div className="p-6 text-t2">{t("workspace.loading")}</div>;
@@ -1038,6 +1298,7 @@ export default function WorkspacePage() {
 
       <div className="overflow-x-auto">{content}</div>
       {draft && <WorkspaceDrawer draft={draft} setDraft={setDraft} onClose={() => setDraft(null)} overview={overview} activeBoardId={boardId} />}
+      {taskDetail && <TaskDetailDrawer task={taskDetail} overview={overview} onClose={() => setTaskDetail(null)} onEdit={(task) => { setTaskDetail(null); setDraft(makeDraft("task", task, boardId)); }} />}
 
       {editingColumn && (
         <WorkspaceColumnEditor
@@ -1072,7 +1333,7 @@ function WorkspaceColumnEditor({ column, onSave, onClose }: { column: WorkspaceB
         <div className="space-y-4 p-4">
           <label><span className="label-xs mb-1.5 block">{t("workspace.title_field")}</span><input value={title} onChange={(e) => setTitle(e.target.value)} className="workspace-input" /></label>
           <label><span className="label-xs mb-1.5 block">{t("workspace.color")}</span><input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-12 w-full rounded-xl border border-line bg-surface p-1" /></label>
-          <label><span className="label-xs mb-1.5 block">{t("workspace.column_type")}</span><select value={kind} onChange={(e) => setKind(e.target.value)} className="workspace-input"><option value="custom">{t("workspace.column_custom")}</option><option value="backlog">Backlog</option><option value="todo">Todo</option><option value="doing">{t("workspace.status_doing")}</option><option value="blocked">{t("workspace.status_blocked")}</option><option value="done">{t("workspace.status_done")}</option></select></label>
+          <label><span className="label-xs mb-1.5 block">{t("workspace.column_type")}</span><select value={kind} onChange={(e) => setKind(e.target.value)} className="workspace-input"><option value="custom">{t("workspace.column_custom")}</option><option value="backlog">{t("workspace.status_backlog")}</option><option value="todo">{t("workspace.status_todo")}</option><option value="doing">{t("workspace.status_doing")}</option><option value="blocked">{t("workspace.status_blocked")}</option><option value="done">{t("workspace.status_done")}</option></select></label>
           <button onClick={() => onSave({ title, color, kind })} className="workspace-primary-button w-full justify-center">{t("common.save")}</button>
         </div>
       </aside>
