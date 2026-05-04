@@ -1,12 +1,12 @@
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Bookmark, FileText } from "lucide-react";
+import { LayoutDashboard, Bookmark, Layers3 } from "lucide-react";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, key: "nav.dashboard" },
   { to: "/bookmarks", icon: Bookmark, key: "nav.bookmarks" },
-  { to: "/notes", icon: FileText, key: "nav.notes" },
+  { to: "/workspace", icon: Layers3, key: "nav.workspace" },
 ];
 
 export default function Sidebar() {

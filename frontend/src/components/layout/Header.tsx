@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, Bookmark, FileText, Settings, Clock3 } from "lucide-react";
+import { LayoutDashboard, Bookmark, Layers3, Settings, Clock3 } from "lucide-react";
 import { useMetricsStore } from "../../store/useMetricsStore";
 import MetricBar from "../metrics/MetricBar";
 import SettingsModal from "../settings/SettingsModal";
@@ -17,7 +17,7 @@ function formatBytes(bytes: number): string {
 const navItems = [
   { to: "/", icon: LayoutDashboard, key: "nav.dashboard" },
   { to: "/bookmarks", icon: Bookmark, key: "nav.bookmarks" },
-  { to: "/notes", icon: FileText, key: "nav.notes" },
+  { to: "/workspace", icon: Layers3, key: "nav.workspace" },
 ];
 
 export default function Header() {

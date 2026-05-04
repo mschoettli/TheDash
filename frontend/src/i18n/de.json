@@ -2,7 +2,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "bookmarks": "Lesezeichen",
-    "notes": "Notizen"
+    "notes": "Notizen",
+    "workspace": "Workspace"
   },
   "header": {
     "settings": "Einstellungen"

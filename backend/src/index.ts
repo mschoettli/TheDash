@@ -15,6 +15,7 @@ import tagsRouter from "./routes/tags";
 import dockerRouter from "./routes/docker";
 import widgetsRouter from "./routes/widgets";
 import logosRouter from "./routes/logos";
+import workspaceRouter from "./routes/workspace";
 import { getPreviewRoot } from "./lib/previews";
 
 const app = express();
@@ -32,6 +33,7 @@ app.use("/api/tags", tagsRouter);
 app.use("/api/docker", dockerRouter);
 app.use("/api/widgets", widgetsRouter);
 app.use("/api/logos", logosRouter);
+app.use("/api/workspace", workspaceRouter);
 app.use("/api", exportRouter);
 app.use("/api/dashboard", dashboardRouter);
 

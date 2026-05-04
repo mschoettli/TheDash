@@ -2,7 +2,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "bookmarks": "Bookmarks",
-    "notes": "Notes"
+    "notes": "Notes",
+    "workspace": "Workspace"
   },
   "header": {
     "settings": "Settings"

@@ -28,6 +28,10 @@ router.get("/export", (_req, res) => {
   const auditLog = db
     .prepare("SELECT * FROM audit_log ORDER BY created_at DESC, id DESC LIMIT 500")
     .all();
+  const workspaceProjects = db.prepare("SELECT * FROM workspace_projects ORDER BY updated_at DESC").all();
+  const workspaceTasks = db.prepare("SELECT * FROM workspace_tasks ORDER BY sort_order ASC").all();
+  const workspaceWikiPages = db.prepare("SELECT * FROM workspace_wiki_pages ORDER BY updated_at DESC").all();
+  const workspaceDependencies = db.prepare("SELECT * FROM workspace_dependencies ORDER BY id ASC").all();
 
   res.setHeader("Content-Disposition", 'attachment; filename="thedash-backup.json"');
   res.json({
@@ -45,6 +49,10 @@ router.get("/export", (_req, res) => {
     widgets,
     widgetSecrets,
     auditLog,
+    workspaceProjects,
+    workspaceTasks,
+    workspaceWikiPages,
+    workspaceDependencies,
   });
 });
 
@@ -62,6 +70,10 @@ router.post("/import", (req, res) => {
     dashboardCards,
     dashboardItems,
     widgets,
+    workspaceProjects,
+    workspaceTasks,
+    workspaceWikiPages,
+    workspaceDependencies,
   } = req.body;
 
   const doImport = db.transaction(() => {
@@ -74,6 +86,10 @@ router.post("/import", (req, res) => {
     db.prepare("DELETE FROM dashboard_sections").run();
     db.prepare("DELETE FROM widgets").run();
     db.prepare("DELETE FROM widget_secrets").run();
+    db.prepare("DELETE FROM workspace_dependencies").run();
+    db.prepare("DELETE FROM workspace_tasks").run();
+    db.prepare("DELETE FROM workspace_wiki_pages").run();
+    db.prepare("DELETE FROM workspace_projects").run();
     db.prepare("DELETE FROM note_folders").run();
     db.prepare("DELETE FROM tiles").run();
     db.prepare("DELETE FROM notes").run();
@@ -231,6 +247,81 @@ router.post("/import", (req, res) => {
         item.layout ?? "{}",
         item.created_at ?? new Date().toISOString(),
         item.updated_at ?? new Date().toISOString()
+      );
+    }
+
+    for (const project of workspaceProjects ?? []) {
+      db.prepare(
+        `INSERT INTO workspace_projects
+          (id, title, body, status, priority, start_date, due_date, tags, icon, color, custom_fields, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        project.id,
+        project.title,
+        project.body ?? "",
+        project.status ?? "backlog",
+        project.priority ?? "medium",
+        project.start_date ?? null,
+        project.due_date ?? null,
+        Array.isArray(project.tags) ? JSON.stringify(project.tags) : project.tags ?? "[]",
+        project.icon ?? null,
+        project.color ?? null,
+        typeof project.custom_fields === "string" ? project.custom_fields : JSON.stringify(project.custom_fields ?? {}),
+        project.created_at ?? new Date().toISOString(),
+        project.updated_at ?? new Date().toISOString()
+      );
+    }
+
+    for (const task of workspaceTasks ?? []) {
+      db.prepare(
+        `INSERT INTO workspace_tasks
+          (id, project_id, parent_id, title, body, status, priority, start_date, due_date, tags, custom_fields, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        task.id,
+        task.project_id ?? null,
+        task.parent_id ?? null,
+        task.title,
+        task.body ?? "",
+        task.status ?? "todo",
+        task.priority ?? "medium",
+        task.start_date ?? null,
+        task.due_date ?? null,
+        Array.isArray(task.tags) ? JSON.stringify(task.tags) : task.tags ?? "[]",
+        typeof task.custom_fields === "string" ? task.custom_fields : JSON.stringify(task.custom_fields ?? {}),
+        task.sort_order ?? 0,
+        task.created_at ?? new Date().toISOString(),
+        task.updated_at ?? new Date().toISOString()
+      );
+    }
+
+    for (const page of workspaceWikiPages ?? []) {
+      db.prepare(
+        `INSERT INTO workspace_wiki_pages
+          (id, title, body, tags, custom_fields, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        page.id,
+        page.title,
+        page.body ?? "",
+        Array.isArray(page.tags) ? JSON.stringify(page.tags) : page.tags ?? "[]",
+        typeof page.custom_fields === "string" ? page.custom_fields : JSON.stringify(page.custom_fields ?? {}),
+        page.created_at ?? new Date().toISOString(),
+        page.updated_at ?? new Date().toISOString()
+      );
+    }
+
+    for (const dependency of workspaceDependencies ?? []) {
+      db.prepare(
+        "INSERT OR IGNORE INTO workspace_dependencies (id, source_type, source_id, target_type, target_id, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      ).run(
+        dependency.id,
+        dependency.source_type,
+        dependency.source_id,
+        dependency.target_type,
+        dependency.target_id,
+        dependency.kind ?? "blocks",
+        dependency.created_at ?? new Date().toISOString()
       );
     }
   });

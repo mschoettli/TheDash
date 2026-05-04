@@ -163,6 +163,60 @@ export function runMigrations(): void {
       expires_at  TEXT NOT NULL,
       updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS workspace_projects (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      title         TEXT    NOT NULL,
+      body          TEXT    NOT NULL DEFAULT '',
+      status        TEXT    NOT NULL DEFAULT 'backlog',
+      priority      TEXT    NOT NULL DEFAULT 'medium',
+      start_date    TEXT,
+      due_date      TEXT,
+      tags          TEXT    NOT NULL DEFAULT '[]',
+      icon          TEXT,
+      color         TEXT,
+      custom_fields TEXT    NOT NULL DEFAULT '{}',
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_tasks (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id    INTEGER REFERENCES workspace_projects(id) ON DELETE SET NULL,
+      parent_id     INTEGER REFERENCES workspace_tasks(id) ON DELETE CASCADE,
+      title         TEXT    NOT NULL,
+      body          TEXT    NOT NULL DEFAULT '',
+      status        TEXT    NOT NULL DEFAULT 'todo',
+      priority      TEXT    NOT NULL DEFAULT 'medium',
+      start_date    TEXT,
+      due_date      TEXT,
+      tags          TEXT    NOT NULL DEFAULT '[]',
+      custom_fields TEXT    NOT NULL DEFAULT '{}',
+      sort_order    INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_wiki_pages (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      title         TEXT    NOT NULL,
+      body          TEXT    NOT NULL DEFAULT '',
+      tags          TEXT    NOT NULL DEFAULT '[]',
+      custom_fields TEXT    NOT NULL DEFAULT '{}',
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_dependencies (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_type TEXT NOT NULL CHECK (source_type IN ('project', 'task')),
+      source_id   INTEGER NOT NULL,
+      target_type TEXT NOT NULL CHECK (target_type IN ('project', 'task')),
+      target_id   INTEGER NOT NULL,
+      kind        TEXT NOT NULL DEFAULT 'blocks',
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(source_type, source_id, target_type, target_id, kind)
+    );
   `);
 
   if (columnExists("tiles", "api_endpoint")) {
