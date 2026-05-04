@@ -164,6 +164,75 @@ export function runMigrations(): void {
       updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS workspace_boards (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      title         TEXT    NOT NULL,
+      description   TEXT    NOT NULL DEFAULT '',
+      icon          TEXT,
+      color         TEXT,
+      sort_order    INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_board_columns (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      board_id      INTEGER NOT NULL REFERENCES workspace_boards(id) ON DELETE CASCADE,
+      title         TEXT    NOT NULL,
+      color         TEXT,
+      kind          TEXT    NOT NULL DEFAULT 'custom',
+      sort_order    INTEGER NOT NULL DEFAULT 0,
+      is_archived   INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_labels (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      name          TEXT    NOT NULL UNIQUE,
+      color         TEXT    NOT NULL DEFAULT '#06b6d4',
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_tags (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      name          TEXT    NOT NULL UNIQUE,
+      source        TEXT    NOT NULL DEFAULT 'manual',
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_task_labels (
+      task_id       INTEGER NOT NULL REFERENCES workspace_tasks(id) ON DELETE CASCADE,
+      label_id      INTEGER NOT NULL REFERENCES workspace_labels(id) ON DELETE CASCADE,
+      PRIMARY KEY (task_id, label_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_task_tags (
+      task_id       INTEGER NOT NULL REFERENCES workspace_tasks(id) ON DELETE CASCADE,
+      tag_id        INTEGER NOT NULL REFERENCES workspace_tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (task_id, tag_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_checklists (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id       INTEGER NOT NULL REFERENCES workspace_tasks(id) ON DELETE CASCADE,
+      title         TEXT    NOT NULL DEFAULT 'Checklist',
+      sort_order    INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_checklist_items (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      checklist_id  INTEGER NOT NULL REFERENCES workspace_checklists(id) ON DELETE CASCADE,
+      title         TEXT    NOT NULL,
+      is_done       INTEGER NOT NULL DEFAULT 0,
+      sort_order    INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
     CREATE TABLE IF NOT EXISTS workspace_projects (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       title         TEXT    NOT NULL,
@@ -377,6 +446,57 @@ export function runMigrations(): void {
     db.exec("UPDATE notes SET created_at = COALESCE(updated_at, datetime('now')) WHERE created_at IS NULL");
   }
 
+
+  if (!columnExists("workspace_tasks", "board_id")) {
+    db.exec("ALTER TABLE workspace_tasks ADD COLUMN board_id INTEGER REFERENCES workspace_boards(id) ON DELETE SET NULL");
+  }
+
+  if (!columnExists("workspace_tasks", "column_id")) {
+    db.exec("ALTER TABLE workspace_tasks ADD COLUMN column_id INTEGER REFERENCES workspace_board_columns(id) ON DELETE SET NULL");
+  }
+
+  const defaultBoard = db
+    .prepare("SELECT id FROM workspace_boards ORDER BY sort_order ASC, id ASC LIMIT 1")
+    .get() as { id: number } | undefined;
+  const defaultBoardId =
+    defaultBoard?.id ??
+    Number(
+      db
+        .prepare("INSERT INTO workspace_boards (title, description, icon, color, sort_order) VALUES ('TheDash Board', 'Default workspace board', 'kanban', '#06b6d4', 0)")
+        .run().lastInsertRowid
+    );
+
+  const defaultColumns = [
+    { title: "Backlog", kind: "backlog", color: "#64748b", order: 0 },
+    { title: "Todo", kind: "todo", color: "#3b82f6", order: 1 },
+    { title: "Doing", kind: "doing", color: "#06b6d4", order: 2 },
+    { title: "Blocked", kind: "blocked", color: "#f43f5e", order: 3 },
+    { title: "Done", kind: "done", color: "#22c55e", order: 4 },
+  ];
+  const columnCount = db
+    .prepare("SELECT COUNT(*) AS count FROM workspace_board_columns WHERE board_id = ?")
+    .get(defaultBoardId) as { count: number };
+  if (columnCount.count === 0) {
+    const insertColumn = db.prepare("INSERT INTO workspace_board_columns (board_id, title, color, kind, sort_order) VALUES (?, ?, ?, ?, ?)");
+    defaultColumns.forEach((column) => insertColumn.run(defaultBoardId, column.title, column.color, column.kind, column.order));
+  }
+
+  db.exec(`
+    UPDATE workspace_tasks
+    SET board_id = ${defaultBoardId}
+    WHERE board_id IS NULL;
+  `);
+
+  const seededColumns = db
+    .prepare("SELECT id, kind FROM workspace_board_columns WHERE board_id = ? ORDER BY sort_order ASC, id ASC")
+    .all(defaultBoardId) as Array<{ id: number; kind: string }>;
+  const fallbackColumnId = seededColumns[0]?.id;
+  seededColumns.forEach((column) => {
+    db.prepare("UPDATE workspace_tasks SET column_id = ? WHERE board_id = ? AND column_id IS NULL AND status = ?").run(column.id, defaultBoardId, column.kind);
+  });
+  if (fallbackColumnId) {
+    db.prepare("UPDATE workspace_tasks SET column_id = ? WHERE board_id = ? AND column_id IS NULL").run(fallbackColumnId, defaultBoardId);
+  }
   // Seed default settings
   const insert = db.prepare(
     "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)"
@@ -453,3 +573,4 @@ export function runMigrations(): void {
 
   console.log("Database migrations complete.");
 }
+

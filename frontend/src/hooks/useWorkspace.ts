@@ -4,6 +4,59 @@ export type WorkspaceObjectType = "project" | "task" | "wiki" | "note";
 export type WorkspaceStatus = "backlog" | "todo" | "doing" | "blocked" | "done";
 export type WorkspacePriority = "low" | "medium" | "high" | "urgent";
 
+export interface WorkspaceBoard {
+  id: number;
+  title: string;
+  description: string;
+  icon: string | null;
+  color: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceBoardColumn {
+  id: number;
+  board_id: number;
+  title: string;
+  color: string | null;
+  kind: string;
+  sort_order: number;
+  is_archived: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceLabel {
+  id: number;
+  name: string;
+  color: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceTag {
+  id: number;
+  name: string;
+  source: "manual" | "auto" | "ai";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceChecklistItem {
+  id?: number;
+  title: string;
+  is_done: boolean;
+  sort_order?: number;
+}
+
+export interface WorkspaceChecklist {
+  id?: number;
+  title: string;
+  sort_order?: number;
+  items: WorkspaceChecklistItem[];
+}
+
 export interface WorkspaceProject {
   id: number;
   type: "project";
@@ -24,6 +77,8 @@ export interface WorkspaceProject {
 export interface WorkspaceTask {
   id: number;
   type: "task";
+  board_id: number | null;
+  column_id: number | null;
   project_id: number | null;
   parent_id: number | null;
   title: string;
@@ -33,6 +88,9 @@ export interface WorkspaceTask {
   start_date: string | null;
   due_date: string | null;
   tags: string[];
+  labels: WorkspaceLabel[];
+  tag_records: WorkspaceTag[];
+  checklists: WorkspaceChecklist[];
   custom_fields: Record<string, unknown>;
   sort_order: number;
   created_at: string;
@@ -78,6 +136,11 @@ export interface WorkspaceDependency {
 export type WorkspaceObject = WorkspaceProject | WorkspaceTask | WorkspaceWikiPage | WorkspaceNote;
 
 export interface WorkspaceOverview {
+  boards: WorkspaceBoard[];
+  columns: WorkspaceBoardColumn[];
+  labels: WorkspaceLabel[];
+  workspace_tags: WorkspaceTag[];
+  active_board_id: number;
   projects: WorkspaceProject[];
   tasks: WorkspaceTask[];
   wiki: WorkspaceWikiPage[];
@@ -108,7 +171,10 @@ const OVERVIEW_KEY = ["workspace", "overview"];
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
-  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  if (!res.ok) {
+    const message = await res.text().catch(() => "");
+    throw new Error(message || `Request failed (${res.status})`);
+  }
   return res.json() as Promise<T>;
 }
 
@@ -130,6 +196,110 @@ export function useWorkspaceOverview() {
   return useQuery<WorkspaceOverview>({
     queryKey: OVERVIEW_KEY,
     queryFn: () => fetchJson<WorkspaceOverview>("/api/workspace/overview"),
+  });
+}
+
+export function useCreateWorkspaceBoard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<WorkspaceBoard> & { title: string }) => fetchJson<WorkspaceBoard>("/api/workspace/boards", json("POST", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useUpdateWorkspaceBoard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<WorkspaceBoard> & { id: number }) => fetchJson<WorkspaceBoard>(`/api/workspace/boards/${id}`, json("PUT", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useDeleteWorkspaceBoard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => fetchJson<{ ok: true }>(`/api/workspace/boards/${id}`, json("DELETE")),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useCreateWorkspaceColumn() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ boardId, ...data }: Partial<WorkspaceBoardColumn> & { boardId: number; title: string }) => fetchJson<WorkspaceBoardColumn>(`/api/workspace/boards/${boardId}/columns`, json("POST", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useUpdateWorkspaceColumn() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ boardId, id, ...data }: Partial<WorkspaceBoardColumn> & { boardId: number; id: number }) => fetchJson<WorkspaceBoardColumn>(`/api/workspace/boards/${boardId}/columns/${id}`, json("PUT", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useDeleteWorkspaceColumn() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ boardId, id, target_column_id }: { boardId: number; id: number; target_column_id?: number }) => fetchJson<{ ok: true }>(`/api/workspace/boards/${boardId}/columns/${id}`, json("DELETE", { target_column_id })),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useReorderWorkspaceBoard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ boardId, columns, tasks }: { boardId: number; columns?: Array<{ id: number; sort_order: number }>; tasks?: Array<{ id: number; board_id: number; column_id: number; sort_order: number }> }) => fetchJson<{ ok: true }>(`/api/workspace/boards/${boardId}/reorder`, json("PUT", { columns, tasks })),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useCreateWorkspaceLabel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; color?: string }) => fetchJson<WorkspaceLabel>("/api/workspace/labels", json("POST", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useUpdateWorkspaceLabel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<WorkspaceLabel> & { id: number }) => fetchJson<WorkspaceLabel>(`/api/workspace/labels/${id}`, json("PUT", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useDeleteWorkspaceLabel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => fetchJson<{ ok: true }>(`/api/workspace/labels/${id}`, json("DELETE")),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useCreateWorkspaceTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; source?: "manual" | "auto" | "ai" }) => fetchJson<WorkspaceTag>("/api/workspace/tags", json("POST", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useUpdateWorkspaceTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<WorkspaceTag> & { id: number }) => fetchJson<WorkspaceTag>(`/api/workspace/tags/${id}`, json("PUT", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useDeleteWorkspaceTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => fetchJson<{ ok: true }>(`/api/workspace/tags/${id}`, json("DELETE")),
+    onSuccess: () => invalidateWorkspace(qc),
   });
 }
 
@@ -160,7 +330,7 @@ export function useDeleteWorkspaceProject() {
 export function useCreateWorkspaceTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<WorkspaceTask> & { title: string }) => fetchJson<WorkspaceTask>("/api/workspace/tasks", json("POST", data)),
+    mutationFn: (data: Partial<WorkspaceTask> & { title: string; label_ids?: number[]; tag_ids?: number[] }) => fetchJson<WorkspaceTask>("/api/workspace/tasks", json("POST", data)),
     onSuccess: () => invalidateWorkspace(qc),
   });
 }
@@ -168,7 +338,7 @@ export function useCreateWorkspaceTask() {
 export function useUpdateWorkspaceTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<WorkspaceTask> & { id: number }) => fetchJson<WorkspaceTask>(`/api/workspace/tasks/${id}`, json("PUT", data)),
+    mutationFn: ({ id, ...data }: Partial<WorkspaceTask> & { id: number; label_ids?: number[]; tag_ids?: number[] }) => fetchJson<WorkspaceTask>(`/api/workspace/tasks/${id}`, json("PUT", data)),
     onSuccess: () => invalidateWorkspace(qc),
   });
 }
@@ -184,7 +354,7 @@ export function useDeleteWorkspaceTask() {
 export function useReorderWorkspaceTasks() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (items: Array<{ id: number; status: WorkspaceStatus; sort_order: number }>) => fetchJson<{ ok: true }>("/api/workspace/tasks/reorder", json("PUT", { items })),
+    mutationFn: (items: Array<{ id: number; status?: WorkspaceStatus; board_id?: number; column_id?: number; sort_order: number }>) => fetchJson<{ ok: true }>("/api/workspace/tasks/reorder", json("PUT", { items })),
     onSuccess: () => invalidateWorkspace(qc),
   });
 }
