@@ -783,7 +783,7 @@ export default function BookmarksPage() {
 
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-line/60 bg-card px-3 py-2.5 shadow-sm transition-colors focus-within:border-accent/40">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[1rem] border border-line/60 bg-card/80 px-3 py-[0.62rem] shadow-sm transition-colors focus-within:border-accent/40 focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
               {commandIsUrl ? <Link2 size={15} className="shrink-0 text-accent" /> : <Search size={15} className="shrink-0 text-t3" />}
               <input
                 value={captureUrl}
@@ -799,7 +799,7 @@ export default function BookmarksPage() {
                   else setQuery(captureUrl);
                 }}
                 placeholder={t("bookmarks.command_placeholder")}
-                className="min-w-0 flex-1 bg-transparent text-[14px] text-t1 outline-none placeholder:text-t3"
+                className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
               />
               {captureUrl.trim() && (
                 <button
@@ -816,14 +816,14 @@ export default function BookmarksPage() {
                 <button
                   onClick={handleCapture}
                   disabled={captureChecking}
-                  className="shrink-0 rounded-xl bg-accent px-3 py-1.5 text-[12px] font-semibold text-bg hover:opacity-90 disabled:opacity-40"
+                  className="shrink-0 rounded-full bg-accent px-3 py-1 text-[11px] font-semibold text-bg hover:opacity-90 disabled:opacity-40"
                 >
                   {captureChecking ? t("link.suggesting_tags") : t("bookmarks.add_link")}
                 </button>
               ) : (
                 <button
                   onClick={() => setLinkDraft({ section_id: typeof activeSection === "number" ? activeSection : (activeSection === "unsectioned" ? null : defaultSectionId), name: "", url: "", tags: [] } as Partial<Link>)}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-line/60 px-3 py-1.5 text-[12px] font-semibold text-t2 transition-colors hover:border-accent/40 hover:text-accent"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line/60 px-3 py-1 text-[11px] font-semibold text-t2 transition-colors hover:border-accent/40 hover:text-accent"
                 >
                   <Plus size={14} /> {t("bookmarks.add_link")}
                 </button>
@@ -831,17 +831,17 @@ export default function BookmarksPage() {
             </div>
 
             {/* View toggle */}
-            <div className="flex overflow-hidden rounded-xl border border-line/60">
+            <div className="flex overflow-hidden rounded-full border border-line/60">
               <button
                 onClick={() => setView("grid")}
-                className={`p-2 transition-colors ${view === "grid" ? "bg-accent text-bg" : "text-t3 hover:bg-line/30 hover:text-t1"}`}
+                className={`p-1.5 transition-colors ${view === "grid" ? "bg-accent text-bg" : "text-t3 hover:bg-line/30 hover:text-t1"}`}
                 title="Grid"
               >
                 <LayoutGrid size={14} />
               </button>
               <button
                 onClick={() => setView("list")}
-                className={`p-2 transition-colors ${view === "list" ? "bg-accent text-bg" : "text-t3 hover:bg-line/30 hover:text-t1"}`}
+                className={`p-1.5 transition-colors ${view === "list" ? "bg-accent text-bg" : "text-t3 hover:bg-line/30 hover:text-t1"}`}
                 title="List"
               >
                 <List size={14} />

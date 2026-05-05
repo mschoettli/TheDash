@@ -552,7 +552,6 @@ body {
 .workspace-create-card::before,
 .workspace-date-card::before,
 .workspace-timeline-row::before,
-.workspace-board-column::before,
 .workspace-drawer-section::before {
   content: "";
   position: absolute;
@@ -616,6 +615,14 @@ body {
   border-top: 3px solid rgb(var(--accent));
   border-radius: 1.25rem;
   padding: 0.75rem;
+}
+
+.workspace-board-column-header-accent {
+  position: absolute;
+  inset: 0 auto auto 0;
+  height: 3.25rem;
+  width: 3px;
+  background: rgb(var(--tone, var(--accent)));
 }
 
 .workspace-timeline-row {
@@ -728,6 +735,14 @@ body {
   transition: background-color 180ms, color 180ms, border-color 180ms, opacity 180ms;
 }
 
+.workspace-filter-row {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+  white-space: nowrap;
+}
+
 .workspace-tab,
 .workspace-filter-chip,
 .workspace-secondary-button {
@@ -760,8 +775,22 @@ body {
 }
 
 .workspace-filter-chip {
-  padding: 0.32rem 0.65rem;
-  font-size: 0.7rem;
+  border-radius: 999px;
+  padding: 0.24rem 0.68rem;
+  font-size: 0.66rem;
+  line-height: 1.15;
+  background: rgb(var(--card) / 0.72);
+}
+
+.workspace-filter-chip-active {
+  border-color: rgb(var(--accent) / 0.72);
+  background: rgb(var(--accent));
+  color: rgb(var(--bg));
+}
+
+.workspace-filter-chip-active:hover {
+  border-color: rgb(var(--accent));
+  color: rgb(var(--bg));
 }
 
 .workspace-create-card-compact {

@@ -91,6 +91,7 @@ const NotesPage = lazy(() => import("./NotesPage"));
 
 const tabs = ["dashboard", "board", "list", "calendar", "timeline", "mindmap", "projects", "wiki", "notes"] as const;
 const priorities: WorkspacePriority[] = ["low", "medium", "high", "urgent"];
+const statusFilters: WorkspaceStatus[] = ["backlog", "todo", "doing", "blocked", "done"];
 const columnLimit = 10;
 
 type WorkspaceTab = (typeof tabs)[number];
@@ -349,6 +350,7 @@ function SortableColumn({
       style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition, borderTopColor: column.color ?? undefined }}
       className={`workspace-board-column min-w-[290px] ${columnTone(column)} ${sortable.isDragging ? "opacity-50" : ""} ${droppable.isOver ? "ring-2 ring-accent/40" : ""}`}
     >
+      <div className="workspace-board-column-header-accent" style={{ background: column.color ?? undefined }} />
       <div className="mb-3 flex items-center justify-between gap-2">
         <button {...sortable.attributes} {...sortable.listeners} className="cursor-grab touch-none text-t3 active:cursor-grabbing" aria-label={t("workspace.drag_column")}>
           <GripHorizontal size={15} />
@@ -1012,6 +1014,12 @@ export default function WorkspacePage() {
   const activeDragTask = activeDragId?.startsWith("task:") ? tasks.find((task) => `task:${task.id}` === activeDragId) : null;
   const sidebarTabs: WorkspaceTab[] = ["dashboard", "board", "list", "calendar", "timeline", "mindmap", "projects", "wiki", "notes"];
   const tabIcon = (tab: WorkspaceTab) => tab === "dashboard" ? BarChart3 : tab === "board" ? Blocks : tab === "list" ? ListChecks : tab === "calendar" ? CalendarDays : tab === "timeline" ? CheckSquare : tab === "mindmap" ? Network : tab === "projects" ? FolderKanban : tab === "wiki" ? Link2 : FileText;
+  const filterPills = [
+    ...(["project", "task", "wiki", "note"] as WorkspaceObjectType[]).map((type) => ({ key: `type:${type}`, label: t(`workspace.type_${type}`) })),
+    ...priorities.map((priority) => ({ key: `priority:${priority}`, label: t(`workspace.priority_${priority}`) })),
+    ...statusFilters.map((status) => ({ key: `status:${status}`, label: t(`workspace.status_${status}`) })),
+  ];
+  const activeFilter = query.trim().toLowerCase();
 
   const openObject = (item: WorkspaceObject) => {
     if (item.type === "task") {
@@ -1325,7 +1333,19 @@ export default function WorkspacePage() {
           <div className="workspace-search"><Search size={15} className="text-t3" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("workspace.search_placeholder")} className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3" /></div>
         </div>
 
-        {activeTab !== "notes" && <div className="flex gap-1.5 overflow-x-auto pb-0.5">{(["project", "task", "wiki", "note"] as WorkspaceObjectType[]).map((type) => <button key={type} onClick={() => setQuery(`type:${type}`)} className="workspace-filter-chip shrink-0">{t(`workspace.type_${type}`)}</button>)}{priorities.map((priority) => <button key={priority} onClick={() => setQuery(`priority:${priority}`)} className="workspace-filter-chip shrink-0">{t(`workspace.priority_${priority}`)}</button>)}</div>}
+        {activeTab !== "notes" && (
+          <div className="workspace-filter-row">
+            {filterPills.map((filter) => (
+              <button
+                key={filter.key}
+                onClick={() => setQuery(filter.key)}
+                className={`workspace-filter-chip shrink-0 ${activeFilter === filter.key ? "workspace-filter-chip-active" : ""}`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="overflow-x-auto">{content}</div>
       </main>
