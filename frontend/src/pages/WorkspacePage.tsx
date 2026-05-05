@@ -260,8 +260,8 @@ function StatCard({ icon: Icon, label, value, tone }: { icon: React.ElementType;
   return (
     <div className={`workspace-stat ${tone}`}>
       <div>
-        <div className="text-2xl font-semibold text-t1">{value}</div>
-        <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-t2">{label}</div>
+        <div className="text-xl font-semibold text-t1">{value}</div>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-t2">{label}</div>
       </div>
       <span className="workspace-stat-icon">
         <Icon size={18} />
@@ -1010,6 +1010,8 @@ export default function WorkspacePage() {
   const allObjects = useMemo<WorkspaceObject[]>(() => [...projects, ...tasks, ...wiki, ...notes], [projects, tasks, wiki, notes]);
   const filteredObjects = useFilteredObjects(allObjects, query, projects);
   const activeDragTask = activeDragId?.startsWith("task:") ? tasks.find((task) => `task:${task.id}` === activeDragId) : null;
+  const sidebarTabs: WorkspaceTab[] = ["dashboard", "board", "list", "calendar", "timeline", "mindmap", "projects", "wiki", "notes"];
+  const tabIcon = (tab: WorkspaceTab) => tab === "dashboard" ? BarChart3 : tab === "board" ? Blocks : tab === "list" ? ListChecks : tab === "calendar" ? CalendarDays : tab === "timeline" ? CheckSquare : tab === "mindmap" ? Network : tab === "projects" ? FolderKanban : tab === "wiki" ? Link2 : FileText;
 
   const openObject = (item: WorkspaceObject) => {
     if (item.type === "task") {
@@ -1106,28 +1108,26 @@ export default function WorkspacePage() {
   };
 
   const renderDashboard = () => (
-    <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={FolderKanban} label={t("workspace.active_projects")} value={overview?.stats.activeProjects ?? 0} tone="workspace-tone-project" />
         <StatCard icon={ListChecks} label={t("workspace.open_tasks")} value={overview?.stats.openTasks ?? 0} tone="workspace-tone-task" />
-        <StatCard icon={Archive} label={t("workspace.blocked")} value={overview?.stats.blockedTasks ?? 0} tone="workspace-tone-danger" />
         <StatCard icon={CalendarDays} label={t("workspace.due")} value={overview?.stats.dueTasks ?? 0} tone="workspace-tone-warn" />
         <StatCard icon={FileText} label={t("workspace.wiki")} value={overview?.stats.wikiPages ?? 0} tone="workspace-tone-wiki" />
-        <StatCard icon={Blocks} label={t("workspace.boards")} value={boards.length} tone="workspace-tone-note" />
       </div>
-      <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+      <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
         <div className="workspace-panel">
           <div className="mb-3 flex items-center justify-between"><h2 className="text-[15px] font-semibold text-t1">{t("workspace.feed")}</h2><span className="text-[11px] text-t3">{filteredObjects.length}</span></div>
-          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">{filteredObjects.slice(0, 9).map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={openObject} />)}</div>
+          <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">{filteredObjects.slice(0, 9).map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={openObject} />)}</div>
         </div>
-        <div className="space-y-4">
-          <div className="workspace-panel">
-            <h2 className="mb-3 text-[15px] font-semibold text-t1">{t("workspace.thedash_box")}</h2>
-            <div className="grid grid-cols-2 gap-2">{(["project", "task", "wiki", "note"] as WorkspaceObjectType[]).map((type) => <button key={type} onClick={() => quickCreate(type)} className={`workspace-create-card ${typeTone(type)}`}><Plus size={14} className="mb-1" />{t(`workspace.type_${type}`)}</button>)}</div>
-          </div>
+        <div className="space-y-3">
           <div className="workspace-panel">
             <h2 className="mb-3 text-[15px] font-semibold text-t1">{t("workspace.due_soon")}</h2>
             <div className="space-y-2">{tasks.filter((task) => task.due_date && task.status !== "done").slice(0, 6).map((task) => <button key={task.id} onClick={() => setTaskDetail(task)} className="flex w-full items-center justify-between rounded-lg bg-surface px-3 py-2 text-left text-sm text-t2 hover:text-accent"><span className="truncate">{task.title}</span><span className="text-[11px] text-t3">{formatDate(task.due_date)}</span></button>)}{!tasks.some((task) => task.due_date && task.status !== "done") && <p className="text-sm text-t3">{t("workspace.no_due_tasks")}</p>}</div>
+          </div>
+          <div className="workspace-panel">
+            <h2 className="mb-3 text-[15px] font-semibold text-t1">{t("workspace.projects")}</h2>
+            <div className="space-y-2">{projects.slice(0, 5).map((project) => <button key={project.id} onClick={() => openObject(project)} className="flex w-full items-center justify-between rounded-lg bg-surface px-3 py-2 text-left text-sm text-t2 hover:text-accent"><span className="truncate">{project.title}</span><span className="text-[11px] text-t3">{formatDate(project.updated_at)}</span></button>)}{!projects.length && <p className="text-sm text-t3">{t("workspace.no_content")}</p>}</div>
           </div>
         </div>
       </section>
@@ -1283,20 +1283,52 @@ export default function WorkspacePage() {
   if (isLoading) return <div className="p-6 text-t2">{t("workspace.loading")}</div>;
 
   return (
-    <div className="workspace-page space-y-5 p-4 md:p-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><div className="label-xs mb-1">{t("workspace.kicker")}</div><h1 className="text-2xl font-semibold tracking-tight text-t1">{t("workspace.title")}</h1></div>
-        <div className="flex flex-wrap gap-2"><button onClick={() => quickCreate("project")} className="workspace-primary-button"><Plus size={14} />{t("workspace.project")}</button><button onClick={() => quickCreate("task")} className="workspace-secondary-button"><Plus size={14} />{t("workspace.task")}</button></div>
-      </div>
+    <div className="workspace-page flex min-h-0 gap-5 text-t1">
+      <aside className="workspace-sidebar">
+        <div className="sticky top-0 space-y-4">
+          <div className="px-1">
+            <div className="label-xs mb-1">{t("workspace.kicker")}</div>
+            <h1 className="text-lg font-semibold text-t1">{t("workspace.title")}</h1>
+          </div>
 
-      <div className="workspace-command-bar">
-        <div className="workspace-search"><Search size={15} className="text-t3" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("workspace.search_placeholder")} className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3" /></div>
-        <div className="flex gap-1 overflow-x-auto">{tabs.map((tab) => { const Icon = tab === "dashboard" ? BarChart3 : tab === "board" ? Blocks : tab === "list" ? ListChecks : tab === "calendar" ? CalendarDays : tab === "timeline" ? CheckSquare : tab === "mindmap" ? Network : tab === "projects" ? FolderKanban : tab === "wiki" ? Link2 : FileText; return <button key={tab} onClick={() => setActiveTab(tab)} className={`workspace-tab ${activeTab === tab ? "workspace-tab-active" : ""}`}><Icon size={14} />{t(`workspace.tab_${tab}`)}</button>; })}</div>
-      </div>
+          <div>
+            <div className="label-xs mb-2 px-3">{t("workspace.views")}</div>
+            <div className="space-y-0.5">
+              {sidebarTabs.map((tab) => {
+                const Icon = tabIcon(tab);
+                return (
+                  <button key={tab} onClick={() => setActiveTab(tab)} className={`workspace-sidebar-item ${activeTab === tab ? "workspace-sidebar-item-active" : ""}`}>
+                    <Icon size={13} />
+                    <span className="flex-1 text-left">{t(`workspace.tab_${tab}`)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-      {activeTab !== "notes" && <div className="flex flex-wrap gap-2">{(["project", "task", "wiki", "note"] as WorkspaceObjectType[]).map((type) => <button key={type} onClick={() => setQuery(`type:${type}`)} className="workspace-filter-chip">{t(`workspace.type_${type}`)}</button>)}{priorities.map((priority) => <button key={priority} onClick={() => setQuery(`priority:${priority}`)} className="workspace-filter-chip">{t(`workspace.priority_${priority}`)}</button>)}</div>}
+          <div className="border-t border-line/40 pt-3">
+            <div className="label-xs mb-2 px-3">{t("workspace.thedash_box")}</div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(["project", "task", "wiki", "note"] as WorkspaceObjectType[]).map((type) => (
+                <button key={type} onClick={() => quickCreate(type)} className={`workspace-sidebar-create ${typeTone(type)}`}>
+                  <Plus size={12} />
+                  {t(`workspace.type_${type}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </aside>
 
-      <div className="overflow-x-auto">{content}</div>
+      <main className="min-w-0 flex-1 space-y-4">
+        <div className="workspace-command-bar">
+          <div className="workspace-search"><Search size={15} className="text-t3" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("workspace.search_placeholder")} className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3" /></div>
+        </div>
+
+        {activeTab !== "notes" && <div className="flex gap-1.5 overflow-x-auto pb-0.5">{(["project", "task", "wiki", "note"] as WorkspaceObjectType[]).map((type) => <button key={type} onClick={() => setQuery(`type:${type}`)} className="workspace-filter-chip shrink-0">{t(`workspace.type_${type}`)}</button>)}{priorities.map((priority) => <button key={priority} onClick={() => setQuery(`priority:${priority}`)} className="workspace-filter-chip shrink-0">{t(`workspace.priority_${priority}`)}</button>)}</div>}
+
+        <div className="overflow-x-auto">{content}</div>
+      </main>
       {draft && <WorkspaceDrawer draft={draft} setDraft={setDraft} onClose={() => setDraft(null)} overview={overview} activeBoardId={boardId} />}
       {taskDetail && <TaskDetailDrawer task={taskDetail} overview={overview} onClose={() => setTaskDetail(null)} onEdit={(task) => { setTaskDetail(null); setDraft(makeDraft("task", task, boardId)); }} />}
 
