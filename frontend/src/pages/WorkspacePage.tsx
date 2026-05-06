@@ -7,6 +7,8 @@ import {
   BookOpen,
   Blocks,
   CalendarDays,
+  ChevronDown,
+  ChevronRight,
   CheckSquare,
   Circle,
   Edit3,
@@ -16,6 +18,7 @@ import {
   GripVertical,
   Link2,
   ListChecks,
+  MoreHorizontal,
   Network,
   Plus,
   Search,
@@ -101,7 +104,6 @@ const NotesPage = lazy(() => import("./NotesPage"));
 
 const tabs = ["dashboard", "board", "list", "calendar", "timeline", "mindmap", "projects", "wiki", "notes"] as const;
 const priorities: WorkspacePriority[] = ["low", "medium", "high", "urgent"];
-const statusFilters: WorkspaceStatus[] = ["backlog", "todo", "doing", "blocked", "done"];
 const columnLimit = 10;
 
 type WorkspaceTab = (typeof tabs)[number];
@@ -127,6 +129,16 @@ type Draft = {
   book_id?: number | null;
   chapter_id?: number | null;
   sort_order?: number;
+};
+
+type WikiEditorDraft = {
+  id: number;
+  title: string;
+  body: string;
+  tags: string;
+  book_id: number | null;
+  chapter_id: number | null;
+  sort_order: number;
 };
 
 function objectBody(item: WorkspaceObject): string {
@@ -242,38 +254,27 @@ function makeDraft(type: WorkspaceObjectType, item?: WorkspaceObject, boardId?: 
   };
 }
 
-function useFilteredObjects(items: WorkspaceObject[], query: string, projects: WorkspaceProject[]) {
-  return useMemo(() => {
-    const parts = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const operators = parts.filter((part) => part.includes(":"));
-    const textTerms = parts.filter((part) => !part.includes(":"));
+function makeWikiEditorDraft(page: WorkspaceWikiPage): WikiEditorDraft {
+  return {
+    id: page.id,
+    title: page.title,
+    body: page.body,
+    tags: page.tags.join(", "),
+    book_id: page.book_id,
+    chapter_id: page.chapter_id,
+    sort_order: page.sort_order,
+  };
+}
 
-    return items.filter((item) => {
-      const labelNames = item.type === "task" ? item.labels.map((label) => label.name) : [];
-      const workspaceTagNames = item.type === "task" ? item.tag_records.map((tag) => tag.name) : [];
-      const haystack = [item.type, item.title, objectBody(item), ...item.tags, ...labelNames, ...workspaceTagNames].join(" ").toLowerCase();
-      const textMatch = textTerms.every((term) => haystack.includes(term));
-      const operatorMatch = operators.every((operator) => {
-        const [key, ...rest] = operator.split(":");
-        const value = rest.join(":");
-        if (!value) return true;
-        if (key === "type") return item.type === value;
-        if (key === "tag") return [...item.tags, ...workspaceTagNames].some((tag) => tag.toLowerCase().includes(value));
-        if (key === "label" && item.type === "task") return item.labels.some((label) => label.name.toLowerCase().includes(value));
-        if (key === "status") return (item.type === "project" || item.type === "task") && item.status === value;
-        if (key === "priority") return (item.type === "project" || item.type === "task") && item.priority === value;
-        if (key === "project" && item.type === "task") return projects.find((project) => project.id === item.project_id)?.title.toLowerCase().includes(value) ?? false;
-        if (key === "due") {
-          if (!(item.type === "project" || item.type === "task") || !item.due_date) return false;
-          if (value === "overdue") return new Date(item.due_date) < new Date() && item.status !== "done";
-          if (value === "set") return true;
-          return item.due_date.includes(value);
-        }
-        return true;
-      });
-      return textMatch && operatorMatch;
-    });
-  }, [items, projects, query]);
+function serializeWikiEditorDraft(draft: WikiEditorDraft): string {
+  return JSON.stringify({
+    title: draft.title.trim(),
+    body: draft.body,
+    tags: parseTags(draft.tags),
+    book_id: draft.book_id,
+    chapter_id: draft.chapter_id,
+    sort_order: draft.sort_order,
+  });
 }
 
 function StatCard({ icon: Icon, label, value, tone }: { icon: React.ElementType; label: string; value: number; tone: string }) {
@@ -1056,6 +1057,7 @@ export default function WorkspacePage() {
   const createProject = useCreateWorkspaceProject();
   const createTask = useCreateWorkspaceTask();
   const createWiki = useCreateWorkspaceWiki();
+  const updateWikiPage = useUpdateWorkspaceWiki();
   const createWikiBook = useCreateWorkspaceWikiBook();
   const updateWikiBook = useUpdateWorkspaceWikiBook();
   const deleteWikiBook = useDeleteWorkspaceWikiBook();
@@ -1067,7 +1069,6 @@ export default function WorkspacePage() {
   const reorderBoard = useReorderWorkspaceBoard();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("dashboard");
-  const [query, setQuery] = useState("");
   const [wikiQuery, setWikiQuery] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [activeBoardId, setActiveBoardId] = useState<number | null>(null);
@@ -1081,10 +1082,19 @@ export default function WorkspacePage() {
   const [expandedWikiBooks, setExpandedWikiBooks] = useState<number[]>([]);
   const [newWikiBookTitle, setNewWikiBookTitle] = useState("");
   const [newWikiChapterTitle, setNewWikiChapterTitle] = useState("");
+  const [creatingWikiBook, setCreatingWikiBook] = useState(false);
+  const [creatingWikiChapterBookId, setCreatingWikiChapterBookId] = useState<number | null>(null);
+  const [wikiSortMode, setWikiSortMode] = useState(false);
+  const [wikiActionMenu, setWikiActionMenu] = useState<string | null>(null);
   const [editingWikiBook, setEditingWikiBook] = useState<WorkspaceWikiBook | null>(null);
   const [editingWikiChapter, setEditingWikiChapter] = useState<WorkspaceWikiChapter | null>(null);
   const [deleteWikiBookTarget, setDeleteWikiBookTarget] = useState<WorkspaceWikiBook | null>(null);
   const [deleteWikiChapterTarget, setDeleteWikiChapterTarget] = useState<WorkspaceWikiChapter | null>(null);
+  const [editingWikiPageId, setEditingWikiPageId] = useState<number | null>(null);
+  const [wikiEditorDraft, setWikiEditorDraft] = useState<WikiEditorDraft | null>(null);
+  const [wikiAutosaveState, setWikiAutosaveState] = useState<SaveState>("idle");
+  const [wikiAutosaveBaseline, setWikiAutosaveBaseline] = useState("");
+  const [wikiAutosaveError, setWikiAutosaveError] = useState("");
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [taskDetail, setTaskDetail] = useState<WorkspaceTask | null>(null);
 
@@ -1102,20 +1112,18 @@ export default function WorkspacePage() {
   const boardTasks = tasks.filter((task) => task.board_id === boardId);
   const allObjects = useMemo<WorkspaceObject[]>(() => [...projects, ...tasks, ...wiki, ...notes], [projects, tasks, wiki, notes]);
   const activeWikiPage = activeWikiPageId ? wiki.find((page) => page.id === activeWikiPageId) ?? null : null;
-  const filteredObjects = useFilteredObjects(allObjects, query, projects);
+  const filteredObjects = allObjects;
   const activeDragTask = activeDragId?.startsWith("task:") ? tasks.find((task) => `task:${task.id}` === activeDragId) : null;
   const sidebarTabs: WorkspaceTab[] = ["dashboard", "board", "list", "calendar", "timeline", "mindmap", "projects", "wiki", "notes"];
   const tabIcon = (tab: WorkspaceTab) => tab === "dashboard" ? BarChart3 : tab === "board" ? Blocks : tab === "list" ? ListChecks : tab === "calendar" ? CalendarDays : tab === "timeline" ? CheckSquare : tab === "mindmap" ? Network : tab === "projects" ? FolderKanban : tab === "wiki" ? Link2 : FileText;
-  const filterPills = [
-    ...(["project", "task", "wiki", "note"] as WorkspaceObjectType[]).map((type) => ({ key: `type:${type}`, label: t(`workspace.type_${type}`) })),
-    ...priorities.map((priority) => ({ key: `priority:${priority}`, label: t(`workspace.priority_${priority}`) })),
-    ...statusFilters.map((status) => ({ key: `status:${status}`, label: t(`workspace.status_${status}`) })),
-  ];
-  const activeFilter = query.trim().toLowerCase();
-
   const openObject = (item: WorkspaceObject) => {
     if (item.type === "task") {
       setTaskDetail(item);
+      return;
+    }
+    if (item.type === "wiki") {
+      setActiveTab("wiki");
+      openWikiPage(item.id);
       return;
     }
     setDraft(makeDraft(item.type, item, boardId));
@@ -1129,13 +1137,116 @@ export default function WorkspacePage() {
     if (!expandedWikiBooks.length && wikiBooks[0]?.id) setExpandedWikiBooks([wikiBooks[0].id]);
   }, [expandedWikiBooks.length, wikiBooks]);
 
+  useEffect(() => {
+    if (activeWikiPageId === editingWikiPageId) return;
+    setEditingWikiPageId(null);
+    setWikiEditorDraft(null);
+    setWikiAutosaveState("idle");
+    setWikiAutosaveBaseline("");
+    setWikiAutosaveError("");
+  }, [activeWikiPageId, editingWikiPageId]);
+
+  useEffect(() => {
+    if (!wikiEditorDraft || editingWikiPageId !== wikiEditorDraft.id) return;
+    const serialized = serializeWikiEditorDraft(wikiEditorDraft);
+    if (!wikiAutosaveBaseline || serialized === wikiAutosaveBaseline) return;
+
+    setWikiAutosaveState("saving");
+    setWikiAutosaveError("");
+    const timeout = window.setTimeout(async () => {
+      try {
+        const saved = await updateWikiPage.mutateAsync({
+          id: wikiEditorDraft.id,
+          title: wikiEditorDraft.title.trim() || t("workspace.untitled"),
+          body: wikiEditorDraft.body,
+          tags: parseTags(wikiEditorDraft.tags),
+          book_id: wikiEditorDraft.book_id,
+          chapter_id: wikiEditorDraft.chapter_id,
+          sort_order: wikiEditorDraft.sort_order,
+        });
+        const savedDraft = makeWikiEditorDraft(saved);
+        setWikiAutosaveBaseline(serializeWikiEditorDraft(savedDraft));
+        setWikiAutosaveState("saved");
+      } catch {
+        setWikiAutosaveState("error");
+        setWikiAutosaveError(t("workspace.save_error"));
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingWikiPageId, t, updateWikiPage.mutateAsync, wikiAutosaveBaseline, wikiEditorDraft]);
+
+  const openWikiPage = (pageId: number | null) => {
+    setActiveWikiPageId(pageId);
+    setEditingWikiPageId(null);
+    setWikiEditorDraft(null);
+    setWikiAutosaveState("idle");
+    setWikiAutosaveBaseline("");
+    setWikiAutosaveError("");
+  };
+
+  const startWikiEdit = (page: WorkspaceWikiPage) => {
+    const draft = makeWikiEditorDraft(page);
+    setActiveWikiPageId(page.id);
+    setEditingWikiPageId(page.id);
+    setWikiEditorDraft(draft);
+    setWikiAutosaveBaseline(serializeWikiEditorDraft(draft));
+    setWikiAutosaveState("idle");
+    setWikiAutosaveError("");
+  };
+
+  const patchWikiEditorDraft = (patch: Partial<WikiEditorDraft>) => {
+    setWikiEditorDraft((current) => current ? { ...current, ...patch } : current);
+  };
+
+  const saveWikiEditorDraft = async (draftToSave = wikiEditorDraft) => {
+    if (!draftToSave) return true;
+    setWikiAutosaveState("saving");
+    setWikiAutosaveError("");
+    try {
+      const saved = await updateWikiPage.mutateAsync({
+        id: draftToSave.id,
+        title: draftToSave.title.trim() || t("workspace.untitled"),
+        body: draftToSave.body,
+        tags: parseTags(draftToSave.tags),
+        book_id: draftToSave.book_id,
+        chapter_id: draftToSave.chapter_id,
+        sort_order: draftToSave.sort_order,
+      });
+      const savedDraft = makeWikiEditorDraft(saved);
+      setWikiAutosaveBaseline(serializeWikiEditorDraft(savedDraft));
+      setWikiAutosaveState("saved");
+      return true;
+    } catch {
+      setWikiAutosaveState("error");
+      setWikiAutosaveError(t("workspace.save_error"));
+      return false;
+    }
+  };
+
+  const retryWikiAutosave = async () => {
+    await saveWikiEditorDraft();
+  };
+
+  const finishWikiEdit = async () => {
+    if (!wikiEditorDraft) return;
+    if (serializeWikiEditorDraft(wikiEditorDraft) !== wikiAutosaveBaseline) {
+      const saved = await saveWikiEditorDraft(wikiEditorDraft);
+      if (!saved) return;
+    }
+    setEditingWikiPageId(null);
+    setWikiEditorDraft(null);
+    setWikiAutosaveState("idle");
+    setWikiAutosaveBaseline("");
+    setWikiAutosaveError("");
+  };
+
   const quickCreate = async (type: WorkspaceObjectType, columnId?: number) => {
     if (type === "project") setDraft(makeDraft("project", await createProject.mutateAsync({ title: t("workspace.new_project"), body: "## Goal\n\n## Tasks\n", status: "backlog", priority: "medium" }), boardId));
     if (type === "task") setDraft(makeDraft("task", await createTask.mutateAsync({ title: t("workspace.new_task"), board_id: boardId, column_id: columnId ?? boardColumns[0]?.id, priority: "medium" }), boardId, columnId));
     if (type === "wiki") {
       const page = await createWiki.mutateAsync({ title: t("workspace.new_wiki"), body: "## Overview\n", book_id: wikiBooks[0]?.id ?? null });
-      setActiveWikiPageId(page.id);
-      setDraft(makeDraft("wiki", page, boardId));
+      startWikiEdit(page);
     }
     if (type === "note") {
       const note = await createNote.mutateAsync({ title: t("workspace.new_note"), content: "" });
@@ -1324,19 +1435,8 @@ export default function WorkspacePage() {
   };
 
   const renderWikiLibrary = () => {
-    const allWikiLinks = allObjects.flatMap((item) => extractWikiLinks(objectBody(item)));
-    const existingTitles = new Set(wiki.map((page) => normalizeWikiTitle(page.title)));
-    const missingLinks = Array.from(new Set(allWikiLinks.filter((link) => !existingTitles.has(normalizeWikiTitle(link)))));
-    const orphanPages = wiki.filter((page) => !allObjects.some((item) => item.type !== "wiki" || item.id !== page.id ? extractWikiLinks(objectBody(item)).some((link) => normalizeWikiTitle(link) === normalizeWikiTitle(page.title)) : false));
     const activeBook = activeWikiPage ? wikiBooks.find((book) => book.id === activeWikiPage.book_id) : null;
     const activeChapter = activeWikiPage?.chapter_id ? wikiChapters.find((chapter) => chapter.id === activeWikiPage.chapter_id) : null;
-    const activeOutline = activeWikiPage?.body.split("\n").filter((line) => /^#{1,4}\s+/.test(line)).slice(0, 12) ?? [];
-    const activeOutgoingLinks = activeWikiPage ? Array.from(new Set(extractWikiLinks(activeWikiPage.body))) : [];
-    const activeMissingLinks = activeOutgoingLinks.filter((link) => !existingTitles.has(normalizeWikiTitle(link)));
-    const activeBacklinks = activeWikiPage ? allObjects.filter((item) => {
-      if (item.type === "wiki" && item.id === activeWikiPage.id) return false;
-      return extractWikiLinks(objectBody(item)).some((link) => normalizeWikiTitle(link) === normalizeWikiTitle(activeWikiPage.title));
-    }) : [];
     const sortedBooks = [...wikiBooks].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
     const wikiSearch = wikiQuery.trim().toLowerCase();
     const filteredWiki = wiki.filter((page) => {
@@ -1353,22 +1453,13 @@ export default function WorkspacePage() {
     const chaptersFor = (bookId: number) => wikiChapters
       .filter((chapter) => chapter.book_id === bookId)
       .sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
-    const createMissingWiki = async (title: string) => {
-      const existing = wiki.find((page) => normalizeWikiTitle(page.title) === normalizeWikiTitle(title));
-      if (existing) {
-        setActiveWikiPageId(existing.id);
-        return;
-      }
-      const created = await createWiki.mutateAsync({ title, body: `# ${title}\n`, book_id: activeBook?.id ?? wikiBooks[0]?.id ?? null, chapter_id: activeChapter?.id ?? null });
-      setActiveWikiPageId(created.id);
-      setDraft(makeDraft("wiki", created, boardId));
-    };
     const createBook = async () => {
       const title = newWikiBookTitle.trim();
       if (!title) return;
       const book = await createWikiBook.mutateAsync({ title, color: "#8b5cf6" });
       setExpandedWikiBooks((current) => Array.from(new Set([...current, book.id])));
       setNewWikiBookTitle("");
+      setCreatingWikiBook(false);
     };
     const createChapter = async (bookId: number) => {
       const title = newWikiChapterTitle.trim();
@@ -1376,12 +1467,12 @@ export default function WorkspacePage() {
       await createWikiChapter.mutateAsync({ book_id: bookId, title });
       setExpandedWikiBooks((current) => Array.from(new Set([...current, bookId])));
       setNewWikiChapterTitle("");
+      setCreatingWikiChapterBookId(null);
     };
     const createPage = async (bookId: number, chapterId: number | null = null) => {
       const page = await createWiki.mutateAsync({ title: t("workspace.new_wiki"), body: "## Overview\n", book_id: bookId, chapter_id: chapterId });
       setExpandedWikiBooks((current) => Array.from(new Set([...current, bookId])));
-      setActiveWikiPageId(page.id);
-      setDraft(makeDraft("wiki", page, boardId));
+      startWikiEdit(page);
     };
     const movePage = async (page: WorkspaceWikiPage, direction: -1 | 1) => {
       const siblings = wiki
@@ -1408,77 +1499,168 @@ export default function WorkspacePage() {
       const reordered = arrayMove(siblings, index, targetIndex).map((item, sortIndex) => ({ id: item.id, book_id: item.book_id, sort_order: sortIndex }));
       await reorderWiki.mutateAsync({ chapters: reordered });
     };
+    const pageCountForBook = (book: WorkspaceWikiBook) =>
+      pagesFor(book.id, null).length + chaptersFor(book.id).reduce((count, chapter) => count + pagesFor(book.id, chapter.id).length, 0);
+    const isEditingActiveWikiPage = Boolean(activeWikiPage && wikiEditorDraft && editingWikiPageId === activeWikiPage.id);
+    const editorBookId = wikiEditorDraft?.book_id ?? wikiBooks[0]?.id ?? null;
+    const editorChapters = wikiChapters.filter((chapter) => chapter.book_id === editorBookId);
+    const visibleBook = isEditingActiveWikiPage ? wikiBooks.find((book) => book.id === editorBookId) : activeBook;
+    const visibleChapter = isEditingActiveWikiPage && wikiEditorDraft?.chapter_id ? wikiChapters.find((chapter) => chapter.id === wikiEditorDraft.chapter_id) : activeChapter;
+    const openChapterCreate = (bookId: number) => {
+      setCreatingWikiChapterBookId(bookId);
+      setNewWikiChapterTitle("");
+      setExpandedWikiBooks((current) => Array.from(new Set([...current, bookId])));
+      setWikiActionMenu(null);
+    };
 
     return (
       <div className="workspace-wiki-layout">
         <aside className="workspace-panel workspace-wiki-tree">
-          <div className="mb-3">
-            <div className="label-xs">{t("workspace.wiki_home")}</div>
-            <h2 className="mt-1 text-lg font-semibold text-t1">{t("workspace.wiki_library")}</h2>
-            <p className="mt-1 text-[12px] text-t3">{t("workspace.wiki_library_description")}</p>
+          <div className="workspace-wiki-tree-header">
+            <div className="min-w-0">
+              <div className="label-xs">{t("workspace.wiki")}</div>
+              <h2 className="mt-1 text-lg font-semibold text-t1">{t("workspace.wiki_library")}</h2>
+            </div>
+            <div className="workspace-wiki-tree-counts">
+              <span><BookOpen size={12} />{wikiBooks.length}</span>
+              <span><FileText size={12} />{wiki.length}</span>
+            </div>
           </div>
-          <button onClick={() => setActiveWikiPageId(null)} className={`workspace-wiki-home-button ${!activeWikiPage ? "workspace-wiki-page-active" : ""}`}>
-            <BookOpen size={14} />
-            <span>{t("workspace.wiki_home")}</span>
-          </button>
-          <div className="my-3 workspace-search workspace-wiki-search">
+          <div className="mt-3 workspace-search workspace-wiki-search">
             <Search size={14} className="text-t3" />
             <input value={wikiQuery} onChange={(event) => setWikiQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3" placeholder={t("workspace.wiki_search_placeholder")} />
           </div>
-          <div className="mb-4 flex gap-2">
-            <input value={newWikiBookTitle} onChange={(event) => setNewWikiBookTitle(event.target.value)} className="workspace-input h-9" placeholder={t("workspace.new_wiki_book")} />
-            <button onClick={createBook} className="workspace-secondary-button h-9 px-3"><Plus size={12} /></button>
+          <div className="my-3 flex items-center gap-2">
+            <button onClick={() => openWikiPage(null)} className={`workspace-wiki-home-button ${!activeWikiPage ? "workspace-wiki-page-active" : ""}`}>
+              <BookOpen size={14} />
+              <span>{t("workspace.wiki_home")}</span>
+            </button>
+            <button onClick={() => { setCreatingWikiBook((open) => !open); setWikiActionMenu(null); }} className="workspace-secondary-button h-9 shrink-0 px-3"><Plus size={12} />{t("workspace.wiki_book")}</button>
+            <button onClick={() => setWikiSortMode((enabled) => !enabled)} className={`workspace-secondary-button h-9 shrink-0 px-3 ${wikiSortMode ? "workspace-secondary-button-active" : ""}`}><GripHorizontal size={12} />{wikiSortMode ? t("common.done") : t("workspace.sort")}</button>
           </div>
-          <div className="space-y-2">
+          {creatingWikiBook && (
+            <div className="mb-3 flex gap-2">
+              <input autoFocus value={newWikiBookTitle} onChange={(event) => setNewWikiBookTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void createBook(); }} className="workspace-input h-9" placeholder={t("workspace.new_wiki_book")} />
+              <button onClick={createBook} className="workspace-primary-button h-9 px-3"><Plus size={12} /></button>
+            </div>
+          )}
+          <div className="workspace-wiki-tree-list">
             {sortedBooks.map((book) => {
               const expanded = expandedWikiBooks.includes(book.id);
               const directPages = pagesFor(book.id, null);
               const chapters = chaptersFor(book.id);
+              const bookMenuKey = `book:${book.id}`;
               return (
                 <div key={book.id} className="workspace-wiki-book">
-                  <div className="flex items-center gap-2">
+                  <div className="workspace-wiki-row workspace-wiki-book-row">
                     <button onClick={() => setExpandedWikiBooks((current) => expanded ? current.filter((id) => id !== book.id) : [...current, book.id])} className="workspace-wiki-book-button">
+                      {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                       <BookOpen size={14} />
                       <span className="min-w-0 flex-1 truncate">{book.title}</span>
-                      <span className="workspace-meta-pill">{directPages.length + chapters.reduce((count, chapter) => count + pagesFor(book.id, chapter.id).length, 0)}</span>
+                      <span className="workspace-meta-pill">{pageCountForBook(book)}</span>
                     </button>
-                    <button onClick={() => setEditingWikiBook(book)} className="rounded-full p-1.5 text-t3 hover:text-accent"><Edit3 size={13} /></button>
-                    <button onClick={() => moveBook(book, -1)} className="text-t3 hover:text-accent">↑</button>
-                    <button onClick={() => moveBook(book, 1)} className="text-t3 hover:text-accent">↓</button>
-                    {wikiBooks.length > 1 && <button onClick={() => setDeleteWikiBookTarget(book)} className="rounded-full p-1.5 text-t3 hover:text-rose-400"><Trash2 size={13} /></button>}
+                    {wikiSortMode ? (
+                      <div className="workspace-wiki-sort-actions">
+                        <button onClick={() => moveBook(book, -1)}>↑</button>
+                        <button onClick={() => moveBook(book, 1)}>↓</button>
+                      </div>
+                    ) : (
+                      <div className="workspace-wiki-action-wrap">
+                        <button onClick={() => setWikiActionMenu((current) => current === bookMenuKey ? null : bookMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
+                        {wikiActionMenu === bookMenuKey && (
+                          <div className="workspace-wiki-action-menu">
+                            <button onClick={() => { createPage(book.id); setWikiActionMenu(null); }}><Plus size={12} />{t("workspace.new_wiki_page")}</button>
+                            <button onClick={() => openChapterCreate(book.id)}><Plus size={12} />{t("workspace.new_wiki_chapter")}</button>
+                            <button onClick={() => { setEditingWikiBook(book); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
+                            {wikiBooks.length > 1 && <button onClick={() => { setDeleteWikiBookTarget(book); setWikiActionMenu(null); }} className="text-rose-400"><Trash2 size={12} />{t("common.delete")}</button>}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   {expanded && (
-                    <div className="mt-2 space-y-2 pl-3">
-                      <div className="flex gap-2">
-                        <input value={newWikiChapterTitle} onChange={(event) => setNewWikiChapterTitle(event.target.value)} className="workspace-input h-8 text-[12px]" placeholder={t("workspace.new_wiki_chapter")} />
-                        <button onClick={() => createChapter(book.id)} className="workspace-secondary-button h-8 px-2"><Plus size={11} /></button>
-                      </div>
-                      <button onClick={() => createPage(book.id)} className="workspace-wiki-page-button text-accent"><Plus size={12} />{t("workspace.new_wiki_page")}</button>
-                      {directPages.map((page) => (
-                        <div key={page.id} className="flex items-center gap-1">
-                          <button onClick={() => setActiveWikiPageId(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} />{page.title}</button>
-                          <button onClick={() => movePage(page, -1)} className="text-t3 hover:text-accent">↑</button>
-                          <button onClick={() => movePage(page, 1)} className="text-t3 hover:text-accent">↓</button>
+                    <div className="workspace-wiki-children">
+                      {creatingWikiChapterBookId === book.id && (
+                        <div className="workspace-wiki-inline-create">
+                          <input autoFocus value={newWikiChapterTitle} onChange={(event) => setNewWikiChapterTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void createChapter(book.id); }} className="workspace-input h-8 text-[12px]" placeholder={t("workspace.new_wiki_chapter")} />
+                          <button onClick={() => createChapter(book.id)} className="workspace-primary-button h-8 px-2"><Plus size={11} /></button>
                         </div>
-                      ))}
-                      {chapters.map((chapter) => (
-                        <div key={chapter.id} className="workspace-wiki-chapter">
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => setEditingWikiChapter(chapter)} className="workspace-wiki-chapter-title"><GripHorizontal size={12} />{chapter.title}</button>
-                            <button onClick={() => moveChapter(chapter, -1)} className="text-t3 hover:text-accent">↑</button>
-                            <button onClick={() => moveChapter(chapter, 1)} className="text-t3 hover:text-accent">↓</button>
-                            <button onClick={() => setDeleteWikiChapterTarget(chapter)} className="rounded-full p-1 text-t3 hover:text-rose-400"><Trash2 size={12} /></button>
+                      )}
+                      {directPages.map((page) => {
+                        const pageMenuKey = `page:${page.id}`;
+                        return (
+                          <div key={page.id} className="workspace-wiki-row workspace-wiki-page-row">
+                            <button onClick={() => openWikiPage(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} /><span className="truncate">{page.title}</span></button>
+                            {wikiSortMode ? (
+                              <div className="workspace-wiki-sort-actions">
+                                <button onClick={() => movePage(page, -1)}>↑</button>
+                                <button onClick={() => movePage(page, 1)}>↓</button>
+                              </div>
+                            ) : (
+                              <div className="workspace-wiki-action-wrap">
+                                <button onClick={() => setWikiActionMenu((current) => current === pageMenuKey ? null : pageMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
+                                {wikiActionMenu === pageMenuKey && (
+                                  <div className="workspace-wiki-action-menu">
+                                    <button onClick={() => { startWikiEdit(page); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <button onClick={() => createPage(book.id, chapter.id)} className="workspace-wiki-page-button text-accent"><Plus size={12} />{t("workspace.new_wiki_page")}</button>
-                          {pagesFor(book.id, chapter.id).map((page) => (
-                            <div key={page.id} className="flex items-center gap-1">
-                              <button onClick={() => setActiveWikiPageId(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} />{page.title}</button>
-                              <button onClick={() => movePage(page, -1)} className="text-t3 hover:text-accent">↑</button>
-                              <button onClick={() => movePage(page, 1)} className="text-t3 hover:text-accent">↓</button>
+                        );
+                      })}
+                      {chapters.map((chapter) => {
+                        const chapterMenuKey = `chapter:${chapter.id}`;
+                        return (
+                          <div key={chapter.id} className="workspace-wiki-chapter">
+                            <div className="workspace-wiki-row workspace-wiki-chapter-row">
+                              <button onClick={() => setEditingWikiChapter(chapter)} className="workspace-wiki-chapter-title"><GripHorizontal size={12} /><span className="truncate">{chapter.title}</span><span className="workspace-meta-pill">{pagesFor(book.id, chapter.id).length}</span></button>
+                              {wikiSortMode ? (
+                                <div className="workspace-wiki-sort-actions">
+                                  <button onClick={() => moveChapter(chapter, -1)}>↑</button>
+                                  <button onClick={() => moveChapter(chapter, 1)}>↓</button>
+                                </div>
+                              ) : (
+                                <div className="workspace-wiki-action-wrap">
+                                  <button onClick={() => setWikiActionMenu((current) => current === chapterMenuKey ? null : chapterMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
+                                  {wikiActionMenu === chapterMenuKey && (
+                                    <div className="workspace-wiki-action-menu">
+                                      <button onClick={() => { createPage(book.id, chapter.id); setWikiActionMenu(null); }}><Plus size={12} />{t("workspace.new_wiki_page")}</button>
+                                      <button onClick={() => { setEditingWikiChapter(chapter); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
+                                      <button onClick={() => { setDeleteWikiChapterTarget(chapter); setWikiActionMenu(null); }} className="text-rose-400"><Trash2 size={12} />{t("common.delete")}</button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      ))}
+                            <div className="workspace-wiki-chapter-pages">
+                              {pagesFor(book.id, chapter.id).map((page) => {
+                                const pageMenuKey = `page:${page.id}`;
+                                return (
+                                  <div key={page.id} className="workspace-wiki-row workspace-wiki-page-row">
+                                    <button onClick={() => openWikiPage(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} /><span className="truncate">{page.title}</span></button>
+                                    {wikiSortMode ? (
+                                      <div className="workspace-wiki-sort-actions">
+                                        <button onClick={() => movePage(page, -1)}>↑</button>
+                                        <button onClick={() => movePage(page, 1)}>↓</button>
+                                      </div>
+                                    ) : (
+                                      <div className="workspace-wiki-action-wrap">
+                                        <button onClick={() => setWikiActionMenu((current) => current === pageMenuKey ? null : pageMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
+                                        {wikiActionMenu === pageMenuKey && (
+                                          <div className="workspace-wiki-action-menu">
+                                            <button onClick={() => { startWikiEdit(page); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1495,15 +1677,73 @@ export default function WorkspacePage() {
                   <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[12px] text-t3">
                     <span>{t("workspace.wiki")}</span>
                     <span>/</span>
-                    <span>{activeBook?.title ?? t("workspace.wiki_book")}</span>
-                    {activeChapter && <><span>/</span><span>{activeChapter.title}</span></>}
+                    <span>{visibleBook?.title ?? t("workspace.wiki_book")}</span>
+                    {visibleChapter && <><span>/</span><span>{visibleChapter.title}</span></>}
                   </div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-t1">{activeWikiPage.title}</h2>
+                  <h2 className="text-2xl font-semibold tracking-tight text-t1">{isEditingActiveWikiPage && wikiEditorDraft ? wikiEditorDraft.title || t("workspace.untitled") : activeWikiPage.title}</h2>
                   <p className="mt-1 text-sm text-t3">{t("workspace.updated_at")}: {formatDate(activeWikiPage.updated_at)}</p>
                 </div>
-                <button onClick={() => setDraft(makeDraft("wiki", activeWikiPage, boardId))} className="workspace-primary-button"><Edit3 size={14} />{t("workspace.edit_wiki_page")}</button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {isEditingActiveWikiPage && (
+                    <span className={`workspace-autosave-pill workspace-autosave-${wikiAutosaveState}`}>
+                      {wikiAutosaveState === "saving" ? t("workspace.saving") : wikiAutosaveState === "saved" ? t("workspace.saved") : wikiAutosaveState === "error" ? t("workspace.save_error") : t("workspace.autosave")}
+                    </span>
+                  )}
+                  {wikiAutosaveState === "error" && <button onClick={retryWikiAutosave} className="workspace-secondary-button">{t("workspace.retry")}</button>}
+                  {isEditingActiveWikiPage ? (
+                    <>
+                      <button onClick={() => void finishWikiEdit()} className="workspace-primary-button">{t("workspace.preview")}</button>
+                      <button onClick={() => { setEditingWikiPageId(null); setWikiEditorDraft(null); setWikiAutosaveState("idle"); setWikiAutosaveError(""); }} className="workspace-secondary-button">{t("common.cancel")}</button>
+                    </>
+                  ) : (
+                    <button onClick={() => startWikiEdit(activeWikiPage)} className="workspace-primary-button"><Edit3 size={14} />{t("workspace.edit_wiki_page")}</button>
+                  )}
+                </div>
               </div>
-              <MDEditor.Markdown source={markdownWithWikiAnchors(activeWikiPage.body) || t("workspace.no_content")} className="workspace-markdown-preview workspace-wiki-preview" />
+              {isEditingActiveWikiPage && wikiEditorDraft ? (
+                <div className="workspace-wiki-editor-shell">
+                  <section className="workspace-drawer-section workspace-tone-wiki">
+                    <h3 className="workspace-section-title">{t("workspace.basics")}</h3>
+                    <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_220px_220px]">
+                      <label>
+                        <span className="label-xs mb-1.5 block">{t("workspace.title_field")}</span>
+                        <input value={wikiEditorDraft.title} onChange={(event) => patchWikiEditorDraft({ title: event.target.value })} className="workspace-input" />
+                      </label>
+                      <label>
+                        <span className="label-xs mb-1.5 block">{t("workspace.wiki_book")}</span>
+                        <select value={wikiEditorDraft.book_id ?? wikiBooks[0]?.id ?? ""} onChange={(event) => patchWikiEditorDraft({ book_id: event.target.value ? Number(event.target.value) : null, chapter_id: null })} className="workspace-input">
+                          {wikiBooks.map((book) => <option key={book.id} value={book.id}>{book.title}</option>)}
+                        </select>
+                      </label>
+                      <label>
+                        <span className="label-xs mb-1.5 block">{t("workspace.wiki_chapter")}</span>
+                        <select value={wikiEditorDraft.chapter_id ?? ""} onChange={(event) => patchWikiEditorDraft({ chapter_id: event.target.value ? Number(event.target.value) : null })} className="workspace-input">
+                          <option value="">{t("workspace.no_wiki_chapter")}</option>
+                          {editorChapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                    <label className="mt-3 block">
+                      <span className="label-xs mb-1.5 block">{t("workspace.tags")}</span>
+                      <input value={wikiEditorDraft.tags} onChange={(event) => patchWikiEditorDraft({ tags: event.target.value })} className="workspace-input" placeholder={t("workspace.tags_placeholder")} />
+                    </label>
+                  </section>
+                  <section className="workspace-drawer-section workspace-tone-wiki">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <h3 className="workspace-section-title">{t("workspace.markdown")}</h3>
+                      <MarkdownHelpButton />
+                    </div>
+                    <MDEditor
+                      value={wikiEditorDraft.body}
+                      onChange={(value) => patchWikiEditorDraft({ body: value ?? "" })}
+                      height={620}
+                      preview="live"
+                    />
+                  </section>
+                </div>
+              ) : (
+                <MDEditor.Markdown source={markdownWithWikiAnchors(activeWikiPage.body) || t("workspace.no_content")} className="workspace-markdown-preview workspace-wiki-preview" />
+              )}
             </>
           ) : (
             <div className="space-y-4">
@@ -1536,7 +1776,7 @@ export default function WorkspacePage() {
                   <h3 className="workspace-section-title">{t("workspace.recent_wiki_pages")}</h3>
                   <div className="mt-3 grid gap-2">
                     {recentWiki.map((page) => (
-                      <button key={page.id} onClick={() => setActiveWikiPageId(page.id)} className="workspace-agenda-item">
+                      <button key={page.id} onClick={() => openWikiPage(page.id)} className="workspace-agenda-item">
                         <span className="truncate font-semibold">{page.title}</span>
                         <span>{formatDate(page.updated_at)}</span>
                       </button>
@@ -1549,49 +1789,6 @@ export default function WorkspacePage() {
           )}
         </section>
 
-        <aside className="space-y-3">
-          <div className="workspace-panel">
-            <h3 className="workspace-section-title">{t("workspace.outline")}</h3>
-            <div className="mt-3 space-y-1.5">
-              {activeOutline.map((heading) => <div key={heading} className="truncate text-[12px] text-t2">{heading.replace(/^#+\s+/, "")}</div>)}
-              {!activeOutline.length && <p className="text-sm text-t3">{t("workspace.no_headings")}</p>}
-            </div>
-          </div>
-          <div className="workspace-panel">
-            <h3 className="workspace-section-title">{t("workspace.backlinks")}</h3>
-            <div className="mt-3 space-y-2">
-              {activeBacklinks.slice(0, 8).map((item) => <button key={`${item.type}:${item.id}`} onClick={() => openObject(item)} className="block w-full truncate rounded-xl bg-surface px-3 py-2 text-left text-[13px] text-t2 hover:text-accent">{t(`workspace.type_${item.type}`)}: {item.title}</button>)}
-              {!activeBacklinks.length && <p className="text-sm text-t3">{t("workspace.no_backlinks")}</p>}
-            </div>
-          </div>
-          <div className="workspace-panel">
-            <h3 className="workspace-section-title">{t("workspace.outgoing_links")}</h3>
-            <div className="mt-3 space-y-2">
-              {activeOutgoingLinks.slice(0, 8).map((link) => <button key={link} onClick={() => void createMissingWiki(link)} className="block w-full truncate rounded-xl bg-surface px-3 py-2 text-left text-[13px] text-t2 hover:text-accent">[[{link}]]</button>)}
-              {!activeOutgoingLinks.length && <p className="text-sm text-t3">{t("workspace.no_outgoing_links")}</p>}
-            </div>
-          </div>
-          <div className="workspace-panel">
-            <h3 className="workspace-section-title">{t("workspace.missing_links")}</h3>
-            <div className="mt-3 space-y-2">
-              {(activeMissingLinks.length ? activeMissingLinks : missingLinks).slice(0, 10).map((link) => <button key={link} onClick={() => void createMissingWiki(link)} className="flex w-full items-center justify-between rounded-xl bg-surface px-3 py-2 text-left text-[13px] text-t2 hover:text-accent"><span className="truncate">[[{link}]]</span><Plus size={13} /></button>)}
-              {!activeMissingLinks.length && !missingLinks.length && <p className="text-sm text-t3">{t("workspace.no_missing_links")}</p>}
-            </div>
-          </div>
-          <div className="workspace-panel">
-            <h3 className="workspace-section-title">{t("workspace.orphan_pages")}</h3>
-            <div className="mt-3 space-y-2">
-              {orphanPages.slice(0, 8).map((page) => <button key={page.id} onClick={() => openObject(page)} className="block w-full truncate rounded-xl bg-surface px-3 py-2 text-left text-[13px] text-t2 hover:text-accent">{page.title}</button>)}
-              {!orphanPages.length && <p className="text-sm text-t3">{t("workspace.no_orphan_pages")}</p>}
-            </div>
-          </div>
-          <div className="workspace-panel">
-            <h3 className="workspace-section-title">{t("workspace.templates")}</h3>
-            <div className="mt-3 grid gap-2">
-              {["runbook", "service_doc", "incident", "how_to", "project_wiki"].map((template) => <button key={template} onClick={() => setDraft(makeDraft("wiki", { id: 0, type: "wiki", title: t(`workspace.template_${template}`), body: `# ${t(`workspace.template_${template}`)}\n\n## ${t("workspace.overview")}\n`, book_id: activeBook?.id ?? wikiBooks[0]?.id ?? null, chapter_id: activeChapter?.id ?? null, sort_order: 0, tags: [], custom_fields: {}, created_at: "", updated_at: "" }, boardId))} className="workspace-secondary-button justify-center">{t(`workspace.template_${template}`)}</button>)}
-            </div>
-          </div>
-        </aside>
       </div>
     );
   };
@@ -1692,24 +1889,6 @@ export default function WorkspacePage() {
       </aside>
 
       <main className="min-w-0 flex-1 space-y-4">
-        <div className="workspace-command-bar">
-          <div className="workspace-search"><Search size={15} className="text-t3" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("workspace.search_placeholder")} className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3" /></div>
-        </div>
-
-        {activeTab !== "notes" && (
-          <div className="workspace-filter-row">
-            {filterPills.map((filter) => (
-              <button
-                key={filter.key}
-                onClick={() => setQuery(filter.key)}
-                className={`workspace-filter-chip shrink-0 ${activeFilter === filter.key ? "workspace-filter-chip-active" : ""}`}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-        )}
-
         <div className="overflow-x-auto">{content}</div>
       </main>
       {draft && <WorkspaceDrawer draft={draft} setDraft={setDraft} onClose={() => setDraft(null)} overview={overview} activeBoardId={boardId} />}
@@ -1733,7 +1912,7 @@ export default function WorkspacePage() {
       <ConfirmDialog open={Boolean(deleteBoardTarget)} title={t("workspace.delete_board")} description={t("workspace.delete_board_description", { title: deleteBoardTarget?.title ?? "" })} onCancel={() => setDeleteBoardTarget(null)} onConfirm={async () => { if (deleteBoardTarget) await deleteBoard.mutateAsync(deleteBoardTarget.id); setDeleteBoardTarget(null); setActiveBoardId(null); }} />
       {editingWikiBook && <WorkspaceWikiBookEditor book={editingWikiBook} onClose={() => setEditingWikiBook(null)} onSave={async (patch) => { await updateWikiBook.mutateAsync({ id: editingWikiBook.id, ...patch }); setEditingWikiBook(null); }} />}
       {editingWikiChapter && <WorkspaceWikiChapterEditor chapter={editingWikiChapter} books={wikiBooks} onClose={() => setEditingWikiChapter(null)} onSave={async (patch) => { await updateWikiChapter.mutateAsync({ id: editingWikiChapter.id, ...patch }); setEditingWikiChapter(null); }} />}
-      <ConfirmDialog open={Boolean(deleteWikiBookTarget)} title={t("workspace.delete_wiki_book")} description={t("workspace.delete_wiki_book_description", { title: deleteWikiBookTarget?.title ?? "" })} onCancel={() => setDeleteWikiBookTarget(null)} onConfirm={async () => { if (deleteWikiBookTarget) await deleteWikiBook.mutateAsync(deleteWikiBookTarget.id); setDeleteWikiBookTarget(null); setActiveWikiPageId(null); }} />
+      <ConfirmDialog open={Boolean(deleteWikiBookTarget)} title={t("workspace.delete_wiki_book")} description={t("workspace.delete_wiki_book_description", { title: deleteWikiBookTarget?.title ?? "" })} onCancel={() => setDeleteWikiBookTarget(null)} onConfirm={async () => { if (deleteWikiBookTarget) await deleteWikiBook.mutateAsync(deleteWikiBookTarget.id); setDeleteWikiBookTarget(null); openWikiPage(null); }} />
       <ConfirmDialog open={Boolean(deleteWikiChapterTarget)} title={t("workspace.delete_wiki_chapter")} description={t("workspace.delete_wiki_chapter_description", { title: deleteWikiChapterTarget?.title ?? "" })} onCancel={() => setDeleteWikiChapterTarget(null)} onConfirm={async () => { if (deleteWikiChapterTarget) await deleteWikiChapter.mutateAsync(deleteWikiChapterTarget.id); setDeleteWikiChapterTarget(null); }} />
     </div>
   );
