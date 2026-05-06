@@ -494,6 +494,10 @@
     "delete_wiki_chapter": "Delete chapter",
     "delete_wiki_chapter_description": "Delete chapter \"{{title}}\"? Pages will stay in the book without a chapter.",
     "no_wiki_pages": "No wiki pages yet.",
+    "wiki_pages": "Pages",
+    "wiki_search_placeholder": "Search wiki: title, content, book, chapter, tag...",
+    "wiki_home_description": "Structured knowledge base with books, chapters, pages, backlinks, and Markdown preview.",
+    "recent_wiki_pages": "Recently edited pages",
     "updated_at": "Updated"
   },
   "markdown_help": {

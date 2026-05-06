@@ -1085,3 +1085,48 @@ body {
     min-height: auto;
   }
 }
+
+.workspace-wiki-home-button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgb(var(--line) / 0.55);
+  border-radius: 0.9rem;
+  background: rgb(var(--surface) / 0.52);
+  padding: 0.6rem 0.7rem;
+  text-align: left;
+  font-size: 0.82rem;
+  font-weight: 750;
+  color: rgb(var(--t2));
+}
+
+.workspace-wiki-search {
+  min-height: 2.35rem;
+  border-radius: 0.9rem;
+}
+
+.workspace-wiki-home-card {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid rgb(var(--line) / 0.58);
+  border-radius: 1rem;
+  background: rgb(var(--surface) / 0.55);
+  padding: 0.9rem;
+  color: rgb(var(--t2));
+}
+
+.workspace-wiki-home-card span {
+  font-size: 1.45rem;
+  font-weight: 760;
+  line-height: 1;
+  color: rgb(var(--t1));
+}
+
+.workspace-wiki-home-card small {
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(var(--t3));
+}

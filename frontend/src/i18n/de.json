@@ -494,6 +494,10 @@
     "delete_wiki_chapter": "Kapitel löschen",
     "delete_wiki_chapter_description": "Kapitel \"{{title}}\" wirklich löschen? Seiten bleiben im Buch ohne Kapitel erhalten.",
     "no_wiki_pages": "Noch keine Wiki-Seiten vorhanden.",
+    "wiki_pages": "Seiten",
+    "wiki_search_placeholder": "Wiki durchsuchen: Titel, Inhalt, Buch, Kapitel, Tag...",
+    "wiki_home_description": "Strukturierte Wissensbasis mit Büchern, Kapiteln, Seiten, Backlinks und Markdown-Vorschau.",
+    "recent_wiki_pages": "Zuletzt bearbeitete Seiten",
     "updated_at": "Aktualisiert"
   },
   "markdown_help": {

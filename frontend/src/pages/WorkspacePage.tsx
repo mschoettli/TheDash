@@ -715,6 +715,12 @@ function WorkspaceDrawer({
                   <MarkdownHelpButton />
                 </span>
                 <textarea value={draft.body} onChange={(e) => patchDraft({ body: e.target.value })} className="workspace-textarea min-h-[180px]" placeholder={t("workspace.markdown_placeholder")} />
+                {draft.type === "wiki" && (
+                  <div className="mt-3 rounded-2xl border border-line/60 bg-surface/70 p-3">
+                    <div className="label-xs mb-2">{t("workspace.live_preview")}</div>
+                    <MDEditor.Markdown source={markdownWithWikiAnchors(draft.body) || t("workspace.no_content")} className="workspace-markdown-preview" />
+                  </div>
+                )}
               </label>
             </div>
           </section>
@@ -1062,6 +1068,7 @@ export default function WorkspacePage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("dashboard");
   const [query, setQuery] = useState("");
+  const [wikiQuery, setWikiQuery] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [activeBoardId, setActiveBoardId] = useState<number | null>(null);
   const [newBoardTitle, setNewBoardTitle] = useState("");
@@ -1094,7 +1101,7 @@ export default function WorkspacePage() {
   const boardColumns = (overview?.columns ?? []).filter((column) => column.board_id === boardId && !column.is_archived);
   const boardTasks = tasks.filter((task) => task.board_id === boardId);
   const allObjects = useMemo<WorkspaceObject[]>(() => [...projects, ...tasks, ...wiki, ...notes], [projects, tasks, wiki, notes]);
-  const activeWikiPage = wiki.find((page) => page.id === activeWikiPageId) ?? wiki[0] ?? null;
+  const activeWikiPage = activeWikiPageId ? wiki.find((page) => page.id === activeWikiPageId) ?? null : null;
   const filteredObjects = useFilteredObjects(allObjects, query, projects);
   const activeDragTask = activeDragId?.startsWith("task:") ? tasks.find((task) => `task:${task.id}` === activeDragId) : null;
   const sidebarTabs: WorkspaceTab[] = ["dashboard", "board", "list", "calendar", "timeline", "mindmap", "projects", "wiki", "notes"];
@@ -1119,9 +1126,8 @@ export default function WorkspacePage() {
   }, [activeBoardId, overview?.active_board_id]);
 
   useEffect(() => {
-    if (!activeWikiPageId && wiki[0]?.id) setActiveWikiPageId(wiki[0].id);
     if (!expandedWikiBooks.length && wikiBooks[0]?.id) setExpandedWikiBooks([wikiBooks[0].id]);
-  }, [activeWikiPageId, expandedWikiBooks.length, wiki, wikiBooks]);
+  }, [expandedWikiBooks.length, wikiBooks]);
 
   const quickCreate = async (type: WorkspaceObjectType, columnId?: number) => {
     if (type === "project") setDraft(makeDraft("project", await createProject.mutateAsync({ title: t("workspace.new_project"), body: "## Goal\n\n## Tasks\n", status: "backlog", priority: "medium" }), boardId));
@@ -1322,19 +1328,37 @@ export default function WorkspacePage() {
     const existingTitles = new Set(wiki.map((page) => normalizeWikiTitle(page.title)));
     const missingLinks = Array.from(new Set(allWikiLinks.filter((link) => !existingTitles.has(normalizeWikiTitle(link)))));
     const orphanPages = wiki.filter((page) => !allObjects.some((item) => item.type !== "wiki" || item.id !== page.id ? extractWikiLinks(objectBody(item)).some((link) => normalizeWikiTitle(link) === normalizeWikiTitle(page.title)) : false));
-    const activeBook = activeWikiPage ? wikiBooks.find((book) => book.id === activeWikiPage.book_id) : wikiBooks[0];
+    const activeBook = activeWikiPage ? wikiBooks.find((book) => book.id === activeWikiPage.book_id) : null;
     const activeChapter = activeWikiPage?.chapter_id ? wikiChapters.find((chapter) => chapter.id === activeWikiPage.chapter_id) : null;
     const activeOutline = activeWikiPage?.body.split("\n").filter((line) => /^#{1,4}\s+/.test(line)).slice(0, 12) ?? [];
     const activeOutgoingLinks = activeWikiPage ? Array.from(new Set(extractWikiLinks(activeWikiPage.body))) : [];
     const activeMissingLinks = activeOutgoingLinks.filter((link) => !existingTitles.has(normalizeWikiTitle(link)));
+    const activeBacklinks = activeWikiPage ? allObjects.filter((item) => {
+      if (item.type === "wiki" && item.id === activeWikiPage.id) return false;
+      return extractWikiLinks(objectBody(item)).some((link) => normalizeWikiTitle(link) === normalizeWikiTitle(activeWikiPage.title));
+    }) : [];
     const sortedBooks = [...wikiBooks].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+    const wikiSearch = wikiQuery.trim().toLowerCase();
+    const filteredWiki = wiki.filter((page) => {
+      if (!wikiSearch) return true;
+      const book = wikiBooks.find((item) => item.id === page.book_id);
+      const chapter = wikiChapters.find((item) => item.id === page.chapter_id);
+      const haystack = [page.title, page.body, ...page.tags, book?.title, chapter?.title].filter(Boolean).join(" ").toLowerCase();
+      return haystack.includes(wikiSearch);
+    });
+    const recentWiki = [...wiki].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))).slice(0, 6);
     const pagesFor = (bookId: number, chapterId: number | null) => wiki
-      .filter((page) => page.book_id === bookId && (page.chapter_id ?? null) === chapterId)
+      .filter((page) => filteredWiki.includes(page) && page.book_id === bookId && (page.chapter_id ?? null) === chapterId)
       .sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
     const chaptersFor = (bookId: number) => wikiChapters
       .filter((chapter) => chapter.book_id === bookId)
       .sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
     const createMissingWiki = async (title: string) => {
+      const existing = wiki.find((page) => normalizeWikiTitle(page.title) === normalizeWikiTitle(title));
+      if (existing) {
+        setActiveWikiPageId(existing.id);
+        return;
+      }
       const created = await createWiki.mutateAsync({ title, body: `# ${title}\n`, book_id: activeBook?.id ?? wikiBooks[0]?.id ?? null, chapter_id: activeChapter?.id ?? null });
       setActiveWikiPageId(created.id);
       setDraft(makeDraft("wiki", created, boardId));
@@ -1360,12 +1384,29 @@ export default function WorkspacePage() {
       setDraft(makeDraft("wiki", page, boardId));
     };
     const movePage = async (page: WorkspaceWikiPage, direction: -1 | 1) => {
-      const siblings = pagesFor(page.book_id ?? wikiBooks[0]?.id ?? 0, page.chapter_id ?? null);
+      const siblings = wiki
+        .filter((item) => item.book_id === page.book_id && (item.chapter_id ?? null) === (page.chapter_id ?? null))
+        .sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
       const index = siblings.findIndex((item) => item.id === page.id);
       const targetIndex = index + direction;
       if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
       const reordered = arrayMove(siblings, index, targetIndex).map((item, sortIndex) => ({ id: item.id, book_id: item.book_id ?? wikiBooks[0]?.id ?? 0, chapter_id: item.chapter_id, sort_order: sortIndex }));
       await reorderWiki.mutateAsync({ pages: reordered });
+    };
+    const moveBook = async (book: WorkspaceWikiBook, direction: -1 | 1) => {
+      const index = sortedBooks.findIndex((item) => item.id === book.id);
+      const targetIndex = index + direction;
+      if (index < 0 || targetIndex < 0 || targetIndex >= sortedBooks.length) return;
+      const reordered = arrayMove(sortedBooks, index, targetIndex).map((item, sortIndex) => ({ id: item.id, sort_order: sortIndex }));
+      await reorderWiki.mutateAsync({ books: reordered });
+    };
+    const moveChapter = async (chapter: WorkspaceWikiChapter, direction: -1 | 1) => {
+      const siblings = chaptersFor(chapter.book_id);
+      const index = siblings.findIndex((item) => item.id === chapter.id);
+      const targetIndex = index + direction;
+      if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
+      const reordered = arrayMove(siblings, index, targetIndex).map((item, sortIndex) => ({ id: item.id, book_id: item.book_id, sort_order: sortIndex }));
+      await reorderWiki.mutateAsync({ chapters: reordered });
     };
 
     return (
@@ -1375,6 +1416,14 @@ export default function WorkspacePage() {
             <div className="label-xs">{t("workspace.wiki_home")}</div>
             <h2 className="mt-1 text-lg font-semibold text-t1">{t("workspace.wiki_library")}</h2>
             <p className="mt-1 text-[12px] text-t3">{t("workspace.wiki_library_description")}</p>
+          </div>
+          <button onClick={() => setActiveWikiPageId(null)} className={`workspace-wiki-home-button ${!activeWikiPage ? "workspace-wiki-page-active" : ""}`}>
+            <BookOpen size={14} />
+            <span>{t("workspace.wiki_home")}</span>
+          </button>
+          <div className="my-3 workspace-search workspace-wiki-search">
+            <Search size={14} className="text-t3" />
+            <input value={wikiQuery} onChange={(event) => setWikiQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3" placeholder={t("workspace.wiki_search_placeholder")} />
           </div>
           <div className="mb-4 flex gap-2">
             <input value={newWikiBookTitle} onChange={(event) => setNewWikiBookTitle(event.target.value)} className="workspace-input h-9" placeholder={t("workspace.new_wiki_book")} />
@@ -1394,6 +1443,8 @@ export default function WorkspacePage() {
                       <span className="workspace-meta-pill">{directPages.length + chapters.reduce((count, chapter) => count + pagesFor(book.id, chapter.id).length, 0)}</span>
                     </button>
                     <button onClick={() => setEditingWikiBook(book)} className="rounded-full p-1.5 text-t3 hover:text-accent"><Edit3 size={13} /></button>
+                    <button onClick={() => moveBook(book, -1)} className="text-t3 hover:text-accent">↑</button>
+                    <button onClick={() => moveBook(book, 1)} className="text-t3 hover:text-accent">↓</button>
                     {wikiBooks.length > 1 && <button onClick={() => setDeleteWikiBookTarget(book)} className="rounded-full p-1.5 text-t3 hover:text-rose-400"><Trash2 size={13} /></button>}
                   </div>
                   {expanded && (
@@ -1414,6 +1465,8 @@ export default function WorkspacePage() {
                         <div key={chapter.id} className="workspace-wiki-chapter">
                           <div className="flex items-center gap-1">
                             <button onClick={() => setEditingWikiChapter(chapter)} className="workspace-wiki-chapter-title"><GripHorizontal size={12} />{chapter.title}</button>
+                            <button onClick={() => moveChapter(chapter, -1)} className="text-t3 hover:text-accent">↑</button>
+                            <button onClick={() => moveChapter(chapter, 1)} className="text-t3 hover:text-accent">↓</button>
                             <button onClick={() => setDeleteWikiChapterTarget(chapter)} className="rounded-full p-1 text-t3 hover:text-rose-400"><Trash2 size={12} /></button>
                           </div>
                           <button onClick={() => createPage(book.id, chapter.id)} className="workspace-wiki-page-button text-accent"><Plus size={12} />{t("workspace.new_wiki_page")}</button>
@@ -1453,10 +1506,45 @@ export default function WorkspacePage() {
               <MDEditor.Markdown source={markdownWithWikiAnchors(activeWikiPage.body) || t("workspace.no_content")} className="workspace-markdown-preview workspace-wiki-preview" />
             </>
           ) : (
-            <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-line/70 text-center">
-              <BookOpen className="mb-3 text-t3" size={28} />
-              <h2 className="text-lg font-semibold text-t1">{t("workspace.no_wiki_pages")}</h2>
-              <button onClick={() => quickCreate("wiki")} className="workspace-primary-button mt-4"><Plus size={13} />{t("workspace.new_wiki_page")}</button>
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line/60 pb-4">
+                <div>
+                  <div className="label-xs">{t("workspace.wiki_home")}</div>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-tight text-t1">{t("workspace.wiki_library")}</h2>
+                  <p className="mt-1 max-w-2xl text-sm text-t3">{t("workspace.wiki_home_description")}</p>
+                </div>
+                <button onClick={() => quickCreate("wiki")} className="workspace-primary-button"><Plus size={13} />{t("workspace.new_wiki_page")}</button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="workspace-wiki-home-card"><BookOpen size={16} /><span>{wikiBooks.length}</span><small>{t("workspace.wiki_books")}</small></div>
+                <div className="workspace-wiki-home-card"><GripHorizontal size={16} /><span>{wikiChapters.length}</span><small>{t("workspace.wiki_chapters")}</small></div>
+                <div className="workspace-wiki-home-card"><FileText size={16} /><span>{wiki.length}</span><small>{t("workspace.wiki_pages")}</small></div>
+              </div>
+              <div className="grid gap-3 xl:grid-cols-2">
+                <section className="rounded-2xl border border-line/60 bg-surface/50 p-4">
+                  <h3 className="workspace-section-title">{t("workspace.wiki_books")}</h3>
+                  <div className="mt-3 grid gap-2">
+                    {sortedBooks.map((book) => (
+                      <button key={book.id} onClick={() => setExpandedWikiBooks((current) => Array.from(new Set([...current, book.id])))} className="workspace-agenda-item">
+                        <span className="truncate font-semibold">{book.title}</span>
+                        <span>{pagesFor(book.id, null).length + chaptersFor(book.id).reduce((count, chapter) => count + pagesFor(book.id, chapter.id).length, 0)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                <section className="rounded-2xl border border-line/60 bg-surface/50 p-4">
+                  <h3 className="workspace-section-title">{t("workspace.recent_wiki_pages")}</h3>
+                  <div className="mt-3 grid gap-2">
+                    {recentWiki.map((page) => (
+                      <button key={page.id} onClick={() => setActiveWikiPageId(page.id)} className="workspace-agenda-item">
+                        <span className="truncate font-semibold">{page.title}</span>
+                        <span>{formatDate(page.updated_at)}</span>
+                      </button>
+                    ))}
+                    {!recentWiki.length && <p className="workspace-empty-note">{t("workspace.no_wiki_pages")}</p>}
+                  </div>
+                </section>
+              </div>
             </div>
           )}
         </section>
@@ -1467,6 +1555,20 @@ export default function WorkspacePage() {
             <div className="mt-3 space-y-1.5">
               {activeOutline.map((heading) => <div key={heading} className="truncate text-[12px] text-t2">{heading.replace(/^#+\s+/, "")}</div>)}
               {!activeOutline.length && <p className="text-sm text-t3">{t("workspace.no_headings")}</p>}
+            </div>
+          </div>
+          <div className="workspace-panel">
+            <h3 className="workspace-section-title">{t("workspace.backlinks")}</h3>
+            <div className="mt-3 space-y-2">
+              {activeBacklinks.slice(0, 8).map((item) => <button key={`${item.type}:${item.id}`} onClick={() => openObject(item)} className="block w-full truncate rounded-xl bg-surface px-3 py-2 text-left text-[13px] text-t2 hover:text-accent">{t(`workspace.type_${item.type}`)}: {item.title}</button>)}
+              {!activeBacklinks.length && <p className="text-sm text-t3">{t("workspace.no_backlinks")}</p>}
+            </div>
+          </div>
+          <div className="workspace-panel">
+            <h3 className="workspace-section-title">{t("workspace.outgoing_links")}</h3>
+            <div className="mt-3 space-y-2">
+              {activeOutgoingLinks.slice(0, 8).map((link) => <button key={link} onClick={() => void createMissingWiki(link)} className="block w-full truncate rounded-xl bg-surface px-3 py-2 text-left text-[13px] text-t2 hover:text-accent">[[{link}]]</button>)}
+              {!activeOutgoingLinks.length && <p className="text-sm text-t3">{t("workspace.no_outgoing_links")}</p>}
             </div>
           </div>
           <div className="workspace-panel">
