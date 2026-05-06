@@ -53,6 +53,8 @@ import {
   useCreateWorkspaceTag,
   useCreateWorkspaceTask,
   useCreateWorkspaceWiki,
+  useCreateWorkspaceWikiBook,
+  useCreateWorkspaceWikiChapter,
   useDeleteWorkspaceBoard,
   useDeleteWorkspaceColumn,
   useDeleteWorkspaceLabel,
@@ -60,7 +62,10 @@ import {
   useDeleteWorkspaceTag,
   useDeleteWorkspaceTask,
   useDeleteWorkspaceWiki,
+  useDeleteWorkspaceWikiBook,
+  useDeleteWorkspaceWikiChapter,
   useReorderWorkspaceBoard,
+  useReorderWorkspaceWiki,
   useUpdateWorkspaceBoard,
   useUpdateWorkspaceColumn,
   useUpdateWorkspaceDependencies,
@@ -69,6 +74,8 @@ import {
   useUpdateWorkspaceTag,
   useUpdateWorkspaceTask,
   useUpdateWorkspaceWiki,
+  useUpdateWorkspaceWikiBook,
+  useUpdateWorkspaceWikiChapter,
   useWorkspaceAssistant,
   useWorkspaceBacklinks,
   useWorkspaceOverview,
@@ -84,6 +91,9 @@ import {
   WorkspaceStatus,
   WorkspaceTag,
   WorkspaceTask,
+  WorkspaceWikiBook,
+  WorkspaceWikiChapter,
+  WorkspaceWikiPage,
 } from "../hooks/useWorkspace";
 import { useCreateNote, useDeleteNote, useUpdateNote } from "../hooks/useNotes";
 
@@ -114,6 +124,9 @@ type Draft = {
   label_ids: number[];
   tag_ids: number[];
   checklists: WorkspaceChecklist[];
+  book_id?: number | null;
+  chapter_id?: number | null;
+  sort_order?: number;
 };
 
 function objectBody(item: WorkspaceObject): string {
@@ -200,6 +213,9 @@ function makeDraft(type: WorkspaceObjectType, item?: WorkspaceObject, boardId?: 
       label_ids: [],
       tag_ids: [],
       checklists: [],
+      book_id: null,
+      chapter_id: null,
+      sort_order: 0,
     };
   }
 
@@ -220,6 +236,9 @@ function makeDraft(type: WorkspaceObjectType, item?: WorkspaceObject, boardId?: 
     label_ids: item.type === "task" ? item.labels.map((label) => label.id) : [],
     tag_ids: item.type === "task" ? item.tag_records.map((tag) => tag.id) : [],
     checklists: item.type === "task" ? item.checklists : [],
+    book_id: item.type === "wiki" ? item.book_id : null,
+    chapter_id: item.type === "wiki" ? item.chapter_id : null,
+    sort_order: item.type === "wiki" ? item.sort_order : 0,
   };
 }
 
@@ -260,12 +279,12 @@ function useFilteredObjects(items: WorkspaceObject[], query: string, projects: W
 function StatCard({ icon: Icon, label, value, tone }: { icon: React.ElementType; label: string; value: number; tone: string }) {
   return (
     <div className={`workspace-stat ${tone}`}>
-      <div>
-        <div className="text-xl font-semibold text-t1">{value}</div>
-        <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-t2">{label}</div>
+      <div className="min-w-0">
+        <div className="text-[1.35rem] font-semibold leading-none text-t1">{value}</div>
+        <div className="mt-1.5 truncate text-[9px] font-semibold uppercase tracking-[0.15em] text-t2">{label}</div>
       </div>
       <span className="workspace-stat-icon">
-        <Icon size={18} />
+        <Icon size={15} />
       </span>
     </div>
   );
@@ -281,12 +300,12 @@ function ObjectCard({ item, onOpen }: { item: WorkspaceObject; onOpen: (item: Wo
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className={`workspace-type-label ${typeTone(item.type)}`}>{t(`workspace.type_${item.type}`)}</div>
-          <div className="mt-1 truncate text-[15px] font-semibold text-t1">{item.title}</div>
+          <div className="mt-1 truncate text-[14px] font-semibold text-t1">{item.title}</div>
         </div>
         <span className="rounded-full border border-line/50 bg-surface px-2 py-0.5 text-[10px] text-t3">{formatDate(item.updated_at)}</span>
       </div>
-      <p className="mt-3 line-clamp-3 min-h-[3.75rem] text-left text-[12px] leading-5 text-t2">{body || t("workspace.no_content")}</p>
-      <div className="mt-3 flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
+      <p className="mt-2 line-clamp-2 min-h-[2.6rem] text-left text-[12px] leading-[1.35rem] text-t2">{body || t("workspace.no_content")}</p>
+      <div className="mt-2.5 flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
         {badges.slice(0, 3).map((tag) => <span key={tag} className="workspace-tag">{tag}</span>)}
         {badges.length > 3 && <span className="text-[10px] text-t3">+{badges.length - 3}</span>}
       </div>
@@ -431,6 +450,8 @@ function WorkspaceDrawer({
   const createWiki = useCreateWorkspaceWiki();
   const updateWiki = useUpdateWorkspaceWiki();
   const deleteWiki = useDeleteWorkspaceWiki();
+  const createWikiBook = useCreateWorkspaceWikiBook();
+  const createWikiChapter = useCreateWorkspaceWikiChapter();
   const createNote = useCreateNote();
   const updateNote = useUpdateNote();
   const deleteNote = useDeleteNote();
@@ -465,6 +486,10 @@ function WorkspaceDrawer({
   const dependencies = overview?.dependencies ?? [];
   const backlinks = backlinksQuery.data ?? [];
   const wikiPages = overview?.wiki ?? [];
+  const wikiBooks = overview?.wiki_books ?? [];
+  const wikiChapters = overview?.wiki_chapters ?? [];
+  const currentWikiBookId = draft.book_id ?? wikiBooks[0]?.id ?? null;
+  const currentWikiChapters = wikiChapters.filter((chapter) => chapter.book_id === currentWikiBookId);
   const outgoingWikiLinks = Array.from(new Set(extractWikiLinks(draft.body)));
   const missingWikiLinks = outgoingWikiLinks.filter((link) => !wikiPages.some((page) => normalizeWikiTitle(page.title) === normalizeWikiTitle(link)));
   const isExisting = Boolean(draft.id);
@@ -493,6 +518,9 @@ function WorkspaceDrawer({
       label_ids: draft.label_ids,
       tag_ids: draft.tag_ids,
       checklists: draft.checklists,
+      book_id: draft.book_id ?? wikiBooks[0]?.id ?? null,
+      chapter_id: draft.chapter_id ?? null,
+      sort_order: draft.sort_order ?? 0,
     };
 
     try {
@@ -503,7 +531,9 @@ function WorkspaceDrawer({
         const saved = draft.id ? await updateTask.mutateAsync({ id: draft.id, ...payload }) : await createTask.mutateAsync(payload);
         setDraft(makeDraft("task", saved, activeBoardId));
       } else if (draft.type === "wiki") {
-        const saved = draft.id ? await updateWiki.mutateAsync({ id: draft.id, title: payload.title, body: payload.body, tags: payload.tags }) : await createWiki.mutateAsync({ title: payload.title, body: payload.body, tags: payload.tags });
+        const saved = draft.id
+          ? await updateWiki.mutateAsync({ id: draft.id, title: payload.title, body: payload.body, tags: payload.tags, book_id: payload.book_id, chapter_id: payload.chapter_id, sort_order: payload.sort_order })
+          : await createWiki.mutateAsync({ title: payload.title, body: payload.body, tags: payload.tags, book_id: payload.book_id, chapter_id: payload.chapter_id, sort_order: payload.sort_order });
         setDraft(makeDraft("wiki", saved, activeBoardId));
       } else {
         const saved = draft.id
@@ -650,6 +680,18 @@ function WorkspaceDrawer({
     setDraft(makeDraft("wiki", created, activeBoardId));
   };
 
+  const createBookFromDrawer = async () => {
+    const book = await createWikiBook.mutateAsync({ title: t("workspace.new_wiki_book"), color: "#8b5cf6" });
+    patchDraft({ book_id: book.id, chapter_id: null });
+  };
+
+  const createChapterFromDrawer = async () => {
+    const bookId = draft.book_id ?? wikiBooks[0]?.id;
+    if (!bookId) return;
+    const chapter = await createWikiChapter.mutateAsync({ book_id: bookId, title: t("workspace.new_wiki_chapter") });
+    patchDraft({ chapter_id: chapter.id });
+  };
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
@@ -676,6 +718,31 @@ function WorkspaceDrawer({
               </label>
             </div>
           </section>
+
+          {draft.type === "wiki" && (
+            <section className="workspace-drawer-section workspace-tone-wiki">
+              <h3 className="workspace-section-title">{t("workspace.wiki_location")}</h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label>
+                  <span className="label-xs mb-1.5 block">{t("workspace.wiki_book")}</span>
+                  <select value={draft.book_id ?? wikiBooks[0]?.id ?? ""} onChange={(e) => patchDraft({ book_id: Number(e.target.value), chapter_id: null })} className="workspace-input">
+                    {wikiBooks.map((book) => <option key={book.id} value={book.id}>{book.title}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span className="label-xs mb-1.5 block">{t("workspace.wiki_chapter")}</span>
+                  <select value={draft.chapter_id ?? ""} onChange={(e) => patchDraft({ chapter_id: e.target.value ? Number(e.target.value) : null })} className="workspace-input">
+                    <option value="">{t("workspace.no_wiki_chapter")}</option>
+                    {currentWikiChapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={createBookFromDrawer} className="workspace-secondary-button"><Plus size={13} />{t("workspace.wiki_book")}</button>
+                <button onClick={createChapterFromDrawer} className="workspace-secondary-button"><Plus size={13} />{t("workspace.wiki_chapter")}</button>
+              </div>
+            </section>
+          )}
 
           {isWorkItem && (
             <section className="workspace-drawer-section workspace-tone-task">
@@ -983,6 +1050,13 @@ export default function WorkspacePage() {
   const createProject = useCreateWorkspaceProject();
   const createTask = useCreateWorkspaceTask();
   const createWiki = useCreateWorkspaceWiki();
+  const createWikiBook = useCreateWorkspaceWikiBook();
+  const updateWikiBook = useUpdateWorkspaceWikiBook();
+  const deleteWikiBook = useDeleteWorkspaceWikiBook();
+  const createWikiChapter = useCreateWorkspaceWikiChapter();
+  const updateWikiChapter = useUpdateWorkspaceWikiChapter();
+  const deleteWikiChapter = useDeleteWorkspaceWikiChapter();
+  const reorderWiki = useReorderWorkspaceWiki();
   const createNote = useCreateNote();
   const reorderBoard = useReorderWorkspaceBoard();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -996,6 +1070,14 @@ export default function WorkspacePage() {
   const [editingBoard, setEditingBoard] = useState<WorkspaceBoard | null>(null);
   const [deleteColumnTarget, setDeleteColumnTarget] = useState<WorkspaceBoardColumn | null>(null);
   const [deleteBoardTarget, setDeleteBoardTarget] = useState<WorkspaceBoard | null>(null);
+  const [activeWikiPageId, setActiveWikiPageId] = useState<number | null>(null);
+  const [expandedWikiBooks, setExpandedWikiBooks] = useState<number[]>([]);
+  const [newWikiBookTitle, setNewWikiBookTitle] = useState("");
+  const [newWikiChapterTitle, setNewWikiChapterTitle] = useState("");
+  const [editingWikiBook, setEditingWikiBook] = useState<WorkspaceWikiBook | null>(null);
+  const [editingWikiChapter, setEditingWikiChapter] = useState<WorkspaceWikiChapter | null>(null);
+  const [deleteWikiBookTarget, setDeleteWikiBookTarget] = useState<WorkspaceWikiBook | null>(null);
+  const [deleteWikiChapterTarget, setDeleteWikiChapterTarget] = useState<WorkspaceWikiChapter | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [taskDetail, setTaskDetail] = useState<WorkspaceTask | null>(null);
 
@@ -1003,6 +1085,8 @@ export default function WorkspacePage() {
   const projects = overview?.projects ?? [];
   const tasks = overview?.tasks ?? [];
   const wiki = overview?.wiki ?? [];
+  const wikiBooks = overview?.wiki_books ?? [];
+  const wikiChapters = overview?.wiki_chapters ?? [];
   const notes = overview?.notes ?? [];
   const dependencies = overview?.dependencies ?? [];
   const activeBoard = boards.find((board) => board.id === activeBoardId) ?? boards[0];
@@ -1010,6 +1094,7 @@ export default function WorkspacePage() {
   const boardColumns = (overview?.columns ?? []).filter((column) => column.board_id === boardId && !column.is_archived);
   const boardTasks = tasks.filter((task) => task.board_id === boardId);
   const allObjects = useMemo<WorkspaceObject[]>(() => [...projects, ...tasks, ...wiki, ...notes], [projects, tasks, wiki, notes]);
+  const activeWikiPage = wiki.find((page) => page.id === activeWikiPageId) ?? wiki[0] ?? null;
   const filteredObjects = useFilteredObjects(allObjects, query, projects);
   const activeDragTask = activeDragId?.startsWith("task:") ? tasks.find((task) => `task:${task.id}` === activeDragId) : null;
   const sidebarTabs: WorkspaceTab[] = ["dashboard", "board", "list", "calendar", "timeline", "mindmap", "projects", "wiki", "notes"];
@@ -1033,10 +1118,19 @@ export default function WorkspacePage() {
     if (!activeBoardId && overview?.active_board_id) setActiveBoardId(overview.active_board_id);
   }, [activeBoardId, overview?.active_board_id]);
 
+  useEffect(() => {
+    if (!activeWikiPageId && wiki[0]?.id) setActiveWikiPageId(wiki[0].id);
+    if (!expandedWikiBooks.length && wikiBooks[0]?.id) setExpandedWikiBooks([wikiBooks[0].id]);
+  }, [activeWikiPageId, expandedWikiBooks.length, wiki, wikiBooks]);
+
   const quickCreate = async (type: WorkspaceObjectType, columnId?: number) => {
     if (type === "project") setDraft(makeDraft("project", await createProject.mutateAsync({ title: t("workspace.new_project"), body: "## Goal\n\n## Tasks\n", status: "backlog", priority: "medium" }), boardId));
     if (type === "task") setDraft(makeDraft("task", await createTask.mutateAsync({ title: t("workspace.new_task"), board_id: boardId, column_id: columnId ?? boardColumns[0]?.id, priority: "medium" }), boardId, columnId));
-    if (type === "wiki") setDraft(makeDraft("wiki", await createWiki.mutateAsync({ title: t("workspace.new_wiki"), body: "## Overview\n" }), boardId));
+    if (type === "wiki") {
+      const page = await createWiki.mutateAsync({ title: t("workspace.new_wiki"), body: "## Overview\n", book_id: wikiBooks[0]?.id ?? null });
+      setActiveWikiPageId(page.id);
+      setDraft(makeDraft("wiki", page, boardId));
+    }
     if (type === "note") {
       const note = await createNote.mutateAsync({ title: t("workspace.new_note"), content: "" });
       setDraft(makeDraft("note", { ...note, type: "note", body: note.content } as WorkspaceObject, boardId));
@@ -1116,43 +1210,81 @@ export default function WorkspacePage() {
   };
 
   const renderDashboard = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="workspace-dashboard">
+      <div className="workspace-kpi-rail">
         <StatCard icon={FolderKanban} label={t("workspace.active_projects")} value={overview?.stats.activeProjects ?? 0} tone="workspace-tone-project" />
         <StatCard icon={ListChecks} label={t("workspace.open_tasks")} value={overview?.stats.openTasks ?? 0} tone="workspace-tone-task" />
         <StatCard icon={CalendarDays} label={t("workspace.due")} value={overview?.stats.dueTasks ?? 0} tone="workspace-tone-warn" />
         <StatCard icon={FileText} label={t("workspace.wiki")} value={overview?.stats.wikiPages ?? 0} tone="workspace-tone-wiki" />
       </div>
-      <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-        <div className="workspace-panel">
-          <div className="mb-3 flex items-center justify-between"><h2 className="text-[15px] font-semibold text-t1">{t("workspace.feed")}</h2><span className="text-[11px] text-t3">{filteredObjects.length}</span></div>
-          <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">{filteredObjects.slice(0, 9).map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={openObject} />)}</div>
-        </div>
-        <div className="space-y-3">
-          <div className="workspace-panel">
-            <h2 className="mb-3 text-[15px] font-semibold text-t1">{t("workspace.due_soon")}</h2>
-            <div className="space-y-2">{tasks.filter((task) => task.due_date && task.status !== "done").slice(0, 6).map((task) => <button key={task.id} onClick={() => setTaskDetail(task)} className="flex w-full items-center justify-between rounded-lg bg-surface px-3 py-2 text-left text-sm text-t2 hover:text-accent"><span className="truncate">{task.title}</span><span className="text-[11px] text-t3">{formatDate(task.due_date)}</span></button>)}{!tasks.some((task) => task.due_date && task.status !== "done") && <p className="text-sm text-t3">{t("workspace.no_due_tasks")}</p>}</div>
+      <section className="workspace-command-grid">
+        <div className="workspace-panel workspace-focus-panel">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-[15px] font-semibold text-t1">{t("workspace.current_work")}</h2>
+              <p className="mt-1 text-[12px] text-t3">{t("workspace.feed")}</p>
+            </div>
+            <span className="rounded-full border border-line/50 bg-surface px-2.5 py-1 text-[11px] text-t3">{filteredObjects.length}</span>
           </div>
-          <div className="workspace-panel">
-            <h2 className="mb-3 text-[15px] font-semibold text-t1">{t("workspace.projects")}</h2>
-            <div className="space-y-2">{projects.slice(0, 5).map((project) => <button key={project.id} onClick={() => openObject(project)} className="flex w-full items-center justify-between rounded-lg bg-surface px-3 py-2 text-left text-sm text-t2 hover:text-accent"><span className="truncate">{project.title}</span><span className="text-[11px] text-t3">{formatDate(project.updated_at)}</span></button>)}{!projects.length && <p className="text-sm text-t3">{t("workspace.no_content")}</p>}</div>
+          <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
+            {filteredObjects.slice(0, 9).map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={openObject} />)}
           </div>
         </div>
+        <aside className="workspace-agenda">
+          <div className="workspace-panel workspace-agenda-panel">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-[15px] font-semibold text-t1">{t("workspace.today_next")}</h2>
+              <CalendarDays size={14} className="text-t3" />
+            </div>
+            <div className="space-y-1.5">
+              {tasks.filter((task) => task.due_date && task.status !== "done").slice(0, 5).map((task) => (
+                <button key={task.id} onClick={() => setTaskDetail(task)} className="workspace-agenda-item">
+                  <span className="min-w-0 truncate">{task.title}</span>
+                  <span>{formatDate(task.due_date)}</span>
+                </button>
+              ))}
+              {!tasks.some((task) => task.due_date && task.status !== "done") && <p className="workspace-empty-note">{t("workspace.no_due_tasks")}</p>}
+            </div>
+          </div>
+          <div className="workspace-panel workspace-agenda-panel">
+            <h2 className="mb-3 text-[15px] font-semibold text-t1">{t("workspace.active_projects")}</h2>
+            <div className="space-y-1.5">
+              {projects.slice(0, 5).map((project) => (
+                <button key={project.id} onClick={() => openObject(project)} className="workspace-agenda-item">
+                  <span className="min-w-0 truncate">{project.title}</span>
+                  <span>{formatDate(project.updated_at)}</span>
+                </button>
+              ))}
+              {!projects.length && <p className="workspace-empty-note">{t("workspace.no_content")}</p>}
+            </div>
+          </div>
+          <div className="workspace-panel workspace-agenda-panel">
+            <h2 className="mb-3 text-[15px] font-semibold text-t1">{t("workspace.quick_capture")}</h2>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(["project", "task", "wiki", "note"] as WorkspaceObjectType[]).map((type) => (
+                <button key={type} onClick={() => quickCreate(type)} className={`workspace-create-card workspace-create-card-compact ${typeTone(type)}`}>
+                  <Plus size={12} />
+                  {t(`workspace.type_${type}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
       </section>
     </div>
   );
 
   const renderBoard = () => (
     <div className="space-y-3">
-      <div className="workspace-panel flex flex-wrap items-center gap-2">
-        <select value={boardId || ""} onChange={(e) => setActiveBoardId(Number(e.target.value))} className="workspace-input max-w-[260px]">{boards.map((board) => <option key={board.id} value={board.id}>{board.title}</option>)}</select>
-        <input value={newBoardTitle} onChange={(e) => setNewBoardTitle(e.target.value)} className="workspace-input max-w-[220px]" placeholder={t("workspace.new_board")} />
-        <button onClick={createBoardFromInput} className="workspace-secondary-button"><Plus size={13} />{t("workspace.board")}</button>
-        {activeBoard && <button onClick={() => setEditingBoard(activeBoard)} className="workspace-secondary-button">{t("workspace.edit_board")}</button>}
-        {activeBoard && boards.length > 1 && <button onClick={() => setDeleteBoardTarget(activeBoard)} className="workspace-danger-button">{t("workspace.delete_board")}</button>}
-        <div className="ml-auto flex items-center gap-2">
-          <input value={newColumnTitle} onChange={(e) => setNewColumnTitle(e.target.value)} disabled={boardColumns.length >= columnLimit} className="workspace-input max-w-[220px]" placeholder={boardColumns.length >= columnLimit ? t("workspace.column_limit") : t("workspace.new_column")} />
-          <button onClick={createColumnFromInput} disabled={boardColumns.length >= columnLimit} className="workspace-primary-button"><Plus size={13} />{t("workspace.column")}</button>
+      <div className="workspace-board-toolbar">
+        <select value={boardId || ""} onChange={(e) => setActiveBoardId(Number(e.target.value))} className="workspace-input workspace-board-control max-w-[220px]">{boards.map((board) => <option key={board.id} value={board.id}>{board.title}</option>)}</select>
+        <input value={newBoardTitle} onChange={(e) => setNewBoardTitle(e.target.value)} className="workspace-input workspace-board-control max-w-[180px]" placeholder={t("workspace.new_board")} />
+        <button onClick={createBoardFromInput} className="workspace-secondary-button workspace-board-button"><Plus size={12} />{t("workspace.board")}</button>
+        {activeBoard && <button onClick={() => setEditingBoard(activeBoard)} className="workspace-secondary-button workspace-board-button">{t("workspace.edit_board")}</button>}
+        {activeBoard && boards.length > 1 && <button onClick={() => setDeleteBoardTarget(activeBoard)} className="workspace-danger-button workspace-board-button">{t("workspace.delete_board")}</button>}
+        <div className="ml-auto flex min-w-0 items-center gap-1.5">
+          <input value={newColumnTitle} onChange={(e) => setNewColumnTitle(e.target.value)} disabled={boardColumns.length >= columnLimit} className="workspace-input workspace-board-control max-w-[180px]" placeholder={boardColumns.length >= columnLimit ? t("workspace.column_limit") : t("workspace.new_column")} />
+          <button onClick={createColumnFromInput} disabled={boardColumns.length >= columnLimit} className="workspace-primary-button workspace-board-button"><Plus size={12} />{t("workspace.column")}</button>
         </div>
       </div>
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveDragId(null)}>
@@ -1190,29 +1322,158 @@ export default function WorkspacePage() {
     const existingTitles = new Set(wiki.map((page) => normalizeWikiTitle(page.title)));
     const missingLinks = Array.from(new Set(allWikiLinks.filter((link) => !existingTitles.has(normalizeWikiTitle(link)))));
     const orphanPages = wiki.filter((page) => !allObjects.some((item) => item.type !== "wiki" || item.id !== page.id ? extractWikiLinks(objectBody(item)).some((link) => normalizeWikiTitle(link) === normalizeWikiTitle(page.title)) : false));
+    const activeBook = activeWikiPage ? wikiBooks.find((book) => book.id === activeWikiPage.book_id) : wikiBooks[0];
+    const activeChapter = activeWikiPage?.chapter_id ? wikiChapters.find((chapter) => chapter.id === activeWikiPage.chapter_id) : null;
+    const activeOutline = activeWikiPage?.body.split("\n").filter((line) => /^#{1,4}\s+/.test(line)).slice(0, 12) ?? [];
+    const activeOutgoingLinks = activeWikiPage ? Array.from(new Set(extractWikiLinks(activeWikiPage.body))) : [];
+    const activeMissingLinks = activeOutgoingLinks.filter((link) => !existingTitles.has(normalizeWikiTitle(link)));
+    const sortedBooks = [...wikiBooks].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+    const pagesFor = (bookId: number, chapterId: number | null) => wiki
+      .filter((page) => page.book_id === bookId && (page.chapter_id ?? null) === chapterId)
+      .sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
+    const chaptersFor = (bookId: number) => wikiChapters
+      .filter((chapter) => chapter.book_id === bookId)
+      .sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
     const createMissingWiki = async (title: string) => {
-      const created = await createWiki.mutateAsync({ title, body: `# ${title}\n` });
+      const created = await createWiki.mutateAsync({ title, body: `# ${title}\n`, book_id: activeBook?.id ?? wikiBooks[0]?.id ?? null, chapter_id: activeChapter?.id ?? null });
+      setActiveWikiPageId(created.id);
       setDraft(makeDraft("wiki", created, boardId));
+    };
+    const createBook = async () => {
+      const title = newWikiBookTitle.trim();
+      if (!title) return;
+      const book = await createWikiBook.mutateAsync({ title, color: "#8b5cf6" });
+      setExpandedWikiBooks((current) => Array.from(new Set([...current, book.id])));
+      setNewWikiBookTitle("");
+    };
+    const createChapter = async (bookId: number) => {
+      const title = newWikiChapterTitle.trim();
+      if (!title) return;
+      await createWikiChapter.mutateAsync({ book_id: bookId, title });
+      setExpandedWikiBooks((current) => Array.from(new Set([...current, bookId])));
+      setNewWikiChapterTitle("");
+    };
+    const createPage = async (bookId: number, chapterId: number | null = null) => {
+      const page = await createWiki.mutateAsync({ title: t("workspace.new_wiki"), body: "## Overview\n", book_id: bookId, chapter_id: chapterId });
+      setExpandedWikiBooks((current) => Array.from(new Set([...current, bookId])));
+      setActiveWikiPageId(page.id);
+      setDraft(makeDraft("wiki", page, boardId));
+    };
+    const movePage = async (page: WorkspaceWikiPage, direction: -1 | 1) => {
+      const siblings = pagesFor(page.book_id ?? wikiBooks[0]?.id ?? 0, page.chapter_id ?? null);
+      const index = siblings.findIndex((item) => item.id === page.id);
+      const targetIndex = index + direction;
+      if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
+      const reordered = arrayMove(siblings, index, targetIndex).map((item, sortIndex) => ({ id: item.id, book_id: item.book_id ?? wikiBooks[0]?.id ?? 0, chapter_id: item.chapter_id, sort_order: sortIndex }));
+      await reorderWiki.mutateAsync({ pages: reordered });
     };
 
     return (
-      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-        <div className="space-y-3">
-          <div className="workspace-panel flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-[17px] font-semibold text-t1">{t("workspace.wiki_library")}</h2>
-              <p className="mt-1 text-sm text-t3">{t("workspace.wiki_library_description")}</p>
-            </div>
-            <button onClick={() => quickCreate("wiki")} className="workspace-primary-button"><Plus size={13} />{t("workspace.new_wiki")}</button>
+      <div className="workspace-wiki-layout">
+        <aside className="workspace-panel workspace-wiki-tree">
+          <div className="mb-3">
+            <div className="label-xs">{t("workspace.wiki_home")}</div>
+            <h2 className="mt-1 text-lg font-semibold text-t1">{t("workspace.wiki_library")}</h2>
+            <p className="mt-1 text-[12px] text-t3">{t("workspace.wiki_library_description")}</p>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">{wiki.map((item) => <ObjectCard key={item.id} item={item} onOpen={openObject} />)}</div>
-        </div>
+          <div className="mb-4 flex gap-2">
+            <input value={newWikiBookTitle} onChange={(event) => setNewWikiBookTitle(event.target.value)} className="workspace-input h-9" placeholder={t("workspace.new_wiki_book")} />
+            <button onClick={createBook} className="workspace-secondary-button h-9 px-3"><Plus size={12} /></button>
+          </div>
+          <div className="space-y-2">
+            {sortedBooks.map((book) => {
+              const expanded = expandedWikiBooks.includes(book.id);
+              const directPages = pagesFor(book.id, null);
+              const chapters = chaptersFor(book.id);
+              return (
+                <div key={book.id} className="workspace-wiki-book">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setExpandedWikiBooks((current) => expanded ? current.filter((id) => id !== book.id) : [...current, book.id])} className="workspace-wiki-book-button">
+                      <BookOpen size={14} />
+                      <span className="min-w-0 flex-1 truncate">{book.title}</span>
+                      <span className="workspace-meta-pill">{directPages.length + chapters.reduce((count, chapter) => count + pagesFor(book.id, chapter.id).length, 0)}</span>
+                    </button>
+                    <button onClick={() => setEditingWikiBook(book)} className="rounded-full p-1.5 text-t3 hover:text-accent"><Edit3 size={13} /></button>
+                    {wikiBooks.length > 1 && <button onClick={() => setDeleteWikiBookTarget(book)} className="rounded-full p-1.5 text-t3 hover:text-rose-400"><Trash2 size={13} /></button>}
+                  </div>
+                  {expanded && (
+                    <div className="mt-2 space-y-2 pl-3">
+                      <div className="flex gap-2">
+                        <input value={newWikiChapterTitle} onChange={(event) => setNewWikiChapterTitle(event.target.value)} className="workspace-input h-8 text-[12px]" placeholder={t("workspace.new_wiki_chapter")} />
+                        <button onClick={() => createChapter(book.id)} className="workspace-secondary-button h-8 px-2"><Plus size={11} /></button>
+                      </div>
+                      <button onClick={() => createPage(book.id)} className="workspace-wiki-page-button text-accent"><Plus size={12} />{t("workspace.new_wiki_page")}</button>
+                      {directPages.map((page) => (
+                        <div key={page.id} className="flex items-center gap-1">
+                          <button onClick={() => setActiveWikiPageId(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} />{page.title}</button>
+                          <button onClick={() => movePage(page, -1)} className="text-t3 hover:text-accent">↑</button>
+                          <button onClick={() => movePage(page, 1)} className="text-t3 hover:text-accent">↓</button>
+                        </div>
+                      ))}
+                      {chapters.map((chapter) => (
+                        <div key={chapter.id} className="workspace-wiki-chapter">
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => setEditingWikiChapter(chapter)} className="workspace-wiki-chapter-title"><GripHorizontal size={12} />{chapter.title}</button>
+                            <button onClick={() => setDeleteWikiChapterTarget(chapter)} className="rounded-full p-1 text-t3 hover:text-rose-400"><Trash2 size={12} /></button>
+                          </div>
+                          <button onClick={() => createPage(book.id, chapter.id)} className="workspace-wiki-page-button text-accent"><Plus size={12} />{t("workspace.new_wiki_page")}</button>
+                          {pagesFor(book.id, chapter.id).map((page) => (
+                            <div key={page.id} className="flex items-center gap-1">
+                              <button onClick={() => setActiveWikiPageId(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} />{page.title}</button>
+                              <button onClick={() => movePage(page, -1)} className="text-t3 hover:text-accent">↑</button>
+                              <button onClick={() => movePage(page, 1)} className="text-t3 hover:text-accent">↓</button>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </aside>
+
+        <section className="workspace-panel workspace-wiki-page">
+          {activeWikiPage ? (
+            <>
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-line/60 pb-4">
+                <div className="min-w-0">
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[12px] text-t3">
+                    <span>{t("workspace.wiki")}</span>
+                    <span>/</span>
+                    <span>{activeBook?.title ?? t("workspace.wiki_book")}</span>
+                    {activeChapter && <><span>/</span><span>{activeChapter.title}</span></>}
+                  </div>
+                  <h2 className="text-2xl font-semibold tracking-tight text-t1">{activeWikiPage.title}</h2>
+                  <p className="mt-1 text-sm text-t3">{t("workspace.updated_at")}: {formatDate(activeWikiPage.updated_at)}</p>
+                </div>
+                <button onClick={() => setDraft(makeDraft("wiki", activeWikiPage, boardId))} className="workspace-primary-button"><Edit3 size={14} />{t("workspace.edit_wiki_page")}</button>
+              </div>
+              <MDEditor.Markdown source={markdownWithWikiAnchors(activeWikiPage.body) || t("workspace.no_content")} className="workspace-markdown-preview workspace-wiki-preview" />
+            </>
+          ) : (
+            <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-line/70 text-center">
+              <BookOpen className="mb-3 text-t3" size={28} />
+              <h2 className="text-lg font-semibold text-t1">{t("workspace.no_wiki_pages")}</h2>
+              <button onClick={() => quickCreate("wiki")} className="workspace-primary-button mt-4"><Plus size={13} />{t("workspace.new_wiki_page")}</button>
+            </div>
+          )}
+        </section>
+
         <aside className="space-y-3">
+          <div className="workspace-panel">
+            <h3 className="workspace-section-title">{t("workspace.outline")}</h3>
+            <div className="mt-3 space-y-1.5">
+              {activeOutline.map((heading) => <div key={heading} className="truncate text-[12px] text-t2">{heading.replace(/^#+\s+/, "")}</div>)}
+              {!activeOutline.length && <p className="text-sm text-t3">{t("workspace.no_headings")}</p>}
+            </div>
+          </div>
           <div className="workspace-panel">
             <h3 className="workspace-section-title">{t("workspace.missing_links")}</h3>
             <div className="mt-3 space-y-2">
-              {missingLinks.slice(0, 10).map((link) => <button key={link} onClick={() => void createMissingWiki(link)} className="flex w-full items-center justify-between rounded-xl bg-surface px-3 py-2 text-left text-[13px] text-t2 hover:text-accent"><span className="truncate">[[{link}]]</span><Plus size={13} /></button>)}
-              {!missingLinks.length && <p className="text-sm text-t3">{t("workspace.no_missing_links")}</p>}
+              {(activeMissingLinks.length ? activeMissingLinks : missingLinks).slice(0, 10).map((link) => <button key={link} onClick={() => void createMissingWiki(link)} className="flex w-full items-center justify-between rounded-xl bg-surface px-3 py-2 text-left text-[13px] text-t2 hover:text-accent"><span className="truncate">[[{link}]]</span><Plus size={13} /></button>)}
+              {!activeMissingLinks.length && !missingLinks.length && <p className="text-sm text-t3">{t("workspace.no_missing_links")}</p>}
             </div>
           </div>
           <div className="workspace-panel">
@@ -1225,7 +1486,7 @@ export default function WorkspacePage() {
           <div className="workspace-panel">
             <h3 className="workspace-section-title">{t("workspace.templates")}</h3>
             <div className="mt-3 grid gap-2">
-              {["runbook", "service_doc", "incident", "how_to", "project_wiki"].map((template) => <button key={template} onClick={() => setDraft(makeDraft("wiki", { id: 0, type: "wiki", title: t(`workspace.template_${template}`), body: `# ${t(`workspace.template_${template}`)}\n\n## ${t("workspace.overview")}\n`, tags: [], custom_fields: {}, created_at: "", updated_at: "" }, boardId))} className="workspace-secondary-button justify-center">{t(`workspace.template_${template}`)}</button>)}
+              {["runbook", "service_doc", "incident", "how_to", "project_wiki"].map((template) => <button key={template} onClick={() => setDraft(makeDraft("wiki", { id: 0, type: "wiki", title: t(`workspace.template_${template}`), body: `# ${t(`workspace.template_${template}`)}\n\n## ${t("workspace.overview")}\n`, book_id: activeBook?.id ?? wikiBooks[0]?.id ?? null, chapter_id: activeChapter?.id ?? null, sort_order: 0, tags: [], custom_fields: {}, created_at: "", updated_at: "" }, boardId))} className="workspace-secondary-button justify-center">{t(`workspace.template_${template}`)}</button>)}
             </div>
           </div>
         </aside>
@@ -1368,6 +1629,10 @@ export default function WorkspacePage() {
       )}
       <ConfirmDialog open={Boolean(deleteColumnTarget)} title={t("workspace.delete_column")} description={t("workspace.delete_column_description", { title: deleteColumnTarget?.title ?? "" })} onCancel={() => setDeleteColumnTarget(null)} onConfirm={async () => { if (deleteColumnTarget) await deleteColumn.mutateAsync({ boardId, id: deleteColumnTarget.id, target_column_id: boardColumns.find((column) => column.id !== deleteColumnTarget.id)?.id }); setDeleteColumnTarget(null); }} />
       <ConfirmDialog open={Boolean(deleteBoardTarget)} title={t("workspace.delete_board")} description={t("workspace.delete_board_description", { title: deleteBoardTarget?.title ?? "" })} onCancel={() => setDeleteBoardTarget(null)} onConfirm={async () => { if (deleteBoardTarget) await deleteBoard.mutateAsync(deleteBoardTarget.id); setDeleteBoardTarget(null); setActiveBoardId(null); }} />
+      {editingWikiBook && <WorkspaceWikiBookEditor book={editingWikiBook} onClose={() => setEditingWikiBook(null)} onSave={async (patch) => { await updateWikiBook.mutateAsync({ id: editingWikiBook.id, ...patch }); setEditingWikiBook(null); }} />}
+      {editingWikiChapter && <WorkspaceWikiChapterEditor chapter={editingWikiChapter} books={wikiBooks} onClose={() => setEditingWikiChapter(null)} onSave={async (patch) => { await updateWikiChapter.mutateAsync({ id: editingWikiChapter.id, ...patch }); setEditingWikiChapter(null); }} />}
+      <ConfirmDialog open={Boolean(deleteWikiBookTarget)} title={t("workspace.delete_wiki_book")} description={t("workspace.delete_wiki_book_description", { title: deleteWikiBookTarget?.title ?? "" })} onCancel={() => setDeleteWikiBookTarget(null)} onConfirm={async () => { if (deleteWikiBookTarget) await deleteWikiBook.mutateAsync(deleteWikiBookTarget.id); setDeleteWikiBookTarget(null); setActiveWikiPageId(null); }} />
+      <ConfirmDialog open={Boolean(deleteWikiChapterTarget)} title={t("workspace.delete_wiki_chapter")} description={t("workspace.delete_wiki_chapter_description", { title: deleteWikiChapterTarget?.title ?? "" })} onCancel={() => setDeleteWikiChapterTarget(null)} onConfirm={async () => { if (deleteWikiChapterTarget) await deleteWikiChapter.mutateAsync(deleteWikiChapterTarget.id); setDeleteWikiChapterTarget(null); }} />
     </div>
   );
 }
@@ -1408,6 +1673,48 @@ function WorkspaceBoardEditor({ board, onSave, onClose }: { board: WorkspaceBoar
           <label><span className="label-xs mb-1.5 block">{t("workspace.description")}</span><textarea value={description} onChange={(e) => setDescription(e.target.value)} className="workspace-textarea" /></label>
           <label><span className="label-xs mb-1.5 block">{t("workspace.color")}</span><input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-12 w-full rounded-xl border border-line bg-surface p-1" /></label>
           <button onClick={() => onSave({ title, description, color })} className="workspace-primary-button w-full justify-center">{t("common.save")}</button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+function WorkspaceWikiBookEditor({ book, onSave, onClose }: { book: WorkspaceWikiBook; onSave: (patch: Partial<WorkspaceWikiBook>) => Promise<void>; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [title, setTitle] = useState(book.title);
+  const [description, setDescription] = useState(book.description ?? "");
+  const [color, setColor] = useState(book.color ?? "#8b5cf6");
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <aside className="workspace-drawer z-50">
+        <div className="flex items-center justify-between border-b border-line/60 p-4"><h2 className="text-lg font-semibold text-t1">{t("workspace.edit_wiki_book")}</h2><button onClick={onClose} className="rounded-full p-2 text-t3 hover:bg-line/20"><X size={18} /></button></div>
+        <div className="space-y-4 p-4">
+          <label><span className="label-xs mb-1.5 block">{t("workspace.title_field")}</span><input value={title} onChange={(e) => setTitle(e.target.value)} className="workspace-input" /></label>
+          <label><span className="label-xs mb-1.5 block">{t("workspace.description")}</span><textarea value={description} onChange={(e) => setDescription(e.target.value)} className="workspace-textarea" /></label>
+          <label><span className="label-xs mb-1.5 block">{t("workspace.color")}</span><input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-12 w-full rounded-xl border border-line bg-surface p-1" /></label>
+          <button onClick={() => onSave({ title, description, color })} className="workspace-primary-button w-full justify-center">{t("common.save")}</button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+function WorkspaceWikiChapterEditor({ chapter, books, onSave, onClose }: { chapter: WorkspaceWikiChapter; books: WorkspaceWikiBook[]; onSave: (patch: Partial<WorkspaceWikiChapter>) => Promise<void>; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [title, setTitle] = useState(chapter.title);
+  const [description, setDescription] = useState(chapter.description ?? "");
+  const [bookId, setBookId] = useState(chapter.book_id);
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <aside className="workspace-drawer z-50">
+        <div className="flex items-center justify-between border-b border-line/60 p-4"><h2 className="text-lg font-semibold text-t1">{t("workspace.edit_wiki_chapter")}</h2><button onClick={onClose} className="rounded-full p-2 text-t3 hover:bg-line/20"><X size={18} /></button></div>
+        <div className="space-y-4 p-4">
+          <label><span className="label-xs mb-1.5 block">{t("workspace.title_field")}</span><input value={title} onChange={(e) => setTitle(e.target.value)} className="workspace-input" /></label>
+          <label><span className="label-xs mb-1.5 block">{t("workspace.wiki_book")}</span><select value={bookId} onChange={(e) => setBookId(Number(e.target.value))} className="workspace-input">{books.map((book) => <option key={book.id} value={book.id}>{book.title}</option>)}</select></label>
+          <label><span className="label-xs mb-1.5 block">{t("workspace.description")}</span><textarea value={description} onChange={(e) => setDescription(e.target.value)} className="workspace-textarea" /></label>
+          <button onClick={() => onSave({ title, description, book_id: bookId })} className="workspace-primary-button w-full justify-center">{t("common.save")}</button>
         </div>
       </aside>
     </>

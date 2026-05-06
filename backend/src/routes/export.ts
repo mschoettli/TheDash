@@ -30,6 +30,8 @@ router.get("/export", (_req, res) => {
     .all();
   const workspaceProjects = db.prepare("SELECT * FROM workspace_projects ORDER BY updated_at DESC").all();
   const workspaceTasks = db.prepare("SELECT * FROM workspace_tasks ORDER BY sort_order ASC").all();
+  const workspaceWikiBooks = db.prepare("SELECT * FROM workspace_wiki_books ORDER BY sort_order ASC").all();
+  const workspaceWikiChapters = db.prepare("SELECT * FROM workspace_wiki_chapters ORDER BY book_id ASC, sort_order ASC").all();
   const workspaceWikiPages = db.prepare("SELECT * FROM workspace_wiki_pages ORDER BY updated_at DESC").all();
   const workspaceDependencies = db.prepare("SELECT * FROM workspace_dependencies ORDER BY id ASC").all();
 
@@ -51,6 +53,8 @@ router.get("/export", (_req, res) => {
     auditLog,
     workspaceProjects,
     workspaceTasks,
+    workspaceWikiBooks,
+    workspaceWikiChapters,
     workspaceWikiPages,
     workspaceDependencies,
   });
@@ -72,6 +76,8 @@ router.post("/import", (req, res) => {
     widgets,
     workspaceProjects,
     workspaceTasks,
+    workspaceWikiBooks,
+    workspaceWikiChapters,
     workspaceWikiPages,
     workspaceDependencies,
   } = req.body;
@@ -89,6 +95,8 @@ router.post("/import", (req, res) => {
     db.prepare("DELETE FROM workspace_dependencies").run();
     db.prepare("DELETE FROM workspace_tasks").run();
     db.prepare("DELETE FROM workspace_wiki_pages").run();
+    db.prepare("DELETE FROM workspace_wiki_chapters").run();
+    db.prepare("DELETE FROM workspace_wiki_books").run();
     db.prepare("DELETE FROM workspace_projects").run();
     db.prepare("DELETE FROM note_folders").run();
     db.prepare("DELETE FROM tiles").run();
@@ -295,17 +303,63 @@ router.post("/import", (req, res) => {
       );
     }
 
+    let fallbackWikiBookId: number | null = null;
+    for (const book of workspaceWikiBooks ?? []) {
+      db.prepare(
+        `INSERT INTO workspace_wiki_books
+          (id, title, description, icon, color, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        book.id,
+        book.title,
+        book.description ?? "",
+        book.icon ?? null,
+        book.color ?? null,
+        book.sort_order ?? 0,
+        book.created_at ?? new Date().toISOString(),
+        book.updated_at ?? new Date().toISOString()
+      );
+      fallbackWikiBookId = fallbackWikiBookId ?? book.id;
+    }
+
+    if (!fallbackWikiBookId) {
+      fallbackWikiBookId = Number(
+        db
+          .prepare("INSERT INTO workspace_wiki_books (title, description, icon, color, sort_order) VALUES ('Wiki', 'Default wiki book', 'book-open', '#8b5cf6', 0)")
+          .run().lastInsertRowid
+      );
+    }
+
+    for (const chapter of workspaceWikiChapters ?? []) {
+      db.prepare(
+        `INSERT INTO workspace_wiki_chapters
+          (id, book_id, title, description, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        chapter.id,
+        chapter.book_id ?? fallbackWikiBookId,
+        chapter.title,
+        chapter.description ?? "",
+        chapter.sort_order ?? 0,
+        chapter.created_at ?? new Date().toISOString(),
+        chapter.updated_at ?? new Date().toISOString()
+      );
+    }
+
     for (const page of workspaceWikiPages ?? []) {
       db.prepare(
         `INSERT INTO workspace_wiki_pages
-          (id, title, body, tags, custom_fields, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+          (id, book_id, chapter_id, title, body, tags, custom_fields, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         page.id,
+        page.book_id ?? fallbackWikiBookId,
+        page.chapter_id ?? null,
         page.title,
         page.body ?? "",
         Array.isArray(page.tags) ? JSON.stringify(page.tags) : page.tags ?? "[]",
         typeof page.custom_fields === "string" ? page.custom_fields : JSON.stringify(page.custom_fields ?? {}),
+        page.sort_order ?? 0,
         page.created_at ?? new Date().toISOString(),
         page.updated_at ?? new Date().toISOString()
       );

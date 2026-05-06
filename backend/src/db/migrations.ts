@@ -276,6 +276,27 @@ export function runMigrations(): void {
       updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS workspace_wiki_books (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      title         TEXT    NOT NULL,
+      description   TEXT    NOT NULL DEFAULT '',
+      icon          TEXT,
+      color         TEXT,
+      sort_order    INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS workspace_wiki_chapters (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      book_id       INTEGER NOT NULL REFERENCES workspace_wiki_books(id) ON DELETE CASCADE,
+      title         TEXT    NOT NULL,
+      description   TEXT    NOT NULL DEFAULT '',
+      sort_order    INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS workspace_dependencies (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       source_type TEXT NOT NULL CHECK (source_type IN ('project', 'task')),
@@ -454,6 +475,31 @@ export function runMigrations(): void {
   if (!columnExists("workspace_tasks", "column_id")) {
     db.exec("ALTER TABLE workspace_tasks ADD COLUMN column_id INTEGER REFERENCES workspace_board_columns(id) ON DELETE SET NULL");
   }
+
+  if (!columnExists("workspace_wiki_pages", "book_id")) {
+    db.exec("ALTER TABLE workspace_wiki_pages ADD COLUMN book_id INTEGER REFERENCES workspace_wiki_books(id) ON DELETE SET NULL");
+  }
+
+  if (!columnExists("workspace_wiki_pages", "chapter_id")) {
+    db.exec("ALTER TABLE workspace_wiki_pages ADD COLUMN chapter_id INTEGER REFERENCES workspace_wiki_chapters(id) ON DELETE SET NULL");
+  }
+
+  if (!columnExists("workspace_wiki_pages", "sort_order")) {
+    db.exec("ALTER TABLE workspace_wiki_pages ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0");
+  }
+
+  const defaultWikiBook = db
+    .prepare("SELECT id FROM workspace_wiki_books ORDER BY sort_order ASC, id ASC LIMIT 1")
+    .get() as { id: number } | undefined;
+  const defaultWikiBookId =
+    defaultWikiBook?.id ??
+    Number(
+      db
+        .prepare("INSERT INTO workspace_wiki_books (title, description, icon, color, sort_order) VALUES ('Wiki', 'Default wiki book', 'book-open', '#8b5cf6', 0)")
+        .run().lastInsertRowid
+    );
+
+  db.prepare("UPDATE workspace_wiki_pages SET book_id = ? WHERE book_id IS NULL").run(defaultWikiBookId);
 
   const defaultBoard = db
     .prepare("SELECT id FROM workspace_boards ORDER BY sort_order ASC, id ASC LIMIT 1")

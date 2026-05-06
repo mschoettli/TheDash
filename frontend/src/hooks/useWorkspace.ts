@@ -43,6 +43,27 @@ export interface WorkspaceTag {
   updated_at: string;
 }
 
+export interface WorkspaceWikiBook {
+  id: number;
+  title: string;
+  description: string;
+  icon: string | null;
+  color: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceWikiChapter {
+  id: number;
+  book_id: number;
+  title: string;
+  description: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkspaceChecklistItem {
   id?: number;
   title: string;
@@ -100,10 +121,13 @@ export interface WorkspaceTask {
 export interface WorkspaceWikiPage {
   id: number;
   type: "wiki";
+  book_id: number | null;
+  chapter_id: number | null;
   title: string;
   body: string;
   tags: string[];
   custom_fields: Record<string, unknown>;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -140,6 +164,8 @@ export interface WorkspaceOverview {
   columns: WorkspaceBoardColumn[];
   labels: WorkspaceLabel[];
   workspace_tags: WorkspaceTag[];
+  wiki_books: WorkspaceWikiBook[];
+  wiki_chapters: WorkspaceWikiChapter[];
   active_board_id: number;
   projects: WorkspaceProject[];
   tasks: WorkspaceTask[];
@@ -299,6 +325,62 @@ export function useDeleteWorkspaceTag() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => fetchJson<{ ok: true }>(`/api/workspace/tags/${id}`, json("DELETE")),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useCreateWorkspaceWikiBook() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<WorkspaceWikiBook> & { title: string }) => fetchJson<WorkspaceWikiBook>("/api/workspace/wiki/books", json("POST", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useUpdateWorkspaceWikiBook() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<WorkspaceWikiBook> & { id: number }) => fetchJson<WorkspaceWikiBook>(`/api/workspace/wiki/books/${id}`, json("PUT", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useDeleteWorkspaceWikiBook() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => fetchJson<{ ok: true }>(`/api/workspace/wiki/books/${id}`, json("DELETE")),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useCreateWorkspaceWikiChapter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Partial<WorkspaceWikiChapter> & { title: string; book_id: number }) => fetchJson<WorkspaceWikiChapter>("/api/workspace/wiki/chapters", json("POST", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useUpdateWorkspaceWikiChapter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: Partial<WorkspaceWikiChapter> & { id: number }) => fetchJson<WorkspaceWikiChapter>(`/api/workspace/wiki/chapters/${id}`, json("PUT", data)),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useDeleteWorkspaceWikiChapter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => fetchJson<{ ok: true }>(`/api/workspace/wiki/chapters/${id}`, json("DELETE")),
+    onSuccess: () => invalidateWorkspace(qc),
+  });
+}
+
+export function useReorderWorkspaceWiki() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { books?: Array<{ id: number; sort_order: number }>; chapters?: Array<{ id: number; book_id: number; sort_order: number }>; pages?: Array<{ id: number; book_id: number; chapter_id?: number | null; sort_order: number }> }) => fetchJson<{ ok: true }>("/api/workspace/wiki/reorder", json("PUT", data)),
     onSuccess: () => invalidateWorkspace(qc),
   });
 }

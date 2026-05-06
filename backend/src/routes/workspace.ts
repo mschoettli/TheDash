@@ -18,6 +18,7 @@ const DEFAULT_COLUMNS = [
 ];
 
 type WorkspaceType = "project" | "task" | "wiki" | "note";
+const DEFAULT_WIKI_BOOK_TITLE = "Wiki";
 
 function parseJsonArray(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
@@ -138,7 +139,15 @@ function mapTask(row: any) {
 }
 
 function mapWiki(row: any) {
-  return { ...row, type: "wiki" as const, tags: parseJsonArray(row.tags), custom_fields: parseJsonObject(row.custom_fields) };
+  return {
+    ...row,
+    type: "wiki" as const,
+    book_id: row.book_id ?? null,
+    chapter_id: row.chapter_id ?? null,
+    sort_order: row.sort_order ?? 0,
+    tags: parseJsonArray(row.tags),
+    custom_fields: parseJsonObject(row.custom_fields),
+  };
 }
 
 function mapNote(row: any) {
@@ -172,7 +181,17 @@ function getTasks() {
 }
 
 function getWikiPages() {
-  return (db.prepare("SELECT * FROM workspace_wiki_pages ORDER BY updated_at DESC, id DESC").all() as any[]).map(mapWiki);
+  return (db.prepare("SELECT * FROM workspace_wiki_pages ORDER BY book_id ASC, chapter_id ASC, sort_order ASC, updated_at DESC, id DESC").all() as any[]).map(mapWiki);
+}
+
+function getWikiBooks() {
+  return db.prepare("SELECT * FROM workspace_wiki_books ORDER BY sort_order ASC, id ASC").all();
+}
+
+function getWikiChapters(bookId?: number) {
+  const params = bookId ? [bookId] : [];
+  const where = bookId ? "WHERE book_id = ?" : "";
+  return db.prepare(`SELECT * FROM workspace_wiki_chapters ${where} ORDER BY book_id ASC, sort_order ASC, id ASC`).all(...params);
 }
 
 function getNotes() {
@@ -221,6 +240,16 @@ function ensureDefaultBoard(): number {
   const insertColumn = db.prepare("INSERT INTO workspace_board_columns (board_id, title, color, kind, sort_order) VALUES (?, ?, ?, ?, ?)");
   DEFAULT_COLUMNS.forEach((column, index) => insertColumn.run(boardId, column.title, column.color, column.kind, index));
   return boardId;
+}
+
+function ensureDefaultWikiBook(): number {
+  const existing = db.prepare("SELECT id FROM workspace_wiki_books ORDER BY sort_order ASC, id ASC LIMIT 1").get() as { id: number } | undefined;
+  if (existing) return existing.id;
+  return Number(
+    db
+      .prepare("INSERT INTO workspace_wiki_books (title, description, icon, color, sort_order) VALUES (?, ?, ?, ?, 0)")
+      .run(DEFAULT_WIKI_BOOK_TITLE, "Default wiki book", "book-open", "#8b5cf6").lastInsertRowid
+  );
 }
 
 function getFallbackColumn(boardId: number): any {
@@ -285,6 +314,8 @@ function replaceTaskChecklists(taskId: number, checklists: unknown) {
 router.get("/overview", (_req, res) => {
   localizeDefaultColumnTitles();
   const boardId = ensureDefaultBoard();
+  const wikiBookId = ensureDefaultWikiBook();
+  db.prepare("UPDATE workspace_wiki_pages SET book_id = ? WHERE book_id IS NULL").run(wikiBookId);
   const projects = getProjects();
   const tasks = getTasks();
   const wiki = getWikiPages();
@@ -297,6 +328,8 @@ router.get("/overview", (_req, res) => {
     columns: getColumns(undefined, true),
     labels: getLabels(),
     workspace_tags: getWorkspaceTags(),
+    wiki_books: getWikiBooks(),
+    wiki_chapters: getWikiChapters(),
     active_board_id: boardId,
     projects,
     tasks,
@@ -544,21 +577,153 @@ router.delete("/tasks/:id", (req, res) => {
   res.json({ ok: true });
 });
 
+router.get("/wiki/books", (_req, res) => res.json(getWikiBooks()));
+
+router.post("/wiki/books", (req, res) => {
+  const title = String(req.body?.title ?? "").trim();
+  if (!title) return res.status(400).json({ error: "title required" });
+  const max = db.prepare("SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM workspace_wiki_books").get() as { maxOrder: number };
+  const result = db
+    .prepare("INSERT INTO workspace_wiki_books (title, description, icon, color, sort_order) VALUES (?, ?, ?, ?, ?)")
+    .run(title, req.body?.description ?? "", req.body?.icon ?? null, normalizeHex(req.body?.color, "#8b5cf6"), max.maxOrder + 1);
+  res.status(201).json(db.prepare("SELECT * FROM workspace_wiki_books WHERE id = ?").get(result.lastInsertRowid));
+});
+
+router.put("/wiki/books/:id", (req, res) => {
+  const existing = db.prepare("SELECT * FROM workspace_wiki_books WHERE id = ?").get(req.params.id) as any;
+  if (!existing) return res.status(404).json({ error: "not found" });
+  db
+    .prepare("UPDATE workspace_wiki_books SET title = ?, description = ?, icon = ?, color = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(req.body?.title ?? existing.title, req.body?.description ?? existing.description, req.body?.icon ?? existing.icon, req.body?.color !== undefined ? normalizeHex(req.body.color, existing.color ?? "#8b5cf6") : existing.color, req.body?.sort_order ?? existing.sort_order, req.params.id);
+  res.json(db.prepare("SELECT * FROM workspace_wiki_books WHERE id = ?").get(req.params.id));
+});
+
+router.delete("/wiki/books/:id", (req, res) => {
+  const books = getWikiBooks() as any[];
+  if (books.length <= 1) return res.status(400).json({ error: "last book cannot be deleted" });
+  const target = books.find((book) => book.id !== Number(req.params.id));
+  db.transaction(() => {
+    db.prepare("UPDATE workspace_wiki_pages SET book_id = ?, chapter_id = NULL WHERE book_id = ?").run(target.id, req.params.id);
+    db.prepare("DELETE FROM workspace_wiki_books WHERE id = ?").run(req.params.id);
+  })();
+  res.json({ ok: true });
+});
+
+router.get("/wiki/chapters", (req, res) => {
+  const bookId = req.query?.book_id ? Number(req.query.book_id) : undefined;
+  res.json(getWikiChapters(Number.isFinite(bookId) ? bookId : undefined));
+});
+
+router.post("/wiki/chapters", (req, res) => {
+  const title = String(req.body?.title ?? "").trim();
+  const bookId = Number(req.body?.book_id) || ensureDefaultWikiBook();
+  if (!title) return res.status(400).json({ error: "title required" });
+  if (!db.prepare("SELECT id FROM workspace_wiki_books WHERE id = ?").get(bookId)) return res.status(400).json({ error: "invalid book" });
+  const max = db.prepare("SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM workspace_wiki_chapters WHERE book_id = ?").get(bookId) as { maxOrder: number };
+  const result = db
+    .prepare("INSERT INTO workspace_wiki_chapters (book_id, title, description, sort_order) VALUES (?, ?, ?, ?)")
+    .run(bookId, title, req.body?.description ?? "", max.maxOrder + 1);
+  res.status(201).json(db.prepare("SELECT * FROM workspace_wiki_chapters WHERE id = ?").get(result.lastInsertRowid));
+});
+
+router.put("/wiki/chapters/:id", (req, res) => {
+  const existing = db.prepare("SELECT * FROM workspace_wiki_chapters WHERE id = ?").get(req.params.id) as any;
+  if (!existing) return res.status(404).json({ error: "not found" });
+  const bookId = req.body?.book_id !== undefined ? Number(req.body.book_id) : existing.book_id;
+  if (!db.prepare("SELECT id FROM workspace_wiki_books WHERE id = ?").get(bookId)) return res.status(400).json({ error: "invalid book" });
+  db
+    .prepare("UPDATE workspace_wiki_chapters SET book_id = ?, title = ?, description = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(bookId, req.body?.title ?? existing.title, req.body?.description ?? existing.description, req.body?.sort_order ?? existing.sort_order, req.params.id);
+  res.json(db.prepare("SELECT * FROM workspace_wiki_chapters WHERE id = ?").get(req.params.id));
+});
+
+router.delete("/wiki/chapters/:id", (req, res) => {
+  db.transaction(() => {
+    db.prepare("UPDATE workspace_wiki_pages SET chapter_id = NULL WHERE chapter_id = ?").run(req.params.id);
+    db.prepare("DELETE FROM workspace_wiki_chapters WHERE id = ?").run(req.params.id);
+  })();
+  res.json({ ok: true });
+});
+
+router.put("/wiki/reorder", (req, res) => {
+  const books = Array.isArray(req.body?.books) ? req.body.books : [];
+  const chapters = Array.isArray(req.body?.chapters) ? req.body.chapters : [];
+  const pages = Array.isArray(req.body?.pages) ? req.body.pages : [];
+  db.transaction(() => {
+    const updateBook = db.prepare("UPDATE workspace_wiki_books SET sort_order = ?, updated_at = datetime('now') WHERE id = ?");
+    const updateChapter = db.prepare("UPDATE workspace_wiki_chapters SET book_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?");
+    const updatePage = db.prepare("UPDATE workspace_wiki_pages SET book_id = ?, chapter_id = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?");
+    books.forEach((book: any, index: number) => {
+      const id = Number(book.id);
+      if (Number.isFinite(id)) updateBook.run(Number.isFinite(Number(book.sort_order)) ? Number(book.sort_order) : index, id);
+    });
+    chapters.forEach((chapter: any, index: number) => {
+      const id = Number(chapter.id);
+      const bookId = Number(chapter.book_id);
+      if (Number.isFinite(id) && Number.isFinite(bookId)) updateChapter.run(bookId, Number.isFinite(Number(chapter.sort_order)) ? Number(chapter.sort_order) : index, id);
+    });
+    pages.forEach((page: any, index: number) => {
+      const id = Number(page.id);
+      const bookId = Number(page.book_id);
+      const chapterId = Number(page.chapter_id);
+      if (Number.isFinite(id) && Number.isFinite(bookId)) updatePage.run(bookId, Number.isFinite(chapterId) ? chapterId : null, Number.isFinite(Number(page.sort_order)) ? Number(page.sort_order) : index, id);
+    });
+  })();
+  res.json({ ok: true });
+});
+
 router.get("/wiki", (_req, res) => res.json(getWikiPages()));
+
+router.get("/wiki/pages", (_req, res) => res.json(getWikiPages()));
 
 router.post("/wiki", (req, res) => {
   const body = req.body ?? {};
   const title = String(body.title ?? "").trim();
   if (!title) return res.status(400).json({ error: "title required" });
-  const result = db.prepare("INSERT INTO workspace_wiki_pages (title, body, tags, custom_fields, updated_at) VALUES (?, ?, ?, ?, datetime('now'))").run(title, body.body ?? "", stringifyTags(body.tags), stringifyObject(body.custom_fields));
+  const bookId = Number(body.book_id) || ensureDefaultWikiBook();
+  const chapterId = Number(body.chapter_id) || null;
+  const max = db.prepare("SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM workspace_wiki_pages WHERE book_id = ? AND COALESCE(chapter_id, 0) = COALESCE(?, 0)").get(bookId, chapterId) as { maxOrder: number };
+  const result = db
+    .prepare("INSERT INTO workspace_wiki_pages (book_id, chapter_id, title, body, tags, custom_fields, sort_order, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))")
+    .run(bookId, chapterId, title, body.body ?? "", stringifyTags(body.tags), stringifyObject(body.custom_fields), body.sort_order ?? max.maxOrder + 1);
   res.status(201).json(findObject("wiki", Number(result.lastInsertRowid)));
+});
+
+router.post("/wiki/pages", (req, res) => {
+  const body = req.body ?? {};
+  const title = String(body.title ?? "").trim();
+  if (!title) return res.status(400).json({ error: "title required" });
+  const bookId = Number(body.book_id) || ensureDefaultWikiBook();
+  const chapterId = Number(body.chapter_id) || null;
+  const max = db.prepare("SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM workspace_wiki_pages WHERE book_id = ? AND COALESCE(chapter_id, 0) = COALESCE(?, 0)").get(bookId, chapterId) as { maxOrder: number };
+  const result = db
+    .prepare("INSERT INTO workspace_wiki_pages (book_id, chapter_id, title, body, tags, custom_fields, sort_order, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))")
+    .run(bookId, chapterId, title, body.body ?? "", stringifyTags(body.tags), stringifyObject(body.custom_fields), body.sort_order ?? max.maxOrder + 1);
+  res.status(201).json(findObject("wiki", Number(result.lastInsertRowid)));
+});
+
+router.put("/wiki/pages/:id", (req, res) => {
+  const existing = db.prepare("SELECT * FROM workspace_wiki_pages WHERE id = ?").get(req.params.id) as any;
+  if (!existing) return res.status(404).json({ error: "not found" });
+  const body = req.body ?? {};
+  db
+    .prepare("UPDATE workspace_wiki_pages SET book_id = ?, chapter_id = ?, title = ?, body = ?, tags = ?, custom_fields = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(body.book_id !== undefined ? body.book_id : existing.book_id, body.chapter_id !== undefined ? body.chapter_id : existing.chapter_id, body.title ?? existing.title, body.body ?? existing.body, body.tags !== undefined ? stringifyTags(body.tags) : existing.tags, body.custom_fields !== undefined ? stringifyObject(body.custom_fields) : existing.custom_fields, body.sort_order ?? existing.sort_order, req.params.id);
+  res.json(findObject("wiki", Number(req.params.id)));
+});
+
+router.delete("/wiki/pages/:id", (req, res) => {
+  db.prepare("DELETE FROM workspace_wiki_pages WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
 });
 
 router.put("/wiki/:id", (req, res) => {
   const existing = db.prepare("SELECT * FROM workspace_wiki_pages WHERE id = ?").get(req.params.id) as any;
   if (!existing) return res.status(404).json({ error: "not found" });
   const body = req.body ?? {};
-  db.prepare("UPDATE workspace_wiki_pages SET title = ?, body = ?, tags = ?, custom_fields = ?, updated_at = datetime('now') WHERE id = ?").run(body.title ?? existing.title, body.body ?? existing.body, body.tags !== undefined ? stringifyTags(body.tags) : existing.tags, body.custom_fields !== undefined ? stringifyObject(body.custom_fields) : existing.custom_fields, req.params.id);
+  db
+    .prepare("UPDATE workspace_wiki_pages SET book_id = ?, chapter_id = ?, title = ?, body = ?, tags = ?, custom_fields = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(body.book_id !== undefined ? body.book_id : existing.book_id, body.chapter_id !== undefined ? body.chapter_id : existing.chapter_id, body.title ?? existing.title, body.body ?? existing.body, body.tags !== undefined ? stringifyTags(body.tags) : existing.tags, body.custom_fields !== undefined ? stringifyObject(body.custom_fields) : existing.custom_fields, body.sort_order ?? existing.sort_order, req.params.id);
   res.json(findObject("wiki", Number(req.params.id)));
 });
 
@@ -642,6 +807,8 @@ router.post("/reset", (req, res) => {
     db.prepare("DELETE FROM workspace_checklists").run();
     db.prepare("DELETE FROM workspace_tasks").run();
     db.prepare("DELETE FROM workspace_wiki_pages").run();
+    db.prepare("DELETE FROM workspace_wiki_chapters").run();
+    db.prepare("DELETE FROM workspace_wiki_books").run();
     db.prepare("DELETE FROM workspace_projects").run();
     db.prepare("DELETE FROM workspace_board_columns").run();
     db.prepare("DELETE FROM workspace_boards").run();
@@ -649,6 +816,7 @@ router.post("/reset", (req, res) => {
     db.prepare("DELETE FROM note_folders").run();
   })();
   ensureDefaultBoard();
+  ensureDefaultWikiBook();
   res.json({ ok: true });
 });
 
