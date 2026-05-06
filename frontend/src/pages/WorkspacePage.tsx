@@ -398,6 +398,41 @@ function SortableColumn({
   );
 }
 
+function SortableWikiRow({
+  id,
+  className,
+  children,
+}: {
+  id: string;
+  className?: string;
+  children: (handle: React.ReactNode) => React.ReactNode;
+}) {
+  const sortable = useSortable({ id });
+  const handle = (
+    <button {...sortable.attributes} {...sortable.listeners} className="workspace-wiki-drag-handle" aria-label="Drag wiki item">
+      <GripHorizontal size={13} />
+    </button>
+  );
+  return (
+    <div
+      ref={sortable.setNodeRef}
+      style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition }}
+      className={`${className ?? ""} ${sortable.isDragging ? "opacity-50" : ""}`}
+    >
+      {children(handle)}
+    </div>
+  );
+}
+
+function WikiDropZone({ id, children }: { id: string; children: React.ReactNode }) {
+  const droppable = useDroppable({ id });
+  return (
+    <div ref={droppable.setNodeRef} className={droppable.isOver ? "workspace-wiki-drop-active" : ""}>
+      {children}
+    </div>
+  );
+}
+
 function MultiToggle<T extends { id: number; name: string }>({
   items,
   selected,
@@ -1058,6 +1093,7 @@ export default function WorkspacePage() {
   const createTask = useCreateWorkspaceTask();
   const createWiki = useCreateWorkspaceWiki();
   const updateWikiPage = useUpdateWorkspaceWiki();
+  const deleteWikiPage = useDeleteWorkspaceWiki();
   const createWikiBook = useCreateWorkspaceWikiBook();
   const updateWikiBook = useUpdateWorkspaceWikiBook();
   const deleteWikiBook = useDeleteWorkspaceWikiBook();
@@ -1084,8 +1120,8 @@ export default function WorkspacePage() {
   const [newWikiChapterTitle, setNewWikiChapterTitle] = useState("");
   const [creatingWikiBook, setCreatingWikiBook] = useState(false);
   const [creatingWikiChapterBookId, setCreatingWikiChapterBookId] = useState<number | null>(null);
-  const [wikiSortMode, setWikiSortMode] = useState(false);
   const [wikiActionMenu, setWikiActionMenu] = useState<string | null>(null);
+  const [deleteWikiPageTarget, setDeleteWikiPageTarget] = useState<WorkspaceWikiPage | null>(null);
   const [editingWikiBook, setEditingWikiBook] = useState<WorkspaceWikiBook | null>(null);
   const [editingWikiChapter, setEditingWikiChapter] = useState<WorkspaceWikiChapter | null>(null);
   const [deleteWikiBookTarget, setDeleteWikiBookTarget] = useState<WorkspaceWikiBook | null>(null);
@@ -1447,12 +1483,16 @@ export default function WorkspacePage() {
       return haystack.includes(wikiSearch);
     });
     const recentWiki = [...wiki].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))).slice(0, 6);
+    const allPagesFor = (bookId: number, chapterId: number | null) => wiki
+      .filter((page) => page.book_id === bookId && (page.chapter_id ?? null) === chapterId)
+      .sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
     const pagesFor = (bookId: number, chapterId: number | null) => wiki
       .filter((page) => filteredWiki.includes(page) && page.book_id === bookId && (page.chapter_id ?? null) === chapterId)
       .sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
-    const chaptersFor = (bookId: number) => wikiChapters
+    const allChaptersFor = (bookId: number) => wikiChapters
       .filter((chapter) => chapter.book_id === bookId)
       .sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
+    const chaptersFor = allChaptersFor;
     const createBook = async () => {
       const title = newWikiBookTitle.trim();
       if (!title) return;
@@ -1474,30 +1514,60 @@ export default function WorkspacePage() {
       setExpandedWikiBooks((current) => Array.from(new Set([...current, bookId])));
       startWikiEdit(page);
     };
-    const movePage = async (page: WorkspaceWikiPage, direction: -1 | 1) => {
-      const siblings = wiki
-        .filter((item) => item.book_id === page.book_id && (item.chapter_id ?? null) === (page.chapter_id ?? null))
-        .sort((a, b) => a.sort_order - b.sort_order || a.title.localeCompare(b.title));
-      const index = siblings.findIndex((item) => item.id === page.id);
-      const targetIndex = index + direction;
-      if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
-      const reordered = arrayMove(siblings, index, targetIndex).map((item, sortIndex) => ({ id: item.id, book_id: item.book_id ?? wikiBooks[0]?.id ?? 0, chapter_id: item.chapter_id, sort_order: sortIndex }));
-      await reorderWiki.mutateAsync({ pages: reordered });
-    };
-    const moveBook = async (book: WorkspaceWikiBook, direction: -1 | 1) => {
-      const index = sortedBooks.findIndex((item) => item.id === book.id);
-      const targetIndex = index + direction;
-      if (index < 0 || targetIndex < 0 || targetIndex >= sortedBooks.length) return;
-      const reordered = arrayMove(sortedBooks, index, targetIndex).map((item, sortIndex) => ({ id: item.id, sort_order: sortIndex }));
-      await reorderWiki.mutateAsync({ books: reordered });
-    };
-    const moveChapter = async (chapter: WorkspaceWikiChapter, direction: -1 | 1) => {
-      const siblings = chaptersFor(chapter.book_id);
-      const index = siblings.findIndex((item) => item.id === chapter.id);
-      const targetIndex = index + direction;
-      if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
-      const reordered = arrayMove(siblings, index, targetIndex).map((item, sortIndex) => ({ id: item.id, book_id: item.book_id, sort_order: sortIndex }));
-      await reorderWiki.mutateAsync({ chapters: reordered });
+    const handleWikiDragEnd = (event: DragEndEvent) => {
+      const activeId = String(event.active.id);
+      const overId = String(event.over?.id ?? "");
+      if (!overId || activeId === overId) return;
+
+      if (activeId.startsWith("wiki-book:") && overId.startsWith("wiki-book:")) {
+        const activeBookId = Number(activeId.replace("wiki-book:", ""));
+        const overBookId = Number(overId.replace("wiki-book:", ""));
+        const oldIndex = sortedBooks.findIndex((book) => book.id === activeBookId);
+        const newIndex = sortedBooks.findIndex((book) => book.id === overBookId);
+        if (oldIndex < 0 || newIndex < 0) return;
+        reorderWiki.mutate({ books: arrayMove(sortedBooks, oldIndex, newIndex).map((book, index) => ({ id: book.id, sort_order: index })) });
+        return;
+      }
+
+      if (activeId.startsWith("wiki-chapter:")) {
+        const activeChapter = wikiChapters.find((chapter) => chapter.id === Number(activeId.replace("wiki-chapter:", "")));
+        if (!activeChapter) return;
+        const overChapter = overId.startsWith("wiki-chapter:") ? wikiChapters.find((chapter) => chapter.id === Number(overId.replace("wiki-chapter:", ""))) : null;
+        const targetBookId = overChapter?.book_id ?? (overId.startsWith("wiki-book:") ? Number(overId.replace("wiki-book:", "")) : activeChapter.book_id);
+        if (!targetBookId) return;
+        const source = allChaptersFor(activeChapter.book_id).filter((chapter) => chapter.id !== activeChapter.id);
+        const target = allChaptersFor(targetBookId).filter((chapter) => chapter.id !== activeChapter.id);
+        const targetIndex = overChapter ? Math.max(0, target.findIndex((chapter) => chapter.id === overChapter.id)) : target.length;
+        target.splice(targetIndex >= 0 ? targetIndex : target.length, 0, { ...activeChapter, book_id: targetBookId });
+        const chapters = [
+          ...(activeChapter.book_id === targetBookId ? [] : source.map((chapter, index) => ({ id: chapter.id, book_id: chapter.book_id, sort_order: index }))),
+          ...target.map((chapter, index) => ({ id: chapter.id, book_id: targetBookId, sort_order: index })),
+        ];
+        reorderWiki.mutate({ chapters });
+        return;
+      }
+
+      if (activeId.startsWith("wiki-page:")) {
+        const activePage = wiki.find((page) => page.id === Number(activeId.replace("wiki-page:", "")));
+        if (!activePage) return;
+        const overPage = overId.startsWith("wiki-page:") ? wiki.find((page) => page.id === Number(overId.replace("wiki-page:", ""))) : null;
+        const overChapterId = overId.startsWith("wiki-chapter:") ? Number(overId.replace("wiki-chapter:", "")) : null;
+        const overChapter = overChapterId ? wikiChapters.find((chapter) => chapter.id === overChapterId) : null;
+        const overBookId = overId.startsWith("wiki-book:") ? Number(overId.replace("wiki-book:", "")) : null;
+        const targetBookId = overPage?.book_id ?? overChapter?.book_id ?? overBookId ?? activePage.book_id ?? wikiBooks[0]?.id;
+        const targetChapterId = overPage ? overPage.chapter_id : overChapter ? overChapter.id : null;
+        if (!targetBookId) return;
+        const source = allPagesFor(activePage.book_id ?? targetBookId, activePage.chapter_id ?? null).filter((page) => page.id !== activePage.id);
+        const target = allPagesFor(targetBookId, targetChapterId ?? null).filter((page) => page.id !== activePage.id);
+        const targetIndex = overPage ? Math.max(0, target.findIndex((page) => page.id === overPage.id)) : target.length;
+        target.splice(targetIndex >= 0 ? targetIndex : target.length, 0, { ...activePage, book_id: targetBookId, chapter_id: targetChapterId });
+        const movedAcross = activePage.book_id !== targetBookId || (activePage.chapter_id ?? null) !== (targetChapterId ?? null);
+        const pages = [
+          ...(movedAcross ? source.map((page, index) => ({ id: page.id, book_id: page.book_id ?? targetBookId, chapter_id: page.chapter_id, sort_order: index })) : []),
+          ...target.map((page, index) => ({ id: page.id, book_id: targetBookId, chapter_id: targetChapterId, sort_order: index })),
+        ];
+        reorderWiki.mutate({ pages });
+      }
     };
     const pageCountForBook = (book: WorkspaceWikiBook) =>
       pagesFor(book.id, null).length + chaptersFor(book.id).reduce((count, chapter) => count + pagesFor(book.id, chapter.id).length, 0);
@@ -1531,12 +1601,11 @@ export default function WorkspacePage() {
             <input value={wikiQuery} onChange={(event) => setWikiQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[13px] text-t1 outline-none placeholder:text-t3" placeholder={t("workspace.wiki_search_placeholder")} />
           </div>
           <div className="my-3 flex items-center gap-2">
-            <button onClick={() => openWikiPage(null)} className={`workspace-wiki-home-button ${!activeWikiPage ? "workspace-wiki-page-active" : ""}`}>
+            <button onClick={() => openWikiPage(null)} className={`workspace-wiki-home-button flex-1 ${!activeWikiPage ? "workspace-wiki-page-active" : ""}`}>
               <BookOpen size={14} />
               <span>{t("workspace.wiki_home")}</span>
             </button>
             <button onClick={() => { setCreatingWikiBook((open) => !open); setWikiActionMenu(null); }} className="workspace-secondary-button h-9 shrink-0 px-3"><Plus size={12} />{t("workspace.wiki_book")}</button>
-            <button onClick={() => setWikiSortMode((enabled) => !enabled)} className={`workspace-secondary-button h-9 shrink-0 px-3 ${wikiSortMode ? "workspace-secondary-button-active" : ""}`}><GripHorizontal size={12} />{wikiSortMode ? t("common.done") : t("workspace.sort")}</button>
           </div>
           {creatingWikiBook && (
             <div className="mb-3 flex gap-2">
@@ -1544,129 +1613,134 @@ export default function WorkspacePage() {
               <button onClick={createBook} className="workspace-primary-button h-9 px-3"><Plus size={12} /></button>
             </div>
           )}
-          <div className="workspace-wiki-tree-list">
-            {sortedBooks.map((book) => {
-              const expanded = expandedWikiBooks.includes(book.id);
-              const directPages = pagesFor(book.id, null);
-              const chapters = chaptersFor(book.id);
-              const bookMenuKey = `book:${book.id}`;
-              return (
-                <div key={book.id} className="workspace-wiki-book">
-                  <div className="workspace-wiki-row workspace-wiki-book-row">
-                    <button onClick={() => setExpandedWikiBooks((current) => expanded ? current.filter((id) => id !== book.id) : [...current, book.id])} className="workspace-wiki-book-button">
-                      {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                      <BookOpen size={14} />
-                      <span className="min-w-0 flex-1 truncate">{book.title}</span>
-                      <span className="workspace-meta-pill">{pageCountForBook(book)}</span>
-                    </button>
-                    {wikiSortMode ? (
-                      <div className="workspace-wiki-sort-actions">
-                        <button onClick={() => moveBook(book, -1)}>↑</button>
-                        <button onClick={() => moveBook(book, 1)}>↓</button>
-                      </div>
-                    ) : (
-                      <div className="workspace-wiki-action-wrap">
-                        <button onClick={() => setWikiActionMenu((current) => current === bookMenuKey ? null : bookMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
-                        {wikiActionMenu === bookMenuKey && (
-                          <div className="workspace-wiki-action-menu">
-                            <button onClick={() => { createPage(book.id); setWikiActionMenu(null); }}><Plus size={12} />{t("workspace.new_wiki_page")}</button>
-                            <button onClick={() => openChapterCreate(book.id)}><Plus size={12} />{t("workspace.new_wiki_chapter")}</button>
-                            <button onClick={() => { setEditingWikiBook(book); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
-                            {wikiBooks.length > 1 && <button onClick={() => { setDeleteWikiBookTarget(book); setWikiActionMenu(null); }} className="text-rose-400"><Trash2 size={12} />{t("common.delete")}</button>}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {expanded && (
-                    <div className="workspace-wiki-children">
-                      {creatingWikiChapterBookId === book.id && (
-                        <div className="workspace-wiki-inline-create">
-                          <input autoFocus value={newWikiChapterTitle} onChange={(event) => setNewWikiChapterTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void createChapter(book.id); }} className="workspace-input h-8 text-[12px]" placeholder={t("workspace.new_wiki_chapter")} />
-                          <button onClick={() => createChapter(book.id)} className="workspace-primary-button h-8 px-2"><Plus size={11} /></button>
-                        </div>
-                      )}
-                      {directPages.map((page) => {
-                        const pageMenuKey = `page:${page.id}`;
-                        return (
-                          <div key={page.id} className="workspace-wiki-row workspace-wiki-page-row">
-                            <button onClick={() => openWikiPage(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} /><span className="truncate">{page.title}</span></button>
-                            {wikiSortMode ? (
-                              <div className="workspace-wiki-sort-actions">
-                                <button onClick={() => movePage(page, -1)}>↑</button>
-                                <button onClick={() => movePage(page, 1)}>↓</button>
-                              </div>
-                            ) : (
-                              <div className="workspace-wiki-action-wrap">
-                                <button onClick={() => setWikiActionMenu((current) => current === pageMenuKey ? null : pageMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
-                                {wikiActionMenu === pageMenuKey && (
-                                  <div className="workspace-wiki-action-menu">
-                                    <button onClick={() => { startWikiEdit(page); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                      {chapters.map((chapter) => {
-                        const chapterMenuKey = `chapter:${chapter.id}`;
-                        return (
-                          <div key={chapter.id} className="workspace-wiki-chapter">
-                            <div className="workspace-wiki-row workspace-wiki-chapter-row">
-                              <button onClick={() => setEditingWikiChapter(chapter)} className="workspace-wiki-chapter-title"><GripHorizontal size={12} /><span className="truncate">{chapter.title}</span><span className="workspace-meta-pill">{pagesFor(book.id, chapter.id).length}</span></button>
-                              {wikiSortMode ? (
-                                <div className="workspace-wiki-sort-actions">
-                                  <button onClick={() => moveChapter(chapter, -1)}>↑</button>
-                                  <button onClick={() => moveChapter(chapter, 1)}>↓</button>
-                                </div>
-                              ) : (
-                                <div className="workspace-wiki-action-wrap">
-                                  <button onClick={() => setWikiActionMenu((current) => current === chapterMenuKey ? null : chapterMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
-                                  {wikiActionMenu === chapterMenuKey && (
-                                    <div className="workspace-wiki-action-menu">
-                                      <button onClick={() => { createPage(book.id, chapter.id); setWikiActionMenu(null); }}><Plus size={12} />{t("workspace.new_wiki_page")}</button>
-                                      <button onClick={() => { setEditingWikiChapter(chapter); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
-                                      <button onClick={() => { setDeleteWikiChapterTarget(chapter); setWikiActionMenu(null); }} className="text-rose-400"><Trash2 size={12} />{t("common.delete")}</button>
-                                    </div>
-                                  )}
+          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleWikiDragEnd}>
+            <SortableContext items={sortedBooks.map((book) => `wiki-book:${book.id}`)} strategy={verticalListSortingStrategy}>
+              <div className="workspace-wiki-tree-list">
+                {sortedBooks.map((book) => {
+                  const expanded = expandedWikiBooks.includes(book.id);
+                  const directPages = pagesFor(book.id, null);
+                  const chapters = chaptersFor(book.id);
+                  const bookMenuKey = `book:${book.id}`;
+                  return (
+                    <SortableWikiRow key={book.id} id={`wiki-book:${book.id}`} className="workspace-wiki-book">
+                      {(handle) => (
+                        <>
+                          <div className="workspace-wiki-row workspace-wiki-book-row">
+                            {handle}
+                            <button onClick={() => setExpandedWikiBooks((current) => expanded ? current.filter((id) => id !== book.id) : [...current, book.id])} className="workspace-wiki-book-button">
+                              {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                              <BookOpen size={14} />
+                              <span className="min-w-0 flex-1 truncate">{book.title}</span>
+                              <span className="workspace-meta-pill">{pageCountForBook(book)}</span>
+                            </button>
+                            <button onClick={() => openChapterCreate(book.id)} className="workspace-wiki-inline-action"><Plus size={12} />{t("workspace.wiki_chapter")}</button>
+                            <div className="workspace-wiki-action-wrap">
+                              <button onClick={() => setWikiActionMenu((current) => current === bookMenuKey ? null : bookMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
+                              {wikiActionMenu === bookMenuKey && (
+                                <div className="workspace-wiki-action-menu">
+                                  <button onClick={() => { setEditingWikiBook(book); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
+                                  {wikiBooks.length > 1 && <button onClick={() => { setDeleteWikiBookTarget(book); setWikiActionMenu(null); }} className="text-rose-400"><Trash2 size={12} />{t("common.delete")}</button>}
                                 </div>
                               )}
                             </div>
-                            <div className="workspace-wiki-chapter-pages">
-                              {pagesFor(book.id, chapter.id).map((page) => {
-                                const pageMenuKey = `page:${page.id}`;
-                                return (
-                                  <div key={page.id} className="workspace-wiki-row workspace-wiki-page-row">
-                                    <button onClick={() => openWikiPage(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} /><span className="truncate">{page.title}</span></button>
-                                    {wikiSortMode ? (
-                                      <div className="workspace-wiki-sort-actions">
-                                        <button onClick={() => movePage(page, -1)}>↑</button>
-                                        <button onClick={() => movePage(page, 1)}>↓</button>
-                                      </div>
-                                    ) : (
-                                      <div className="workspace-wiki-action-wrap">
-                                        <button onClick={() => setWikiActionMenu((current) => current === pageMenuKey ? null : pageMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
-                                        {wikiActionMenu === pageMenuKey && (
-                                          <div className="workspace-wiki-action-menu">
-                                            <button onClick={() => { startWikiEdit(page); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                          {expanded && (
+                            <WikiDropZone id={`wiki-book:${book.id}`}>
+                              <div className="workspace-wiki-children">
+                                {creatingWikiChapterBookId === book.id && (
+                                  <div className="workspace-wiki-inline-create">
+                                    <input autoFocus value={newWikiChapterTitle} onChange={(event) => setNewWikiChapterTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void createChapter(book.id); }} className="workspace-input h-8 text-[12px]" placeholder={t("workspace.new_wiki_chapter")} />
+                                    <button onClick={() => createChapter(book.id)} className="workspace-primary-button h-8 px-2"><Plus size={11} /></button>
+                                  </div>
+                                )}
+                                <SortableContext items={[...directPages.map((page) => `wiki-page:${page.id}`), ...chapters.map((chapter) => `wiki-chapter:${chapter.id}`)]} strategy={verticalListSortingStrategy}>
+                                  {directPages.map((page) => {
+                                    const pageMenuKey = `page:${page.id}`;
+                                    return (
+                                      <SortableWikiRow key={page.id} id={`wiki-page:${page.id}`} className="workspace-wiki-row workspace-wiki-page-row">
+                                        {(pageHandle) => (
+                                          <>
+                                            {pageHandle}
+                                            <button onClick={() => openWikiPage(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} /><span className="truncate">{page.title}</span></button>
+                                            <div className="workspace-wiki-action-wrap">
+                                              <button onClick={() => setWikiActionMenu((current) => current === pageMenuKey ? null : pageMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
+                                              {wikiActionMenu === pageMenuKey && (
+                                                <div className="workspace-wiki-action-menu">
+                                                  <button onClick={() => { startWikiEdit(page); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
+                                                  <button onClick={() => { setDeleteWikiPageTarget(page); setWikiActionMenu(null); }} className="text-rose-400"><Trash2 size={12} />{t("common.delete")}</button>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </>
+                                        )}
+                                      </SortableWikiRow>
+                                    );
+                                  })}
+                                  {chapters.map((chapter) => {
+                                    const chapterMenuKey = `chapter:${chapter.id}`;
+                                    return (
+                                      <SortableWikiRow key={chapter.id} id={`wiki-chapter:${chapter.id}`} className="workspace-wiki-chapter">
+                                        {(chapterHandle) => (
+                                          <>
+                                            <div className="workspace-wiki-row workspace-wiki-chapter-row">
+                                              {chapterHandle}
+                                              <button onClick={() => setEditingWikiChapter(chapter)} className="workspace-wiki-chapter-title"><Blocks size={12} /><span className="truncate">{chapter.title}</span><span className="workspace-meta-pill">{pagesFor(book.id, chapter.id).length}</span></button>
+                                              <button onClick={() => createPage(book.id, chapter.id)} className="workspace-wiki-inline-action"><Plus size={12} />{t("workspace.wiki_page")}</button>
+                                              <div className="workspace-wiki-action-wrap">
+                                                <button onClick={() => setWikiActionMenu((current) => current === chapterMenuKey ? null : chapterMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
+                                                {wikiActionMenu === chapterMenuKey && (
+                                                  <div className="workspace-wiki-action-menu">
+                                                    <button onClick={() => { setEditingWikiChapter(chapter); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
+                                                    <button onClick={() => { setDeleteWikiChapterTarget(chapter); setWikiActionMenu(null); }} className="text-rose-400"><Trash2 size={12} />{t("common.delete")}</button>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                            <WikiDropZone id={`wiki-chapter:${chapter.id}`}>
+                                              <SortableContext items={pagesFor(book.id, chapter.id).map((page) => `wiki-page:${page.id}`)} strategy={verticalListSortingStrategy}>
+                                                <div className="workspace-wiki-chapter-pages">
+                                                  {pagesFor(book.id, chapter.id).map((page) => {
+                                                    const pageMenuKey = `page:${page.id}`;
+                                                    return (
+                                                      <SortableWikiRow key={page.id} id={`wiki-page:${page.id}`} className="workspace-wiki-row workspace-wiki-page-row">
+                                                        {(pageHandle) => (
+                                                          <>
+                                                            {pageHandle}
+                                                            <button onClick={() => openWikiPage(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} /><span className="truncate">{page.title}</span></button>
+                                                            <div className="workspace-wiki-action-wrap">
+                                                              <button onClick={() => setWikiActionMenu((current) => current === pageMenuKey ? null : pageMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
+                                                              {wikiActionMenu === pageMenuKey && (
+                                                                <div className="workspace-wiki-action-menu">
+                                                                  <button onClick={() => { startWikiEdit(page); setWikiActionMenu(null); }}><Edit3 size={12} />{t("common.edit")}</button>
+                                                                  <button onClick={() => { setDeleteWikiPageTarget(page); setWikiActionMenu(null); }} className="text-rose-400"><Trash2 size={12} />{t("common.delete")}</button>
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          </>
+                                                        )}
+                                                      </SortableWikiRow>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </SortableContext>
+                                            </WikiDropZone>
+                                          </>
+                                        )}
+                                      </SortableWikiRow>
+                                    );
+                                  })}
+                                </SortableContext>
+                              </div>
+                            </WikiDropZone>
+                          )}
+                        </>
+                      )}
+                    </SortableWikiRow>
+                  );
+                })}
+              </div>
+            </SortableContext>
+          </DndContext>
         </aside>
 
         <section className="workspace-panel workspace-wiki-page">
@@ -1696,7 +1770,7 @@ export default function WorkspacePage() {
                       <button onClick={() => { setEditingWikiPageId(null); setWikiEditorDraft(null); setWikiAutosaveState("idle"); setWikiAutosaveError(""); }} className="workspace-secondary-button">{t("common.cancel")}</button>
                     </>
                   ) : (
-                    <button onClick={() => startWikiEdit(activeWikiPage)} className="workspace-primary-button"><Edit3 size={14} />{t("workspace.edit_wiki_page")}</button>
+                    <button onClick={() => startWikiEdit(activeWikiPage)} className="workspace-primary-button px-3" aria-label={t("workspace.edit_wiki_page")} title={t("workspace.edit_wiki_page")}><Edit3 size={14} /></button>
                   )}
                 </div>
               </div>
@@ -1747,14 +1821,6 @@ export default function WorkspacePage() {
             </>
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line/60 pb-4">
-                <div>
-                  <div className="label-xs">{t("workspace.wiki_home")}</div>
-                  <h2 className="mt-1 text-2xl font-semibold tracking-tight text-t1">{t("workspace.wiki_library")}</h2>
-                  <p className="mt-1 max-w-2xl text-sm text-t3">{t("workspace.wiki_home_description")}</p>
-                </div>
-                <button onClick={() => quickCreate("wiki")} className="workspace-primary-button"><Plus size={13} />{t("workspace.new_wiki_page")}</button>
-              </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="workspace-wiki-home-card"><BookOpen size={16} /><span>{wikiBooks.length}</span><small>{t("workspace.wiki_books")}</small></div>
                 <div className="workspace-wiki-home-card"><GripHorizontal size={16} /><span>{wikiChapters.length}</span><small>{t("workspace.wiki_chapters")}</small></div>
@@ -1914,6 +1980,7 @@ export default function WorkspacePage() {
       {editingWikiChapter && <WorkspaceWikiChapterEditor chapter={editingWikiChapter} books={wikiBooks} onClose={() => setEditingWikiChapter(null)} onSave={async (patch) => { await updateWikiChapter.mutateAsync({ id: editingWikiChapter.id, ...patch }); setEditingWikiChapter(null); }} />}
       <ConfirmDialog open={Boolean(deleteWikiBookTarget)} title={t("workspace.delete_wiki_book")} description={t("workspace.delete_wiki_book_description", { title: deleteWikiBookTarget?.title ?? "" })} onCancel={() => setDeleteWikiBookTarget(null)} onConfirm={async () => { if (deleteWikiBookTarget) await deleteWikiBook.mutateAsync(deleteWikiBookTarget.id); setDeleteWikiBookTarget(null); openWikiPage(null); }} />
       <ConfirmDialog open={Boolean(deleteWikiChapterTarget)} title={t("workspace.delete_wiki_chapter")} description={t("workspace.delete_wiki_chapter_description", { title: deleteWikiChapterTarget?.title ?? "" })} onCancel={() => setDeleteWikiChapterTarget(null)} onConfirm={async () => { if (deleteWikiChapterTarget) await deleteWikiChapter.mutateAsync(deleteWikiChapterTarget.id); setDeleteWikiChapterTarget(null); }} />
+      <ConfirmDialog open={Boolean(deleteWikiPageTarget)} title={t("workspace.delete_wiki_page")} description={t("workspace.delete_wiki_page_description", { title: deleteWikiPageTarget?.title ?? "" })} onCancel={() => setDeleteWikiPageTarget(null)} onConfirm={async () => { if (deleteWikiPageTarget) await deleteWikiPage.mutateAsync(deleteWikiPageTarget.id); if (activeWikiPageId === deleteWikiPageTarget?.id) openWikiPage(null); setDeleteWikiPageTarget(null); }} />
     </div>
   );
 }
