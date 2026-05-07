@@ -434,14 +434,6 @@ body {
   font-weight: 700;
 }
 
-.workspace-sidebar-create::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 2px;
-  background: rgb(var(--tone, var(--accent)));
-}
-
 .workspace-panel,
 .workspace-drawer-section {
   border: 1px solid rgb(var(--line) / 0.62);
@@ -596,31 +588,12 @@ body {
   border-top: 2px solid rgb(var(--tone, var(--accent)) / 0.85);
 }
 
-.workspace-object-card::before,
-.workspace-create-card::before,
-.workspace-date-card::before,
-.workspace-timeline-row::before,
-.workspace-drawer-section::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: rgb(var(--workspace-project));
-}
-
 .workspace-tone-project { --tone: var(--workspace-project); }
 .workspace-tone-task { --tone: var(--workspace-task); }
 .workspace-tone-wiki { --tone: var(--workspace-wiki); }
 .workspace-tone-note { --tone: var(--workspace-note); }
 .workspace-tone-danger { --tone: var(--workspace-danger); }
 .workspace-tone-warn { --tone: var(--workspace-warn); }
-
-.workspace-tone-project::before { background: rgb(var(--workspace-project)); }
-.workspace-tone-task::before { background: rgb(var(--workspace-task)); }
-.workspace-tone-wiki::before { background: rgb(var(--workspace-wiki)); }
-.workspace-tone-note::before { background: rgb(var(--workspace-note)); }
-.workspace-tone-danger::before { background: rgb(var(--workspace-danger)); }
-.workspace-tone-warn::before { background: rgb(var(--workspace-warn)); }
 
 .workspace-stat-icon {
   display: flex;
@@ -697,14 +670,6 @@ body {
   border-top: 3px solid rgb(var(--accent));
   border-radius: 1.25rem;
   padding: 0.75rem;
-}
-
-.workspace-board-column-header-accent {
-  position: absolute;
-  inset: 0 auto auto 0;
-  height: 3.25rem;
-  width: 3px;
-  background: rgb(var(--tone, var(--accent)));
 }
 
 .workspace-board-toolbar {

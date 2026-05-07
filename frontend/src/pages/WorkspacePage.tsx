@@ -367,10 +367,9 @@ function SortableColumn({
         sortable.setNodeRef(node);
         droppable.setNodeRef(node);
       }}
-      style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition, borderTopColor: column.color ?? undefined }}
+      style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition }}
       className={`workspace-board-column min-w-[290px] ${columnTone(column)} ${sortable.isDragging ? "opacity-50" : ""} ${droppable.isOver ? "ring-2 ring-accent/40" : ""}`}
     >
-      <div className="workspace-board-column-header-accent" style={{ background: column.color ?? undefined }} />
       <div className="mb-3 flex items-center justify-between gap-2">
         <button {...sortable.attributes} {...sortable.listeners} className="cursor-grab touch-none text-t3 active:cursor-grabbing" aria-label={t("workspace.drag_column")}>
           <GripHorizontal size={15} />
