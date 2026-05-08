@@ -102,7 +102,7 @@ import { useCreateNote, useDeleteNote, useUpdateNote } from "../hooks/useNotes";
 
 const NotesPage = lazy(() => import("./NotesPage"));
 
-const tabs = ["dashboard", "board", "list", "calendar", "timeline", "mindmap", "projects", "wiki", "notes"] as const;
+const tabs = ["dashboard", "projects", "board", "list", "calendar", "timeline", "mindmap", "wiki", "notes"] as const;
 const priorities: WorkspacePriority[] = ["low", "medium", "high", "urgent"];
 const columnLimit = 10;
 
@@ -367,7 +367,7 @@ function SortableColumn({
         sortable.setNodeRef(node);
         droppable.setNodeRef(node);
       }}
-      style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition }}
+      style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition, "--column-accent": column.color ?? undefined } as React.CSSProperties}
       className={`workspace-board-column min-w-[290px] ${columnTone(column)} ${sortable.isDragging ? "opacity-50" : ""} ${droppable.isOver ? "ring-2 ring-accent/40" : ""}`}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -1149,7 +1149,7 @@ export default function WorkspacePage() {
   const activeWikiPage = activeWikiPageId ? wiki.find((page) => page.id === activeWikiPageId) ?? null : null;
   const filteredObjects = allObjects;
   const activeDragTask = activeDragId?.startsWith("task:") ? tasks.find((task) => `task:${task.id}` === activeDragId) : null;
-  const sidebarTabs: WorkspaceTab[] = ["dashboard", "board", "list", "calendar", "timeline", "mindmap", "projects", "wiki", "notes"];
+  const sidebarTabs: WorkspaceTab[] = ["dashboard", "projects", "board", "list", "calendar", "timeline", "mindmap", "wiki", "notes"];
   const tabIcon = (tab: WorkspaceTab) => tab === "dashboard" ? BarChart3 : tab === "board" ? Blocks : tab === "list" ? ListChecks : tab === "calendar" ? CalendarDays : tab === "timeline" ? CheckSquare : tab === "mindmap" ? Network : tab === "projects" ? FolderKanban : tab === "wiki" ? Link2 : FileText;
   const openObject = (item: WorkspaceObject) => {
     if (item.type === "task") {
@@ -1435,7 +1435,7 @@ export default function WorkspacePage() {
         {activeBoard && <button onClick={() => setEditingBoard(activeBoard)} className="workspace-secondary-button workspace-board-button">{t("workspace.edit_board")}</button>}
         {activeBoard && boards.length > 1 && <button onClick={() => setDeleteBoardTarget(activeBoard)} className="workspace-danger-button workspace-board-button">{t("workspace.delete_board")}</button>}
         <div className="ml-auto flex min-w-0 items-center gap-1.5">
-          <input value={newColumnTitle} onChange={(e) => setNewColumnTitle(e.target.value)} disabled={boardColumns.length >= columnLimit} className="workspace-input workspace-board-control max-w-[180px]" placeholder={boardColumns.length >= columnLimit ? t("workspace.column_limit") : t("workspace.new_column")} />
+          <input value={newColumnTitle} onChange={(e) => setNewColumnTitle(e.target.value)} disabled={boardColumns.length >= columnLimit} className="workspace-input workspace-board-control w-full max-w-[180px] sm:w-[180px]" placeholder={boardColumns.length >= columnLimit ? t("workspace.column_limit") : t("workspace.new_column")} />
           <button onClick={createColumnFromInput} disabled={boardColumns.length >= columnLimit} className="workspace-primary-button workspace-board-button"><Plus size={12} />{t("workspace.column")}</button>
         </div>
       </div>

@@ -666,10 +666,20 @@ body {
 }
 
 .workspace-board-column {
+  position: relative;
+  overflow: hidden;
   min-height: 360px;
-  border-top: 3px solid rgb(var(--accent));
   border-radius: 1.25rem;
   padding: 0.75rem;
+}
+
+.workspace-board-column::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  border-radius: 1.25rem 1.25rem 0 0;
+  background: var(--column-accent, rgb(var(--accent)));
 }
 
 .workspace-board-toolbar {

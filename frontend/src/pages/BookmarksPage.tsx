@@ -783,7 +783,7 @@ export default function BookmarksPage() {
 
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-[1rem] border border-line/60 bg-card/80 px-3 py-[0.62rem] shadow-sm transition-colors focus-within:border-accent/40 focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)]">
+            <div className="flex min-w-0 w-full items-center gap-2 rounded-[1rem] border border-line/60 bg-card/80 px-3 py-[0.62rem] shadow-sm transition-colors focus-within:border-accent/40 focus-within:shadow-[0_0_0_3px_rgb(var(--accent)/0.13)] sm:w-[180px] sm:max-w-[180px]">
               {commandIsUrl ? <Link2 size={15} className="shrink-0 text-accent" /> : <Search size={15} className="shrink-0 text-t3" />}
               <input
                 value={captureUrl}
