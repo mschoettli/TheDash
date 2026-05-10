@@ -1176,25 +1176,12 @@ body {
   transition: opacity 0.14s ease, background 0.14s ease, color 0.14s ease;
 }
 
-.workspace-wiki-drag-handle {
-  display: inline-flex;
-  height: 1.65rem;
-  width: 1.65rem;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  color: rgb(var(--t3));
+.workspace-wiki-drag-surface {
   cursor: grab;
   touch-action: none;
 }
 
-.workspace-wiki-drag-handle:hover {
-  background: rgb(var(--surface) / 0.7);
-  color: rgb(var(--accent));
-}
-
-.workspace-wiki-drag-handle:active {
+.workspace-wiki-drag-surface:active {
   cursor: grabbing;
 }
 

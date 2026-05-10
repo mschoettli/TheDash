@@ -404,21 +404,17 @@ function SortableWikiRow({
 }: {
   id: string;
   className?: string;
-  children: (handle: React.ReactNode) => React.ReactNode;
+  children: (dragHandleProps: React.HTMLAttributes<HTMLButtonElement>) => React.ReactNode;
 }) {
   const sortable = useSortable({ id });
-  const handle = (
-    <button {...sortable.attributes} {...sortable.listeners} className="workspace-wiki-drag-handle" aria-label="Drag wiki item">
-      <GripHorizontal size={13} />
-    </button>
-  );
+  const dragHandleProps = { ...sortable.attributes, ...sortable.listeners } as React.HTMLAttributes<HTMLButtonElement>;
   return (
     <div
       ref={sortable.setNodeRef}
       style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition }}
       className={`${className ?? ""} ${sortable.isDragging ? "opacity-50" : ""}`}
     >
-      {children(handle)}
+      {children(dragHandleProps)}
     </div>
   );
 }
@@ -1622,15 +1618,13 @@ export default function WorkspacePage() {
                   const bookMenuKey = `book:${book.id}`;
                   return (
                     <SortableWikiRow key={book.id} id={`wiki-book:${book.id}`} className="workspace-wiki-book">
-                      {(handle) => (
+                      {(dragHandleProps) => (
                         <>
                           <div className="workspace-wiki-row workspace-wiki-book-row">
-                            {handle}
-                            <button onClick={() => setExpandedWikiBooks((current) => expanded ? current.filter((id) => id !== book.id) : [...current, book.id])} className="workspace-wiki-book-button">
+                            <button {...dragHandleProps} onClick={() => setExpandedWikiBooks((current) => expanded ? current.filter((id) => id !== book.id) : [...current, book.id])} className="workspace-wiki-book-button workspace-wiki-drag-surface">
                               {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                               <BookOpen size={14} />
                               <span className="min-w-0 flex-1 truncate">{book.title}</span>
-                              <span className="workspace-meta-pill">{pageCountForBook(book)}</span>
                             </button>
                             <button onClick={() => openChapterCreate(book.id)} className="workspace-wiki-inline-action"><Plus size={12} />{t("workspace.wiki_chapter")}</button>
                             <div className="workspace-wiki-action-wrap">
@@ -1657,10 +1651,9 @@ export default function WorkspacePage() {
                                     const pageMenuKey = `page:${page.id}`;
                                     return (
                                       <SortableWikiRow key={page.id} id={`wiki-page:${page.id}`} className="workspace-wiki-row workspace-wiki-page-row">
-                                        {(pageHandle) => (
+                                        {(pageDragHandleProps) => (
                                           <>
-                                            {pageHandle}
-                                            <button onClick={() => openWikiPage(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} /><span className="truncate">{page.title}</span></button>
+                                            <button {...pageDragHandleProps} onClick={() => openWikiPage(page.id)} className={`workspace-wiki-page-button workspace-wiki-drag-surface ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} /><span className="truncate">{page.title}</span></button>
                                             <div className="workspace-wiki-action-wrap">
                                               <button onClick={() => setWikiActionMenu((current) => current === pageMenuKey ? null : pageMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
                                               {wikiActionMenu === pageMenuKey && (
@@ -1679,11 +1672,10 @@ export default function WorkspacePage() {
                                     const chapterMenuKey = `chapter:${chapter.id}`;
                                     return (
                                       <SortableWikiRow key={chapter.id} id={`wiki-chapter:${chapter.id}`} className="workspace-wiki-chapter">
-                                        {(chapterHandle) => (
+                                        {(chapterDragHandleProps) => (
                                           <>
                                             <div className="workspace-wiki-row workspace-wiki-chapter-row">
-                                              {chapterHandle}
-                                              <button onClick={() => setEditingWikiChapter(chapter)} className="workspace-wiki-chapter-title"><Blocks size={12} /><span className="truncate">{chapter.title}</span><span className="workspace-meta-pill">{pagesFor(book.id, chapter.id).length}</span></button>
+                                              <button {...chapterDragHandleProps} onClick={() => setEditingWikiChapter(chapter)} className="workspace-wiki-chapter-title workspace-wiki-drag-surface"><Blocks size={12} /><span className="truncate">{chapter.title}</span></button>
                                               <button onClick={() => createPage(book.id, chapter.id)} className="workspace-wiki-inline-action"><Plus size={12} />{t("workspace.wiki_page")}</button>
                                               <div className="workspace-wiki-action-wrap">
                                                 <button onClick={() => setWikiActionMenu((current) => current === chapterMenuKey ? null : chapterMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
@@ -1702,10 +1694,9 @@ export default function WorkspacePage() {
                                                     const pageMenuKey = `page:${page.id}`;
                                                     return (
                                                       <SortableWikiRow key={page.id} id={`wiki-page:${page.id}`} className="workspace-wiki-row workspace-wiki-page-row">
-                                                        {(pageHandle) => (
+                                                        {(pageDragHandleProps) => (
                                                           <>
-                                                            {pageHandle}
-                                                            <button onClick={() => openWikiPage(page.id)} className={`workspace-wiki-page-button ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} /><span className="truncate">{page.title}</span></button>
+                                                            <button {...pageDragHandleProps} onClick={() => openWikiPage(page.id)} className={`workspace-wiki-page-button workspace-wiki-drag-surface ${activeWikiPage?.id === page.id ? "workspace-wiki-page-active" : ""}`}><FileText size={12} /><span className="truncate">{page.title}</span></button>
                                                             <div className="workspace-wiki-action-wrap">
                                                               <button onClick={() => setWikiActionMenu((current) => current === pageMenuKey ? null : pageMenuKey)} className="workspace-wiki-action-button"><MoreHorizontal size={14} /></button>
                                                               {wikiActionMenu === pageMenuKey && (

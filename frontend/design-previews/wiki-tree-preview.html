@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TheDash Wiki Tree Preview</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --accent: #00A188;
+      --bg: #0b111d;
+      --panel: #111827;
+      --panel-soft: #151f2e;
+      --line: #263449;
+      --line-soft: rgba(148, 163, 184, 0.2);
+      --text: #e5edf7;
+      --muted: #9aa8ba;
+      --faint: #68778c;
+      --blue: #79d4ff;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 32rem),
+        radial-gradient(circle at 76% 10%, rgba(0, 161, 136, 0.08), transparent 28rem),
+        var(--bg);
+      color: var(--text);
+      letter-spacing: 0;
+    }
+
+    main {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 34px 0 42px;
+    }
+
+    header {
+      margin-bottom: 22px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+    }
+
+    .lead {
+      margin: 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      align-items: start;
+    }
+
+    .preview-card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.016)),
+        var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .preview-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line-soft);
+      padding: 16px 18px;
+    }
+
+    .preview-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 750;
+    }
+
+    .preview-note {
+      color: var(--faint);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .tree-shell {
+      padding: 18px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.026), transparent 18rem),
+        rgba(10, 16, 27, 0.32);
+    }
+
+    .tree {
+      min-height: 360px;
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.56);
+      padding: 14px;
+    }
+
+    button {
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+    }
+
+    .current .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 46px;
+      color: #94a3b8;
+      font-size: 15px;
+      font-weight: 680;
+    }
+
+    .current .row.book {
+      color: #cbd5e1;
+      font-size: 16px;
+      font-weight: 760;
+    }
+
+    .current .row.chapter {
+      margin-left: 32px;
+      color: #94a3b8;
+      font-size: 14px;
+      font-weight: 780;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .current .row.page {
+      margin-left: 40px;
+    }
+
+    .current .row.chapter-page {
+      margin-left: 70px;
+      color: #cbd5e1;
+    }
+
+    .icon {
+      width: 18px;
+      flex: 0 0 18px;
+      color: #8fa0b5;
+      text-align: center;
+    }
+
+    .kebab {
+      margin-left: auto;
+      color: #8fa0b5;
+      letter-spacing: 2px;
+    }
+
+    .pill {
+      display: inline-flex;
+      height: 30px;
+      min-width: 30px;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #708199;
+      padding: 0 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .action-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #91a0b5;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 720;
+    }
+
+    .current .row.is-hover {
+      border-radius: 12px;
+      background: rgba(148, 163, 184, 0.06);
+    }
+
+    .proposed .book-block {
+      border-radius: 12px;
+    }
+
+    .proposed .tree-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 38px;
+      border-radius: 9px;
+      color: var(--muted);
+      padding: 0 8px;
+      transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .proposed .tree-row:hover,
+    .proposed .tree-row.is-active,
+    .proposed .tree-row.is-hover {
+      background: rgba(0, 161, 136, 0.095);
+      color: var(--text);
+      box-shadow: 0 10px 24px rgba(0, 161, 136, 0.045);
+    }
+
+    .proposed .main-cell {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .proposed .title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .proposed .book-row {
+      color: #d8e2ee;
+      font-size: 15px;
+      font-weight: 780;
+    }
+
+    .proposed .direct-page {
+      margin-left: 28px;
+      color: #a9b5c6;
+      font-size: 14px;
+      font-weight: 640;
+    }
+
+    .proposed .chapter-row {
+      margin: 8px 0 2px 28px;
+      color: #91a1b7;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .proposed .chapter-page {
+      margin-left: 58px;
+      color: #cfd8e5;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .proposed .ghost-action,
+    .proposed .ghost-menu {
+      opacity: 0.22;
+      transition: opacity 160ms ease, color 160ms ease, background 160ms ease;
+    }
+
+    .proposed .tree-row:hover .ghost-action,
+    .proposed .tree-row:hover .ghost-menu,
+    .proposed .tree-row.is-hover .ghost-action,
+    .proposed .tree-row.is-hover .ghost-menu,
+    .proposed .tree-row.is-active .ghost-menu {
+      opacity: 1;
+    }
+
+    .proposed .ghost-action,
+    .proposed .ghost-menu {
+      display: inline-flex;
+      height: 28px;
+      min-width: 28px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      color: #8fa0b5;
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .proposed .ghost-action:hover,
+    .proposed .ghost-menu:hover {
+      background: rgba(148, 163, 184, 0.12);
+      color: #e6eef8;
+    }
+
+    .proposed .row-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .proposed .connector {
+      margin-left: 30px;
+      padding-left: 0;
+    }
+
+    .drag-surface {
+      cursor: grab;
+    }
+
+    .drag-surface:active {
+      cursor: grabbing;
+    }
+
+    .legend {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+      color: var(--faint);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .legend strong {
+      color: var(--muted);
+    }
+
+    @media (max-width: 900px) {
+      .preview-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Wiki Tree Preview</h1>
+      <p class="lead">
+        Standalone design sandbox for the workspace wiki tree. Future visual changes should be tried here before touching production React or CSS.
+      </p>
+    </header>
+
+    <section class="preview-grid" aria-label="Wiki tree preview comparison">
+      <article class="preview-card current">
+        <div class="preview-head">
+          <h2 class="preview-title">Current</h2>
+          <span class="preview-note">Noisy controls, weak hierarchy</span>
+        </div>
+        <div class="tree-shell">
+          <div class="tree">
+            <div class="row book">
+              <span class="icon">⌄</span>
+              <span class="icon">▱</span>
+              <span>Docker</span>
+              <span class="action-pill">+ Kapitel</span>
+              <span class="kebab">•••</span>
+            </div>
+            <div class="row page">
+              <span class="icon">▧</span>
+              <span>Kommandos</span>
+              <span class="kebab">•••</span>
+            </div>
+            <div class="row page">
+              <span class="icon">▧</span>
+              <span>Neue Wiki-Seite</span>
+              <span class="kebab">•••</span>
+            </div>
+            <div class="row chapter is-hover">
+              <span class="icon">▦</span>
+              <span>COMPOSE</span>
+              <span class="action-pill">+ Seite</span>
+              <span class="kebab">•••</span>
+            </div>
+            <div class="row chapter-page">
+              <span class="icon">▧</span>
+              <span>All Docker Commands</span>
+              <span class="kebab">•••</span>
+            </div>
+          </div>
+          <div class="legend">
+            <span><strong>Issue:</strong> create and menu controls sit too close to the content and compete with the tree labels.</span>
+            <span><strong>Issue:</strong> hierarchy relies on spacing, but the controls disrupt the tree shape.</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="preview-card proposed">
+        <div class="preview-head">
+          <h2 class="preview-title">Proposed</h2>
+          <span class="preview-note">Quieter tree, clearer roles</span>
+        </div>
+        <div class="tree-shell">
+          <div class="tree">
+            <div class="book-block">
+              <div class="tree-row book-row">
+                <span class="main-cell drag-surface">
+                  <span>⌄</span>
+                  <span>▱</span>
+                  <span class="title">Docker</span>
+                </span>
+                <span class="row-actions">
+                  <span class="ghost-action" title="Add chapter">+</span>
+                  <span class="ghost-menu">•••</span>
+                </span>
+              </div>
+
+              <div class="connector">
+                <div class="tree-row direct-page">
+                  <span class="main-cell drag-surface">
+                    <span>▧</span>
+                    <span class="title">Kommandos</span>
+                  </span>
+                  <span class="ghost-menu">•••</span>
+                </div>
+
+                <div class="tree-row direct-page">
+                  <span class="main-cell drag-surface">
+                    <span>▧</span>
+                    <span class="title">Neue Wiki-Seite</span>
+                  </span>
+                  <span class="ghost-menu">•••</span>
+                </div>
+
+                <div class="tree-row chapter-row is-hover">
+                  <span class="main-cell drag-surface">
+                    <span>▦</span>
+                    <span class="title">Compose</span>
+                  </span>
+                  <span class="row-actions">
+                    <span class="ghost-action" title="Add page">+</span>
+                    <span class="ghost-menu">•••</span>
+                  </span>
+                </div>
+
+                <div class="tree-row chapter-page is-active">
+                  <span class="main-cell drag-surface">
+                    <span>▧</span>
+                    <span class="title">All Docker Commands</span>
+                  </span>
+                  <span class="ghost-menu">•••</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="legend">
+            <span><strong>Rule:</strong> drag-and-drop uses the row text area directly; no leading dot handles.</span>
+            <span><strong>Rule:</strong> pages are leaf nodes, chapters are section headers, books are the top-level container.</span>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
