@@ -11,7 +11,7 @@ interface Props {
 export default function TileMinimal({ tile, status, apiData: _ }: Props) {
   return (
     <div className="tile-glass tile-hover-plane relative flex h-full min-h-0 items-center justify-center overflow-hidden rounded-2xl border border-line/40 px-3 py-2 text-center">
-      <span className="absolute left-1/2 top-[26%] -translate-x-1/2">
+      <span className="absolute right-3 top-3 z-10">
         <StatusDot status={status} size="sm" />
       </span>
       <div className="flex min-w-0 -translate-y-0.5 flex-col items-center justify-center gap-1">

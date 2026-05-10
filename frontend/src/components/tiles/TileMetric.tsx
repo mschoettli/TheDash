@@ -27,13 +27,15 @@ export default function TileMetric({ tile, status, apiData }: Props) {
 
   return (
     <div className="tile-glass tile-hover-plane group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line/45 p-3 shadow-sm">
-      <div className="flex shrink-0 items-center gap-2.5">
+      <span className="absolute right-3 top-3 z-10">
+        <StatusDot status={status} size="sm" />
+      </span>
+      <div className="flex shrink-0 items-center gap-2.5 pr-5">
         <FaviconImg url={tile.url} name={tile.name} size={32} explicitIconUrl={tile.icon_url} className="shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-semibold leading-tight tracking-[-0.01em] text-t1">{tile.name}</div>
           {tile.show_address && <div className="truncate text-[9px] font-medium text-t3">{hostLabel(tile.url)}</div>}
         </div>
-        <StatusDot status={status} size="sm" />
       </div>
 
       {metricItems.length > 0 && (
