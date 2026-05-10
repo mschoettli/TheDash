@@ -291,10 +291,25 @@ function StatCard({ icon: Icon, label, value, tone }: { icon: React.ElementType;
   );
 }
 
-function ObjectCard({ item, onOpen }: { item: WorkspaceObject; onOpen: (item: WorkspaceObject) => void }) {
+function ObjectCard({ item, onOpen, compact = false }: { item: WorkspaceObject; onOpen: (item: WorkspaceObject) => void; compact?: boolean }) {
   const { t } = useTranslation();
   const body = stripMarkdown(objectBody(item));
   const badges = objectBadges(item);
+  const meta = item.type === "task"
+    ? t(`workspace.priority_${item.priority}`)
+    : badges[0] ?? formatDate(item.updated_at);
+
+  if (compact) {
+    return (
+      <button onClick={() => onOpen(item)} className={`workspace-object-card workspace-object-card-compact-row ${typeTone(item.type)}`}>
+        <div className="min-w-0 flex-1">
+          <div className={`workspace-type-label ${typeTone(item.type)}`}>{t(`workspace.type_${item.type}`)}</div>
+          <div className="mt-0.5 truncate text-[13px] font-semibold text-t1">{item.title}</div>
+        </div>
+        <span className="workspace-object-meta">{meta}</span>
+      </button>
+    );
+  }
 
   return (
     <button onClick={() => onOpen(item)} className={`workspace-object-card ${typeTone(item.type)}`}>
@@ -320,20 +335,20 @@ function SortableTaskCard({ task, project, onOpen }: { task: WorkspaceTask; proj
 
   return (
     <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`workspace-task-card ${isDragging ? "opacity-40" : ""}`}>
-      <button {...attributes} {...listeners} className="cursor-grab touch-none text-t3 active:cursor-grabbing" aria-label={t("workspace.drag_card")}>
-        <GripVertical size={14} />
+      {task.due_date && <span className="workspace-task-due-pill">{formatDate(task.due_date)}</span>}
+      <button {...attributes} {...listeners} className="mt-0.5 cursor-grab touch-none text-t3 active:cursor-grabbing" aria-label={t("workspace.drag_card")}>
+        <GripVertical size={13} />
       </button>
       <button onClick={() => onOpen(task)} className="min-w-0 flex-1 text-left">
         <div className="truncate text-[13px] font-semibold text-t1">{task.title}</div>
         {project && <div className="mt-0.5 truncate text-[11px] text-t3">{project.title}</div>}
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="mt-1.5 flex flex-wrap gap-1">
           {task.labels.slice(0, 3).map((label) => (
             <span key={label.id} className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ backgroundColor: label.color }}>
               {label.name}
             </span>
           ))}
           <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${priorityClass(task.priority)}`}>{t(`workspace.priority_${task.priority}`)}</span>
-          {task.due_date && <span className="rounded-full border border-line/50 bg-surface px-2 py-0.5 text-[10px] text-t3">{formatDate(task.due_date)}</span>}
         </div>
       </button>
     </div>
@@ -347,7 +362,6 @@ function SortableColumn({
   onOpen,
   onAddTask,
   onEditColumn,
-  onDeleteColumn,
 }: {
   column: WorkspaceBoardColumn;
   tasks: WorkspaceTask[];
@@ -355,7 +369,6 @@ function SortableColumn({
   onOpen: (item: WorkspaceObject) => void;
   onAddTask: (column: WorkspaceBoardColumn) => void;
   onEditColumn: (column: WorkspaceBoardColumn) => void;
-  onDeleteColumn: (column: WorkspaceBoardColumn) => void;
 }) {
   const { t } = useTranslation();
   const sortable = useSortable({ id: `column:${column.id}`, data: { type: "column", column } });
@@ -378,8 +391,8 @@ function SortableColumn({
           <h3 className="truncate text-[12px] font-semibold uppercase tracking-[0.16em] text-t1">{column.title}</h3>
         </button>
         <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] text-t3">{tasks.length}</span>
-        <button onClick={() => onDeleteColumn(column)} className="text-t3 hover:text-rose-400" aria-label={t("workspace.delete_column")}>
-          <Trash2 size={13} />
+        <button onClick={() => onAddTask(column)} className="workspace-column-add-pill" aria-label={t("workspace.add_card")}>
+          <Plus size={13} />
         </button>
       </div>
       <SortableContext items={tasks.map((task) => `task:${task.id}`)} strategy={verticalListSortingStrategy}>
@@ -390,9 +403,6 @@ function SortableColumn({
           {!tasks.length && <div className="rounded-xl border border-dashed border-line/70 p-4 text-center text-[12px] text-t3">{t("workspace.drop_card_here")}</div>}
         </div>
       </SortableContext>
-      <button onClick={() => onAddTask(column)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-line/60 bg-surface/70 px-3 py-2 text-[12px] font-semibold text-t2 hover:text-accent">
-        <Plus size={13} /> {t("workspace.add_card")}
-      </button>
     </section>
   );
 }
@@ -1141,9 +1151,22 @@ export default function WorkspacePage() {
   const boardId = activeBoard?.id ?? overview?.active_board_id ?? 0;
   const boardColumns = (overview?.columns ?? []).filter((column) => column.board_id === boardId && !column.is_archived);
   const boardTasks = tasks.filter((task) => task.board_id === boardId);
-  const allObjects = useMemo<WorkspaceObject[]>(() => [...projects, ...tasks, ...wiki, ...notes], [projects, tasks, wiki, notes]);
+  const allObjects = useMemo<WorkspaceObject[]>(() => [...projects, ...tasks, ...notes], [projects, tasks, notes]);
   const activeWikiPage = activeWikiPageId ? wiki.find((page) => page.id === activeWikiPageId) ?? null : null;
-  const filteredObjects = allObjects;
+  const filteredObjects = useMemo(
+    () => [...allObjects].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))),
+    [allObjects]
+  );
+  const dueTasks = useMemo(
+    () => tasks
+      .filter((task) => task.due_date && task.status !== "done")
+      .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date))),
+    [tasks]
+  );
+  const activeProjects = useMemo(
+    () => [...projects].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))),
+    [projects]
+  );
   const activeDragTask = activeDragId?.startsWith("task:") ? tasks.find((task) => `task:${task.id}` === activeDragId) : null;
   const sidebarTabs: WorkspaceTab[] = ["dashboard", "projects", "board", "list", "calendar", "timeline", "mindmap", "wiki", "notes"];
   const tabIcon = (tab: WorkspaceTab) => tab === "dashboard" ? BarChart3 : tab === "board" ? Blocks : tab === "list" ? ListChecks : tab === "calendar" ? CalendarDays : tab === "timeline" ? CheckSquare : tab === "mindmap" ? Network : tab === "projects" ? FolderKanban : tab === "wiki" ? Link2 : FileText;
@@ -1374,8 +1397,9 @@ export default function WorkspacePage() {
             </div>
             <span className="rounded-full border border-line/50 bg-surface px-2.5 py-1 text-[11px] text-t3">{filteredObjects.length}</span>
           </div>
-          <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
-            {filteredObjects.slice(0, 9).map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={openObject} />)}
+          <div className="workspace-current-list">
+            {filteredObjects.slice(0, 8).map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={openObject} compact />)}
+            {!filteredObjects.length && <p className="workspace-empty-note">{t("workspace.no_content")}</p>}
           </div>
         </div>
         <aside className="workspace-agenda">
@@ -1385,31 +1409,31 @@ export default function WorkspacePage() {
               <CalendarDays size={14} className="text-t3" />
             </div>
             <div className="space-y-1.5">
-              {tasks.filter((task) => task.due_date && task.status !== "done").slice(0, 5).map((task) => (
+              {dueTasks.slice(0, 3).map((task) => (
                 <button key={task.id} onClick={() => setTaskDetail(task)} className="workspace-agenda-item">
                   <span className="min-w-0 truncate">{task.title}</span>
                   <span>{formatDate(task.due_date)}</span>
                 </button>
               ))}
-              {!tasks.some((task) => task.due_date && task.status !== "done") && <p className="workspace-empty-note">{t("workspace.no_due_tasks")}</p>}
+              {!dueTasks.length && <p className="workspace-empty-note">{t("workspace.no_due_tasks")}</p>}
             </div>
           </div>
           <div className="workspace-panel workspace-agenda-panel">
             <h2 className="mb-3 text-[15px] font-semibold text-t1">{t("workspace.active_projects")}</h2>
             <div className="space-y-1.5">
-              {projects.slice(0, 5).map((project) => (
+              {activeProjects.slice(0, 3).map((project) => (
                 <button key={project.id} onClick={() => openObject(project)} className="workspace-agenda-item">
                   <span className="min-w-0 truncate">{project.title}</span>
                   <span>{formatDate(project.updated_at)}</span>
                 </button>
               ))}
-              {!projects.length && <p className="workspace-empty-note">{t("workspace.no_content")}</p>}
+              {!activeProjects.length && <p className="workspace-empty-note">{t("workspace.no_content")}</p>}
             </div>
           </div>
           <div className="workspace-panel workspace-agenda-panel">
             <h2 className="mb-3 text-[15px] font-semibold text-t1">{t("workspace.quick_capture")}</h2>
-            <div className="grid grid-cols-2 gap-1.5">
-              {(["project", "task", "wiki", "note"] as WorkspaceObjectType[]).map((type) => (
+            <div className="grid gap-1.5">
+              {(["project", "task", "note"] as WorkspaceObjectType[]).map((type) => (
                 <button key={type} onClick={() => quickCreate(type)} className={`workspace-create-card workspace-create-card-compact ${typeTone(type)}`}>
                   <Plus size={12} />
                   {t(`workspace.type_${type}`)}
@@ -1438,7 +1462,7 @@ export default function WorkspacePage() {
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveDragId(null)}>
         <SortableContext items={boardColumns.map((column) => `column:${column.id}`)} strategy={horizontalListSortingStrategy}>
           <div className="flex min-h-[520px] gap-3 overflow-x-auto pb-4">
-            {boardColumns.map((column) => <SortableColumn key={column.id} column={column} tasks={boardTasks.filter((task) => task.column_id === column.id).sort((a, b) => a.sort_order - b.sort_order)} projects={projects} onOpen={openObject} onAddTask={() => quickCreate("task", column.id)} onEditColumn={setEditingColumn} onDeleteColumn={setDeleteColumnTarget} />)}
+            {boardColumns.map((column) => <SortableColumn key={column.id} column={column} tasks={boardTasks.filter((task) => task.column_id === column.id).sort((a, b) => a.sort_order - b.sort_order)} projects={projects} onOpen={openObject} onAddTask={() => quickCreate("task", column.id)} onEditColumn={setEditingColumn} />)}
           </div>
         </SortableContext>
         <DragOverlay>{activeDragTask ? <div className="workspace-task-card w-[260px] shadow-xl"><GripVertical size={14} /><div className="font-semibold text-t1">{activeDragTask.title}</div></div> : null}</DragOverlay>
@@ -1954,6 +1978,7 @@ export default function WorkspacePage() {
         <WorkspaceColumnEditor
           column={editingColumn}
           onSave={async (patch) => { await updateColumn.mutateAsync({ boardId, id: editingColumn.id, ...patch }); setEditingColumn(null); }}
+          onDelete={() => { setDeleteColumnTarget(editingColumn); setEditingColumn(null); }}
           onClose={() => setEditingColumn(null)}
         />
       )}
@@ -1975,7 +2000,7 @@ export default function WorkspacePage() {
   );
 }
 
-function WorkspaceColumnEditor({ column, onSave, onClose }: { column: WorkspaceBoardColumn; onSave: (patch: Partial<WorkspaceBoardColumn>) => Promise<void>; onClose: () => void }) {
+function WorkspaceColumnEditor({ column, onSave, onDelete, onClose }: { column: WorkspaceBoardColumn; onSave: (patch: Partial<WorkspaceBoardColumn>) => Promise<void>; onDelete: () => void; onClose: () => void }) {
   const { t } = useTranslation();
   const [title, setTitle] = useState(column.title);
   const [color, setColor] = useState(column.color ?? "#06b6d4");
@@ -1989,7 +2014,10 @@ function WorkspaceColumnEditor({ column, onSave, onClose }: { column: WorkspaceB
           <label><span className="label-xs mb-1.5 block">{t("workspace.title_field")}</span><input value={title} onChange={(e) => setTitle(e.target.value)} className="workspace-input" /></label>
           <label><span className="label-xs mb-1.5 block">{t("workspace.color")}</span><input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-12 w-full rounded-xl border border-line bg-surface p-1" /></label>
           <label><span className="label-xs mb-1.5 block">{t("workspace.column_type")}</span><select value={kind} onChange={(e) => setKind(e.target.value)} className="workspace-input"><option value="custom">{t("workspace.column_custom")}</option><option value="backlog">{t("workspace.status_backlog")}</option><option value="todo">{t("workspace.status_todo")}</option><option value="doing">{t("workspace.status_doing")}</option><option value="blocked">{t("workspace.status_blocked")}</option><option value="done">{t("workspace.status_done")}</option></select></label>
-          <button onClick={() => onSave({ title, color, kind })} className="workspace-primary-button w-full justify-center">{t("common.save")}</button>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button onClick={onDelete} className="workspace-danger-button justify-center"><Trash2 size={13} />{t("common.delete")}</button>
+            <button onClick={() => onSave({ title, color, kind })} className="workspace-primary-button justify-center">{t("common.save")}</button>
+          </div>
         </div>
       </aside>
     </>

@@ -270,8 +270,8 @@ body {
 
 .tile-hover-plane > .tile-status-dot {
   position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
+  top: 0.55rem;
+  right: 0.55rem;
   z-index: 10;
 }
 
@@ -524,27 +524,27 @@ body {
 
 .workspace-command-grid {
   display: grid;
-  gap: 0.95rem;
+  gap: 0.75rem;
 }
 
 @media (min-width: 1280px) {
   .workspace-command-grid {
-    grid-template-columns: minmax(0, 1.55fr) minmax(290px, 0.45fr);
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 0.34fr);
     align-items: start;
   }
 }
 
 .workspace-focus-panel {
-  padding: 1.05rem;
+  padding: 0.85rem;
 }
 
 .workspace-agenda {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.55rem;
 }
 
 .workspace-agenda-panel {
-  padding: 0.85rem;
+  padding: 0.7rem;
 }
 
 .workspace-drawer-section {
@@ -633,6 +633,32 @@ body {
   box-shadow: 0 14px 34px rgb(15 23 42 / 0.09);
 }
 
+.workspace-current-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.workspace-object-card-compact-row {
+  display: flex;
+  min-height: 3.35rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border-radius: 0.85rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.workspace-object-meta {
+  flex-shrink: 0;
+  border: 1px solid rgb(var(--line) / 0.5);
+  border-radius: 999px;
+  background: rgb(var(--surface) / 0.58);
+  padding: 0.18rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: rgb(var(--t3));
+}
+
 .dark .workspace-object-card:hover,
 .dark .workspace-create-card:hover,
 .dark .workspace-date-card:hover,
@@ -712,9 +738,9 @@ body {
   gap: 0.75rem;
   border-radius: 0.8rem;
   background: rgb(var(--surface) / 0.64);
-  padding: 0.62rem 0.75rem;
+  padding: 0.5rem 0.62rem;
   text-align: left;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   color: rgb(var(--t2));
   transition: background-color 180ms, color 180ms, border-color 180ms;
 }
@@ -733,16 +759,50 @@ body {
 .workspace-empty-note {
   border-radius: 0.8rem;
   background: rgb(var(--surface) / 0.46);
-  padding: 0.7rem 0.75rem;
+  padding: 0.55rem 0.62rem;
   font-size: 0.78rem;
   color: rgb(var(--t3));
 }
 
 .workspace-task-card {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.42rem;
   border-radius: 0.9rem;
-  padding: 0.75rem;
+  padding: 0.58rem 0.65rem;
+}
+
+.workspace-task-due-pill {
+  position: absolute;
+  right: 0.55rem;
+  top: 0.55rem;
+  border: 1px solid rgb(var(--line) / 0.5);
+  border-radius: 999px;
+  background: rgb(var(--surface) / 0.78);
+  padding: 0.14rem 0.45rem;
+  font-size: 0.62rem;
+  font-weight: 650;
+  color: rgb(var(--t3));
+}
+
+.workspace-column-add-pill {
+  display: inline-flex;
+  height: 1.55rem;
+  min-width: 1.9rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 255 255 / 0.45);
+  border-radius: 999px;
+  background: var(--column-accent, rgb(var(--accent)));
+  color: white;
+  box-shadow: 0 6px 14px rgb(15 23 42 / 0.12);
+  transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.workspace-column-add-pill:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 0.16);
 }
 
 .workspace-board-column {
@@ -968,11 +1028,14 @@ body {
 }
 
 .workspace-create-card-compact {
-  min-height: 4.1rem;
+  min-height: 2.6rem;
   align-items: center;
   display: flex;
-  gap: 0.5rem;
-  font-size: 0.9rem;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  border-radius: 0.85rem;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
