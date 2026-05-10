@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Pencil } from "lucide-react";
 import { Tile, TileMetrics, fetchTileMetrics } from "../../hooks/useTiles";
-import { useSettingsStore } from "../../store/useSettingsStore";
 import TileCard from "./TileCard";
 import TileCompact from "./TileCompact";
 import TileMinimal from "./TileMinimal";
@@ -19,8 +18,7 @@ interface Props {
 }
 
 export default function TileWrapper({ tile, editMode = false, onEdit }: Props) {
-  const globalStyle = useSettingsStore((s) => s.widgetStyle);
-  const effectiveStyle = tile.style ?? globalStyle;
+  const effectiveStyle = tile.style ?? "card";
 
   const [status, setStatus] = useState<OnlineStatus>("checking");
   const [apiData, setApiData] = useState<TileMetrics | null>(null);
@@ -113,19 +111,19 @@ export default function TileWrapper({ tile, editMode = false, onEdit }: Props) {
           <TileCard {...tileProps} />
         )}
       </a>
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          if (onEdit) onEdit(tile);
-          else setEditOpen(true);
-        }}
-        className={`absolute bottom-2 right-2 z-20 rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 shadow-sm transition-all hover:text-accent ${
-          editMode ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-        }`}
-        title="Bearbeiten"
-      >
-        <Pencil size={13} />
-      </button>
+      {editMode && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            if (onEdit) onEdit(tile);
+            else setEditOpen(true);
+          }}
+          className="absolute bottom-2 right-2 z-20 rounded-lg border border-line/50 bg-surface/90 p-1.5 text-t3 opacity-100 shadow-sm transition-all hover:text-accent"
+          title="Bearbeiten"
+        >
+          <Pencil size={13} />
+        </button>
+      )}
       {!onEdit && <TileEditModal open={editOpen} onClose={() => setEditOpen(false)} tile={tile} />}
     </div>
   );

@@ -330,8 +330,75 @@
       color: var(--muted);
     }
 
+    .markdown-check {
+      margin-top: 18px;
+    }
+
+    .markdown-check-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .code-theme {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .code-theme h3 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .code-theme pre {
+      overflow: auto;
+      margin: 0;
+      border-radius: 11px;
+      padding: 14px;
+      font: 12px/1.58 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .code-theme.light {
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    .code-theme.light pre {
+      border: 1px solid #d7e0ec;
+      background: #f1f5f9;
+      color: #1e293b;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    }
+
+    .code-theme.dark,
+    .code-theme.glass {
+      background: rgba(15, 23, 42, 0.72);
+      color: #e5edf7;
+    }
+
+    .code-theme.dark pre,
+    .code-theme.glass pre {
+      border: 1px solid rgba(148, 163, 184, 0.34);
+      background: #111827;
+      color: #e2e8f0;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+    }
+
+    .code-theme.glass {
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025)),
+        rgba(15, 23, 42, 0.48);
+      backdrop-filter: blur(14px);
+    }
+
     @media (max-width: 900px) {
       .preview-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .markdown-check-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -454,6 +521,41 @@
           </div>
         </div>
       </article>
+    </section>
+
+    <section class="markdown-check" aria-label="Markdown code block theme check">
+      <div class="preview-head">
+        <h2 class="preview-title">Markdown Code Blocks</h2>
+        <span class="preview-note">Light, dark, and glass contrast check</span>
+      </div>
+      <div class="tree-shell">
+        <div class="markdown-check-grid">
+          <article class="code-theme light">
+            <h3>Light</h3>
+            <pre><code>services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server
+    ports:
+      - 2283:2283</code></pre>
+          </article>
+          <article class="code-theme dark">
+            <h3>Dark</h3>
+            <pre><code>services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server
+    ports:
+      - 2283:2283</code></pre>
+          </article>
+          <article class="code-theme glass">
+            <h3>Glass</h3>
+            <pre><code>services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server
+    ports:
+      - 2283:2283</code></pre>
+          </article>
+        </div>
+      </div>
     </section>
   </main>
 </body>

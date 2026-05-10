@@ -42,8 +42,13 @@ function applyTheme(theme: Theme) {
 }
 
 function applyBackground(mode: BackgroundMode, image: string) {
+  const trimmed = image.trim();
+  const source = /^https?:\/\//i.test(trimmed)
+    ? `/api/image?url=${encodeURIComponent(trimmed)}`
+    : trimmed;
+  const cssUrl = source.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   document.documentElement.dataset.background = mode;
-  document.documentElement.style.setProperty("--custom-background-image", image.trim() ? `url("${image.trim()}")` : "none");
+  document.documentElement.style.setProperty("--custom-background-image", cssUrl ? `url("${cssUrl}")` : "none");
 }
 
 export const useSettingsStore = create<SettingsState>()(

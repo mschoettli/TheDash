@@ -54,17 +54,18 @@ export default function SettingsModal({ open, onClose }: Props) {
   const {
     theme,
     language,
-    widgetStyle,
     backgroundMode,
     backgroundImage,
     setTheme,
     setLanguage,
-    setWidgetStyle,
     setBackgroundMode,
     setBackgroundImage,
   } = useSettingsStore();
   const importRef = useRef<HTMLInputElement>(null);
+  const backgroundUploadRef = useRef<HTMLInputElement>(null);
   const [runtime, setRuntime] = useState<{ aiTagging: { enabled: boolean; provider: string; model: string | null }; logos: { provider: string } } | null>(null);
+  const [backgroundUploadError, setBackgroundUploadError] = useState<string | null>(null);
+  const [backgroundUploading, setBackgroundUploading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -105,6 +106,28 @@ export default function SettingsModal({ open, onClose }: Props) {
     e.target.value = "";
   };
 
+  const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBackgroundUploadError(null);
+    setBackgroundUploading(true);
+    try {
+      const res = await fetch("/api/settings/background", {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json() as { url: string };
+      setBackgroundImage(data.url);
+    } catch {
+      setBackgroundUploadError(t("settings.background_upload_error"));
+    } finally {
+      setBackgroundUploading(false);
+      e.target.value = "";
+    }
+  };
+
   return (
     <Modal open={open} onClose={onClose} title={t("settings.title")} maxWidth="max-w-2xl">
       <div className="grid gap-4">
@@ -116,15 +139,6 @@ export default function SettingsModal({ open, onClose }: Props) {
               { value: "light" as const, label: t("settings.theme_light") },
               { value: "dark" as const, label: t("settings.theme_dark") },
               { value: "dashy" as const, label: t("settings.theme_dashy") },
-            ]}
-          />
-          <ToggleGroup
-            value={widgetStyle}
-            onChange={setWidgetStyle}
-            options={[
-              { value: "card" as const, label: t("settings.style_card") },
-              { value: "compact" as const, label: t("settings.style_compact") },
-              { value: "minimal" as const, label: t("settings.style_minimal") },
             ]}
           />
         </SettingSection>
@@ -182,6 +196,13 @@ export default function SettingsModal({ open, onClose }: Props) {
               className={fieldClass}
             />
             <button
+              onClick={() => backgroundUploadRef.current?.click()}
+              disabled={backgroundUploading}
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-line/50 px-3 py-2 text-[13px] font-medium text-t2 transition-colors hover:border-accent/35 hover:text-t1 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Upload size={13} /> {backgroundUploading ? t("settings.background_uploading") : t("settings.background_upload")}
+            </button>
+            <button
               onClick={() => {
                 setBackgroundImage("");
                 setBackgroundMode("default");
@@ -190,7 +211,9 @@ export default function SettingsModal({ open, onClose }: Props) {
             >
               <RotateCcw size={13} /> {t("settings.reset")}
             </button>
+            <input ref={backgroundUploadRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={handleBackgroundUpload} />
           </div>
+          {backgroundUploadError && <p className="text-[12px] text-rose-500">{backgroundUploadError}</p>}
         </SettingSection>
 
         <SettingSection title={t("settings.backup")}>
