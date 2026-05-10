@@ -633,9 +633,22 @@ body {
   box-shadow: 0 14px 34px rgb(15 23 42 / 0.09);
 }
 
-.workspace-current-list {
+.workspace-current-columns {
   display: grid;
+  gap: 0.55rem;
+}
+
+.workspace-current-column {
+  display: grid;
+  min-width: 0;
+  align-content: start;
   gap: 0.45rem;
+}
+
+@media (min-width: 768px) {
+  .workspace-current-columns {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .workspace-object-card-compact-row {

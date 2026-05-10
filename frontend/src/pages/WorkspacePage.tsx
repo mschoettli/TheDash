@@ -1151,12 +1151,7 @@ export default function WorkspacePage() {
   const boardId = activeBoard?.id ?? overview?.active_board_id ?? 0;
   const boardColumns = (overview?.columns ?? []).filter((column) => column.board_id === boardId && !column.is_archived);
   const boardTasks = tasks.filter((task) => task.board_id === boardId);
-  const allObjects = useMemo<WorkspaceObject[]>(() => [...projects, ...tasks, ...notes], [projects, tasks, notes]);
   const activeWikiPage = activeWikiPageId ? wiki.find((page) => page.id === activeWikiPageId) ?? null : null;
-  const filteredObjects = useMemo(
-    () => [...allObjects].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))),
-    [allObjects]
-  );
   const dueTasks = useMemo(
     () => tasks
       .filter((task) => task.due_date && task.status !== "done")
@@ -1167,6 +1162,15 @@ export default function WorkspacePage() {
     () => [...projects].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))),
     [projects]
   );
+  const dashboardTasks = useMemo(
+    () => [...tasks].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))),
+    [tasks]
+  );
+  const dashboardNotes = useMemo(
+    () => [...notes].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))),
+    [notes]
+  );
+  const currentWorkCount = activeProjects.length + dashboardTasks.length + dashboardNotes.length;
   const activeDragTask = activeDragId?.startsWith("task:") ? tasks.find((task) => `task:${task.id}` === activeDragId) : null;
   const sidebarTabs: WorkspaceTab[] = ["dashboard", "projects", "board", "list", "calendar", "timeline", "mindmap", "wiki", "notes"];
   const tabIcon = (tab: WorkspaceTab) => tab === "dashboard" ? BarChart3 : tab === "board" ? Blocks : tab === "list" ? ListChecks : tab === "calendar" ? CalendarDays : tab === "timeline" ? CheckSquare : tab === "mindmap" ? Network : tab === "projects" ? FolderKanban : tab === "wiki" ? Link2 : FileText;
@@ -1390,17 +1394,14 @@ export default function WorkspacePage() {
       </div>
       <section className="workspace-command-grid">
         <div className="workspace-panel workspace-focus-panel">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-[15px] font-semibold text-t1">{t("workspace.current_work")}</h2>
-              <p className="mt-1 text-[12px] text-t3">{t("workspace.feed")}</p>
-            </div>
-            <span className="rounded-full border border-line/50 bg-surface px-2.5 py-1 text-[11px] text-t3">{filteredObjects.length}</span>
+          <div className="workspace-current-columns">
+            {[activeProjects, dashboardTasks, dashboardNotes].map((items, index) => (
+              <div key={index} className="workspace-current-column">
+                {items.slice(0, 6).map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={openObject} compact />)}
+              </div>
+            ))}
           </div>
-          <div className="workspace-current-list">
-            {filteredObjects.slice(0, 8).map((item) => <ObjectCard key={`${item.type}:${item.id}`} item={item} onOpen={openObject} compact />)}
-            {!filteredObjects.length && <p className="workspace-empty-note">{t("workspace.no_content")}</p>}
-          </div>
+          {!currentWorkCount && <p className="workspace-empty-note">{t("workspace.no_content")}</p>}
         </div>
         <aside className="workspace-agenda">
           <div className="workspace-panel workspace-agenda-panel">
