@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import MDEditor from "@uiw/react-md-editor";
 import {
@@ -8,6 +8,7 @@ import {
   Blocks,
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   CheckSquare,
   Circle,
@@ -183,6 +184,38 @@ function parseTags(value: string): string[] {
 function formatDate(value: string | null): string {
   if (!value) return "-";
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function dateKeyFromDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateKeyFromValue(value: string | null): string {
+  if (!value) return "";
+  const directMatch = value.match(/^\d{4}-\d{2}-\d{2}/);
+  if (directMatch) return directMatch[0];
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : dateKeyFromDate(date);
+}
+
+function dateFromKey(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function monthGridDays(month: Date): Date[] {
+  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+  const mondayOffset = (firstDay.getDay() + 6) % 7;
+  const start = new Date(firstDay);
+  start.setDate(firstDay.getDate() - mondayOffset);
+  return Array.from({ length: 42 }, (_, index) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + index));
+}
+
+function monthLabel(month: Date): string {
+  return month.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 
 function priorityClass(priority: WorkspacePriority): string {
@@ -1138,6 +1171,12 @@ export default function WorkspacePage() {
   const [wikiAutosaveError, setWikiAutosaveError] = useState("");
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [taskDetail, setTaskDetail] = useState<WorkspaceTask | null>(null);
+  const todayKey = dateKeyFromDate(new Date());
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayKey);
 
   const boards = overview?.boards ?? [];
   const projects = overview?.projects ?? [];
@@ -1171,6 +1210,20 @@ export default function WorkspacePage() {
     [notes]
   );
   const currentWorkCount = activeProjects.length + dashboardTasks.length + dashboardNotes.length;
+  const tasksByDueDate = useMemo(() => tasks.reduce<Record<string, WorkspaceTask[]>>((groups, task) => {
+    const key = dateKeyFromValue(task.due_date);
+    if (!key) return groups;
+    groups[key] = [...(groups[key] ?? []), task];
+    return groups;
+  }, {}), [tasks]);
+  const calendarDays = useMemo(() => monthGridDays(calendarMonth), [calendarMonth]);
+  const selectedCalendarTasks = tasksByDueDate[selectedCalendarDate] ?? [];
+  const datedCalendarTasks = useMemo(
+    () => tasks
+      .filter((task) => dateKeyFromValue(task.due_date))
+      .sort((a, b) => dateKeyFromValue(a.due_date).localeCompare(dateKeyFromValue(b.due_date))),
+    [tasks]
+  );
   const activeDragTask = activeDragId?.startsWith("task:") ? tasks.find((task) => `task:${task.id}` === activeDragId) : null;
   const sidebarTabs: WorkspaceTab[] = ["dashboard", "projects", "board", "list", "calendar", "timeline", "mindmap", "wiki", "notes"];
   const tabIcon = (tab: WorkspaceTab) => tab === "dashboard" ? BarChart3 : tab === "board" ? Blocks : tab === "list" ? ListChecks : tab === "calendar" ? CalendarDays : tab === "timeline" ? CheckSquare : tab === "mindmap" ? Network : tab === "projects" ? FolderKanban : tab === "wiki" ? Link2 : FileText;
@@ -1481,8 +1534,137 @@ export default function WorkspacePage() {
   );
 
   const renderCalendar = () => {
-    const dated = [...projects, ...tasks].filter((item) => item.due_date).sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)));
-    return <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{dated.map((item) => <button key={`${item.type}:${item.id}`} onClick={() => openObject(item)} className={`workspace-date-card ${typeTone(item.type)}`}><div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-t3"><CalendarDays size={13} />{formatDate(item.due_date)}</div><div className="mt-2 text-[15px] font-semibold text-t1">{item.title}</div></button>)}</div>;
+    const weekdayLabels = Array.from({ length: 7 }, (_, index) => new Date(2024, 0, index + 1).toLocaleDateString(undefined, { weekday: "short" }));
+    const mobileDateKeys = Array.from(new Set(datedCalendarTasks.map((task) => dateKeyFromValue(task.due_date))));
+    const selectedDate = dateFromKey(selectedCalendarDate);
+    const moveMonth = (offset: number) => setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+    const goToToday = () => {
+      const today = new Date();
+      setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+      setSelectedCalendarDate(dateKeyFromDate(today));
+    };
+    const selectDay = (key: string) => setSelectedCalendarDate(key);
+    const handleDayKey = (event: KeyboardEvent<HTMLDivElement>, key: string) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      selectDay(key);
+    };
+
+    return (
+      <div className="workspace-calendar-layout">
+        <section className="workspace-calendar-shell">
+          <div className="workspace-calendar-toolbar">
+            <div>
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-t3">
+                <CalendarDays size={14} />
+                {t("workspace.calendar_view")}
+              </div>
+              <h2 className="mt-1 text-[1.35rem] font-semibold text-t1">{monthLabel(calendarMonth)}</h2>
+            </div>
+            <div className="workspace-calendar-controls">
+              <button type="button" onClick={() => moveMonth(-1)} className="workspace-calendar-icon-button" aria-label={t("workspace.previous_month")}>
+                <ChevronLeft size={16} />
+              </button>
+              <button type="button" onClick={goToToday} className="workspace-calendar-today-button">{t("workspace.today")}</button>
+              <button type="button" onClick={() => moveMonth(1)} className="workspace-calendar-icon-button" aria-label={t("workspace.next_month")}>
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="workspace-calendar-grid-shell">
+            <div className="workspace-calendar-weekdays">
+              {weekdayLabels.map((weekday) => <div key={weekday}>{weekday}</div>)}
+            </div>
+            <div className="workspace-calendar-grid">
+              {calendarDays.map((day) => {
+                const key = dateKeyFromDate(day);
+                const dayTasks = tasksByDueDate[key] ?? [];
+                const isOutsideMonth = day.getMonth() !== calendarMonth.getMonth();
+                const isToday = key === todayKey;
+                const isSelected = key === selectedCalendarDate;
+                return (
+                  <div
+                    key={key}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => selectDay(key)}
+                    onKeyDown={(event) => handleDayKey(event, key)}
+                    className={`workspace-calendar-day ${isOutsideMonth ? "workspace-calendar-day-muted" : ""} ${isToday ? "workspace-calendar-day-today" : ""} ${isSelected ? "workspace-calendar-day-selected" : ""}`}
+                  >
+                    <div className="workspace-calendar-day-number">{day.getDate()}</div>
+                    <div className="workspace-calendar-day-tasks">
+                      {dayTasks.slice(0, 3).map((task) => {
+                        const project = projects.find((item) => item.id === task.project_id);
+                        return (
+                          <button
+                            key={task.id}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setTaskDetail(task);
+                            }}
+                            className="workspace-calendar-task"
+                          >
+                            <span className={`workspace-calendar-priority ${priorityClass(task.priority)}`}>{t(`workspace.priority_${task.priority}`)}</span>
+                            <span className="workspace-calendar-task-title">{task.title}</span>
+                            {project && <span className="workspace-calendar-task-project">{project.title}</span>}
+                          </button>
+                        );
+                      })}
+                      {dayTasks.length > 3 && <div className="workspace-calendar-more">{t("workspace.more_tasks", { count: dayTasks.length - 3 })}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="workspace-calendar-mobile-agenda">
+            {mobileDateKeys.map((key) => {
+              const date = dateFromKey(key);
+              const dayTasks = tasksByDueDate[key] ?? [];
+              return (
+                <div key={key} className="workspace-calendar-mobile-day">
+                  <div className="workspace-calendar-mobile-date">
+                    <span>{date.toLocaleDateString(undefined, { weekday: "short" })}</span>
+                    <strong>{formatDate(key)}</strong>
+                  </div>
+                  <div className="grid gap-2">
+                    {dayTasks.map((task) => (
+                      <button key={task.id} type="button" onClick={() => setTaskDetail(task)} className="workspace-calendar-agenda-task">
+                        <span className="truncate font-semibold text-t1">{task.title}</span>
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${priorityClass(task.priority)}`}>{t(`workspace.priority_${task.priority}`)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {!mobileDateKeys.length && <p className="workspace-empty-note">{t("workspace.no_due_tasks")}</p>}
+          </div>
+        </section>
+
+        <aside className="workspace-calendar-agenda-panel">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-t3">{t("workspace.selected_day")}</div>
+              <h3 className="mt-1 text-[1rem] font-semibold text-t1">{selectedDate.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</h3>
+            </div>
+            <span className="rounded-full border border-line/60 bg-surface px-2.5 py-1 text-[11px] font-semibold text-t3">{selectedCalendarTasks.length}</span>
+          </div>
+          <div className="mt-4 grid gap-2">
+            {selectedCalendarTasks.map((task) => (
+              <button key={task.id} type="button" onClick={() => setTaskDetail(task)} className="workspace-calendar-agenda-task">
+                <span className="truncate font-semibold text-t1">{task.title}</span>
+                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${priorityClass(task.priority)}`}>{t(`workspace.priority_${task.priority}`)}</span>
+              </button>
+            ))}
+            {!selectedCalendarTasks.length && <p className="workspace-empty-note">{t("workspace.no_due_tasks")}</p>}
+          </div>
+        </aside>
+      </div>
+    );
   };
 
   const renderTimeline = () => {
