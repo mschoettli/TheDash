@@ -27,7 +27,7 @@ export default function TileMetric({ tile, status, apiData }: Props) {
 
   return (
     <div className="tile-glass tile-hover-plane group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line/45 p-3 shadow-sm">
-      <span className="absolute right-3 top-3 z-10">
+      <span className="tile-status-dot">
         <StatusDot status={status} size="sm" />
       </span>
       <div className="flex shrink-0 items-center gap-2.5 pr-5">

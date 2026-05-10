@@ -27,7 +27,7 @@ export default function TileCard({ tile, status, apiData }: Props) {
 
   return (
     <div className="tile-glass tile-hover-plane group relative flex h-full items-center gap-3 overflow-hidden rounded-2xl border border-line/45 px-3 py-2 pr-8 shadow-sm">
-      <span className="absolute right-3 top-3 z-10">
+      <span className="tile-status-dot">
         <StatusDot status={status} size="sm" />
       </span>
       <FaviconImg url={tile.url} name={tile.name} size={34} explicitIconUrl={tile.icon_url} className="shrink-0" />
