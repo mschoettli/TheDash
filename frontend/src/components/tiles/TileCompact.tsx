@@ -10,7 +10,7 @@ interface Props {
 
 export default function TileCompact({ tile, status, apiData }: Props) {
   return (
-    <div className="tile-glass relative flex h-full items-center gap-2.5 overflow-hidden rounded-2xl border border-line/40 px-3 py-2 transition-colors duration-150 hover:border-accent/30">
+    <div className="tile-glass tile-hover-plane relative flex h-full items-center gap-2.5 overflow-hidden rounded-2xl border border-line/40 px-3 py-2">
       <FaviconImg url={tile.url} name={tile.name} size={26} explicitIconUrl={tile.icon_url} className="shrink-0" />
       <span className="min-w-0 flex-1 truncate text-[12px] font-semibold tracking-[-0.01em] text-t1">
         {tile.name}

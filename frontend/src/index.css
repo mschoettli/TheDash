@@ -243,6 +243,49 @@ body {
   box-shadow: 0 14px 38px rgb(2 8 23 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.12);
 }
 
+/* ─── Tile hover: no frame, only a calm light plane ─────────────────────────── */
+.tile-hover-plane {
+  isolation: isolate;
+  transition: background 180ms ease, box-shadow 180ms ease;
+}
+
+.tile-hover-plane::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(145deg, rgb(var(--accent) / 0.08), rgb(255 255 255 / 0.035)),
+    rgb(var(--card) / 0.10);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.tile-hover-plane > * {
+  position: relative;
+  z-index: 1;
+}
+
+.tile-hover-plane:hover {
+  box-shadow: 0 14px 34px rgb(15 23 42 / 0.09);
+}
+
+.tile-hover-plane:hover::after {
+  opacity: 1;
+}
+
+.dark .tile-hover-plane:hover {
+  box-shadow: 0 16px 38px rgb(2 6 23 / 0.32);
+}
+
+:root[data-theme-preset="dashy"] .tile-hover-plane:hover {
+  box-shadow:
+    0 18px 46px rgb(2 8 23 / 0.40),
+    inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+
 /* ─── .modal-panel ────────────────────────────────────────────────────────────── */
 .modal-panel {
   background:
@@ -568,15 +611,45 @@ body {
   border-radius: 1.05rem;
   padding: 0.8rem;
   text-align: left;
-  transition: transform 180ms, border-color 180ms, box-shadow 180ms;
+  transition: background 180ms, box-shadow 180ms;
 }
 
 .workspace-object-card:hover,
 .workspace-create-card:hover,
-.workspace-date-card:hover {
-  transform: translateY(-2px);
-  border-color: rgb(var(--accent) / 0.38);
-  box-shadow: 0 16px 36px rgb(15 23 42 / 0.11);
+.workspace-date-card:hover,
+.workspace-task-card:hover,
+.workspace-timeline-row:hover,
+.workspace-wiki-home-card:hover {
+  background:
+    linear-gradient(145deg, rgb(var(--accent) / 0.08), rgb(255 255 255 / 0.035)),
+    rgb(var(--card) / 0.86);
+  box-shadow: 0 14px 34px rgb(15 23 42 / 0.09);
+}
+
+.dark .workspace-object-card:hover,
+.dark .workspace-create-card:hover,
+.dark .workspace-date-card:hover,
+.dark .workspace-task-card:hover,
+.dark .workspace-timeline-row:hover,
+.dark .workspace-wiki-home-card:hover {
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.085), rgb(var(--accent) / 0.045)),
+    rgb(37 45 62 / 0.98);
+  box-shadow: 0 16px 38px rgb(2 6 23 / 0.32);
+}
+
+:root[data-theme-preset="dashy"] .workspace-object-card:hover,
+:root[data-theme-preset="dashy"] .workspace-create-card:hover,
+:root[data-theme-preset="dashy"] .workspace-date-card:hover,
+:root[data-theme-preset="dashy"] .workspace-task-card:hover,
+:root[data-theme-preset="dashy"] .workspace-timeline-row:hover,
+:root[data-theme-preset="dashy"] .workspace-wiki-home-card:hover {
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.16), rgb(var(--accent) / 0.07)),
+    rgb(var(--card) / 0.60);
+  box-shadow:
+    0 18px 46px rgb(2 8 23 / 0.40),
+    inset 0 1px 0 rgb(255 255 255 / 0.12);
 }
 
 .workspace-stat {

@@ -262,7 +262,7 @@ function WidgetTile({ widget, editMode, onEdit, onDelete }: {
   onEdit: () => void; onDelete: () => void;
 }) {
   return (
-    <div className={`tile-glass relative h-full overflow-hidden rounded-2xl border p-3 shadow-sm transition-colors duration-150 hover:border-accent/35 ${editMode ? "border-accent/25 ring-1 ring-accent/10" : "border-line/45"}`}>
+    <div className={`tile-glass tile-hover-plane relative h-full overflow-hidden rounded-2xl border p-3 shadow-sm ${editMode ? "border-accent/25 ring-1 ring-accent/10" : "border-line/45"}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <IconBadge value={String(widget.config.icon ?? "")} name={widget.title} size={32} className="shrink-0" />

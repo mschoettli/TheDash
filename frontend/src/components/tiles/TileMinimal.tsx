@@ -10,7 +10,7 @@ interface Props {
 
 export default function TileMinimal({ tile, status, apiData: _ }: Props) {
   return (
-    <div className="tile-glass relative flex h-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-2xl border border-line/40 px-3 py-2 text-center transition-colors duration-150 hover:border-accent/30">
+    <div className="tile-glass tile-hover-plane relative flex h-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-2xl border border-line/40 px-3 py-2 text-center">
       <span className="absolute right-2 top-2">
         <StatusDot status={status} size="sm" />
       </span>

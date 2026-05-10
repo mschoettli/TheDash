@@ -26,7 +26,7 @@ export default function TileMetric({ tile, status, apiData }: Props) {
     : [];
 
   return (
-    <div className="tile-glass group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line/45 p-3 shadow-sm transition-colors duration-150 hover:border-accent/35">
+    <div className="tile-glass tile-hover-plane group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line/45 p-3 shadow-sm">
       <div className="flex shrink-0 items-center gap-2.5">
         <FaviconImg url={tile.url} name={tile.name} size={32} explicitIconUrl={tile.icon_url} className="shrink-0" />
         <div className="min-w-0 flex-1">

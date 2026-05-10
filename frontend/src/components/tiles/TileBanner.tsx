@@ -18,7 +18,7 @@ function hostLabel(url: string): string {
 
 export default function TileBanner({ tile, status, apiData: _ }: Props) {
   return (
-    <div className="tile-glass group relative flex h-full items-center gap-3 overflow-hidden rounded-2xl border border-line/45 px-3 py-2 shadow-sm transition-colors duration-150 hover:border-accent/35">
+    <div className="tile-glass tile-hover-plane group relative flex h-full items-center gap-3 overflow-hidden rounded-2xl border border-line/45 px-3 py-2 shadow-sm">
       <FaviconImg url={tile.url} name={tile.name} size={36} explicitIconUrl={tile.icon_url} className="shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[14px] font-semibold leading-tight tracking-[-0.01em] text-t1">{tile.name}</div>

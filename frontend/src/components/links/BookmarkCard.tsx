@@ -153,7 +153,7 @@ export default function BookmarkCard({
       <>
         <div
           onClick={openLink}
-          className={`group flex items-center gap-3 rounded-2xl border border-line/50 bg-card px-3 py-2.5 transition-all hover:border-accent/30 hover:shadow-sm ${
+          className={`tile-hover-plane group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-line/50 bg-card px-3 py-2.5 transition-all ${
             isDragging ? "opacity-40 shadow-xl" : ""
           } ${link.is_archived ? "opacity-60" : ""} cursor-pointer ${selected ? "ring-2 ring-accent/40" : ""}`}
         >
@@ -212,7 +212,7 @@ export default function BookmarkCard({
     <>
       <article
         onClick={openLink}
-        className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line/50 bg-card transition-all hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5 ${
+        className={`tile-hover-plane group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line/50 bg-card transition-all ${
           isDragging ? "opacity-40 shadow-xl" : ""
         } ${link.is_archived ? "opacity-60" : ""} cursor-pointer ${selected ? "ring-2 ring-accent/40" : ""}`}
       >
