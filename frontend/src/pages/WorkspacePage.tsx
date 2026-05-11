@@ -2,6 +2,19 @@ import { lazy, Suspense, useEffect, useMemo, useState, type KeyboardEvent } from
 import { useTranslation } from "react-i18next";
 import MDEditor from "@uiw/react-md-editor";
 import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  Handle,
+  MiniMap,
+  Position,
+  ReactFlow,
+  type Edge,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import {
   Archive,
   BarChart3,
   BookOpen,
@@ -109,6 +122,17 @@ const columnLimit = 10;
 
 type WorkspaceTab = (typeof tabs)[number];
 type SaveState = "idle" | "saving" | "saved" | "error";
+type MindmapFilterKey = "projects" | "tasks" | "wiki" | "notes" | "dependencies";
+type MindmapNodeKind = WorkspaceObjectType | "root" | "group";
+type MindmapNodeData = {
+  label: string;
+  kind: MindmapNodeKind;
+  meta?: string;
+  count?: number;
+};
+type MindmapFlowNode = Node<MindmapNodeData, "mindmap">;
+type MindmapFlowEdge = Edge<{ dependency?: boolean }>;
+type MindmapFilters = Record<MindmapFilterKey, boolean>;
 
 type Draft = {
   type: WorkspaceObjectType;
@@ -239,6 +263,25 @@ function columnTone(column: WorkspaceBoardColumn): string {
   if (column.kind === "backlog") return "workspace-tone-warn";
   return "workspace-tone-project";
 }
+
+function MindmapNodeCard({ data }: NodeProps<MindmapFlowNode>) {
+  return (
+    <div className={`workspace-flow-node workspace-flow-node-${data.kind}`}>
+      <Handle type="target" position={Position.Left} className="workspace-flow-handle" />
+      <div className="workspace-flow-node-kicker">{data.kind}</div>
+      <div className="workspace-flow-node-title">{data.label}</div>
+      {(data.meta || data.count !== undefined) && (
+        <div className="workspace-flow-node-meta">
+          {data.meta && <span>{data.meta}</span>}
+          {data.count !== undefined && <span>{data.count}</span>}
+        </div>
+      )}
+      <Handle type="source" position={Position.Right} className="workspace-flow-handle" />
+    </div>
+  );
+}
+
+const mindmapNodeTypes = { mindmap: MindmapNodeCard };
 
 function makeDraft(type: WorkspaceObjectType, item?: WorkspaceObject, boardId?: number, columnId?: number): Draft {
   if (!item) {
@@ -1143,6 +1186,7 @@ export default function WorkspacePage() {
   const reorderBoard = useReorderWorkspaceBoard();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("dashboard");
+  const [mindmapFilters, setMindmapFilters] = useState<MindmapFilters>({ projects: true, tasks: true, wiki: true, notes: true, dependencies: true });
   const [wikiQuery, setWikiQuery] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [activeBoardId, setActiveBoardId] = useState<number | null>(null);
@@ -1224,6 +1268,92 @@ export default function WorkspacePage() {
       .sort((a, b) => dateKeyFromValue(a.due_date).localeCompare(dateKeyFromValue(b.due_date))),
     [tasks]
   );
+  const mindmapFilterItems = useMemo<Array<{ key: MindmapFilterKey; label: string }>>(() => [
+    { key: "projects", label: t("workspace.projects") },
+    { key: "tasks", label: t("workspace.tasks") },
+    { key: "wiki", label: t("workspace.wiki") },
+    { key: "notes", label: t("workspace.notes") },
+    { key: "dependencies", label: t("workspace.dependencies") },
+  ], [t]);
+  const mindmapData = useMemo(() => {
+    const sortedProjects = [...projects].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))).slice(0, 6);
+    const sortedTasks = [...tasks].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))).slice(0, 10);
+    const sortedWiki = [...wiki].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))).slice(0, 6);
+    const sortedNotes = [...notes].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))).slice(0, 5);
+    const lanes: Array<{ key: Exclude<MindmapFilterKey, "dependencies">; label: string; y: number; items: WorkspaceObject[] }> = [
+      { key: "projects", label: t("workspace.projects"), y: 120, items: sortedProjects },
+      { key: "tasks", label: t("workspace.tasks"), y: 350, items: sortedTasks },
+      { key: "wiki", label: t("workspace.wiki"), y: 580, items: sortedWiki },
+      { key: "notes", label: t("workspace.notes"), y: 790, items: sortedNotes },
+    ];
+    const nodes: MindmapFlowNode[] = [{
+      id: "root",
+      type: "mindmap",
+      position: { x: 0, y: 410 },
+      data: { label: t("workspace.title"), kind: "root", count: projects.length + tasks.length + wiki.length + notes.length },
+    }];
+    const objectByNodeId = new Map<string, WorkspaceObject>();
+
+    lanes.forEach((lane) => {
+      if (!mindmapFilters[lane.key]) return;
+      nodes.push({
+        id: `group:${lane.key}`,
+        type: "mindmap",
+        position: { x: 270, y: lane.y },
+        data: { label: lane.label, kind: "group", count: lane.items.length },
+      });
+      const firstY = lane.y - ((lane.items.length - 1) * 76) / 2;
+      lane.items.forEach((item, index) => {
+        const nodeId = `${item.type}:${item.id}`;
+        objectByNodeId.set(nodeId, item);
+        nodes.push({
+          id: nodeId,
+          type: "mindmap",
+          position: { x: 590, y: firstY + index * 76 },
+          data: {
+            label: item.title,
+            kind: item.type,
+            meta: item.type === "task"
+              ? t(`workspace.priority_${item.priority}`)
+              : item.tags.slice(0, 2).join(", ") || formatDate(item.updated_at),
+          },
+        });
+      });
+    });
+
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const edgeIds = new Set<string>();
+    const edges: MindmapFlowEdge[] = [];
+    const addEdge = (source: string, target: string, dependency = false) => {
+      if (!nodeIds.has(source) || !nodeIds.has(target) || source === target) return;
+      const id = `${source}->${target}:${dependency ? "dependency" : "direct"}`;
+      if (edgeIds.has(id)) return;
+      edgeIds.add(id);
+      edges.push({
+        id,
+        source,
+        target,
+        type: "smoothstep",
+        className: dependency ? "workspace-flow-edge-dependency" : "workspace-flow-edge",
+        data: { dependency },
+      });
+    };
+
+    lanes.forEach((lane) => {
+      if (!mindmapFilters[lane.key]) return;
+      addEdge("root", `group:${lane.key}`);
+      lane.items.forEach((item) => addEdge(`group:${lane.key}`, `${item.type}:${item.id}`));
+    });
+    sortedTasks.forEach((task) => {
+      if (task.project_id) addEdge(`project:${task.project_id}`, `task:${task.id}`);
+      if (task.parent_id) addEdge(`task:${task.parent_id}`, `task:${task.id}`);
+    });
+    if (mindmapFilters.dependencies) {
+      dependencies.forEach((dep) => addEdge(`${dep.source_type}:${dep.source_id}`, `${dep.target_type}:${dep.target_id}`, true));
+    }
+
+    return { nodes, edges, objectByNodeId };
+  }, [dependencies, mindmapFilters, notes, projects, t, tasks, wiki]);
   const activeDragTask = activeDragId?.startsWith("task:") ? tasks.find((task) => `task:${task.id}` === activeDragId) : null;
   const sidebarTabs: WorkspaceTab[] = ["dashboard", "projects", "board", "list", "calendar", "timeline", "mindmap", "wiki", "notes"];
   const tabIcon = (tab: WorkspaceTab) => tab === "dashboard" ? BarChart3 : tab === "board" ? Blocks : tab === "list" ? ListChecks : tab === "calendar" ? CalendarDays : tab === "timeline" ? CheckSquare : tab === "mindmap" ? Network : tab === "projects" ? FolderKanban : tab === "wiki" ? Link2 : FileText;
@@ -2057,43 +2187,44 @@ export default function WorkspacePage() {
   };
 
   const renderMindmap = () => {
-    const node = (id: string, label: string, x: number, y: number, type: WorkspaceObjectType | "root", onClick?: () => void) => ({ id, label, x, y, type, onClick });
-    const projectNodes = projects.slice(0, 4).map((item, index) => node(`project:${item.id}`, item.title, 16, 210 + index * 72, "project", () => openObject(item)));
-    const taskNodes = tasks.slice(0, 6).map((item, index) => node(`task:${item.id}`, item.title, 49, 160 + index * 58, "task", () => setTaskDetail(item)));
-    const wikiNodes = wiki.slice(0, 4).map((item, index) => node(`wiki:${item.id}`, item.title, 78, 205 + index * 70, "wiki", () => openObject(item)));
-    const noteNodes = notes.slice(0, 3).map((item, index) => node(`note:${item.id}`, item.title, 78, 495 + index * 58, "note", () => openObject(item)));
-    const branchNodes = [
-      node("branch:projects", t("workspace.projects"), 16, 95, "project"),
-      node("branch:tasks", t("workspace.tasks"), 49, 95, "task"),
-      node("branch:wiki", t("workspace.wiki"), 78, 95, "wiki"),
-      node("branch:notes", t("workspace.notes"), 78, 430, "note"),
-    ];
-    const nodes = [node("root", t("workspace.title"), 49, 30, "root"), ...branchNodes, ...projectNodes, ...taskNodes, ...wikiNodes, ...noteNodes];
-    const nodeById = new Map(nodes.map((item) => [item.id, item]));
-    const lines = [
-      ...branchNodes.map((item) => ["root", item.id]),
-      ...projectNodes.map((item) => ["branch:projects", item.id]),
-      ...taskNodes.map((item) => [item.label && tasks.find((task) => `task:${task.id}` === item.id)?.project_id ? `project:${tasks.find((task) => `task:${task.id}` === item.id)?.project_id}` : "branch:tasks", item.id]),
-      ...wikiNodes.map((item) => ["branch:wiki", item.id]),
-      ...noteNodes.map((item) => ["branch:notes", item.id]),
-      ...dependencies.map((dep) => [`${dep.source_type}:${dep.source_id}`, `${dep.target_type}:${dep.target_id}`]),
-    ].filter(([from, to]) => nodeById.has(from) && nodeById.has(to));
-
     return (
-      <div className="workspace-mindmap">
-        <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
-          {lines.map(([from, to], index) => {
-            const a = nodeById.get(from)!;
-            const b = nodeById.get(to)!;
-            return <line key={`${from}-${to}-${index}`} x1={`${a.x}%`} y1={a.y} x2={`${b.x}%`} y2={b.y} className="workspace-mindmap-line" />;
-          })}
-        </svg>
-        {nodes.map((item) => (
-          <button key={item.id} onClick={item.onClick} disabled={!item.onClick} className={`workspace-mindmap-node ${item.type === "root" ? "workspace-mindmap-root" : typeTone(item.type as WorkspaceObjectType)}`} style={{ left: `${item.x}%`, top: item.y }}>
-            {item.type === "root" ? <Network size={15} /> : <BookOpen size={13} />}
-            <span>{item.label}</span>
-          </button>
-        ))}
+      <div className="workspace-mindmap-shell">
+        <div className="workspace-mindmap-toolbar">
+          {mindmapFilterItems.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setMindmapFilters((current) => ({ ...current, [item.key]: !current[item.key] }))}
+              className={`workspace-mindmap-filter ${mindmapFilters[item.key] ? "workspace-mindmap-filter-active" : ""}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="workspace-mindmap-canvas">
+          <ReactFlow
+            nodes={mindmapData.nodes}
+            edges={mindmapData.edges}
+            nodeTypes={mindmapNodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.18 }}
+            minZoom={0.25}
+            maxZoom={1.4}
+            onNodeClick={(_, node) => {
+              const item = mindmapData.objectByNodeId.get(node.id);
+              if (!item) return;
+              if (item.type === "task") {
+                setTaskDetail(item);
+                return;
+              }
+              openObject(item);
+            }}
+          >
+            <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} />
+            <Controls showInteractive={false} />
+            <MiniMap pannable zoomable nodeStrokeWidth={3} className="workspace-mindmap-minimap" />
+          </ReactFlow>
+        </div>
       </div>
     );
   };
