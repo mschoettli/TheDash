@@ -9,6 +9,7 @@ import {
   MiniMap,
   Position,
   ReactFlow,
+  useNodesState,
   type Edge,
   type Node,
   type NodeProps,
@@ -642,23 +643,20 @@ function WorkspaceDrawer({
 
     try {
       if (draft.type === "project") {
-        const saved = draft.id ? await updateProject.mutateAsync({ id: draft.id, ...payload }) : await createProject.mutateAsync(payload);
-        setDraft(makeDraft("project", saved, activeBoardId));
+        if (draft.id) await updateProject.mutateAsync({ id: draft.id, ...payload });
+        else await createProject.mutateAsync(payload);
       } else if (draft.type === "task") {
-        const saved = draft.id ? await updateTask.mutateAsync({ id: draft.id, ...payload }) : await createTask.mutateAsync(payload);
-        setDraft(makeDraft("task", saved, activeBoardId));
+        if (draft.id) await updateTask.mutateAsync({ id: draft.id, ...payload });
+        else await createTask.mutateAsync(payload);
       } else if (draft.type === "wiki") {
-        const saved = draft.id
-          ? await updateWiki.mutateAsync({ id: draft.id, title: payload.title, body: payload.body, tags: payload.tags, book_id: payload.book_id, chapter_id: payload.chapter_id, sort_order: payload.sort_order })
-          : await createWiki.mutateAsync({ title: payload.title, body: payload.body, tags: payload.tags, book_id: payload.book_id, chapter_id: payload.chapter_id, sort_order: payload.sort_order });
-        setDraft(makeDraft("wiki", saved, activeBoardId));
+        if (draft.id) await updateWiki.mutateAsync({ id: draft.id, title: payload.title, body: payload.body, tags: payload.tags, book_id: payload.book_id, chapter_id: payload.chapter_id, sort_order: payload.sort_order });
+        else await createWiki.mutateAsync({ title: payload.title, body: payload.body, tags: payload.tags, book_id: payload.book_id, chapter_id: payload.chapter_id, sort_order: payload.sort_order });
       } else {
-        const saved = draft.id
-          ? await updateNote.mutateAsync({ id: draft.id, title: payload.title, content: payload.body, tags: payload.tags })
-          : await createNote.mutateAsync({ title: payload.title, content: payload.body, tags: payload.tags });
-        setDraft(makeDraft("note", { ...saved, type: "note", body: saved.content } as WorkspaceObject, activeBoardId));
+        if (draft.id) await updateNote.mutateAsync({ id: draft.id, title: payload.title, content: payload.body, tags: payload.tags });
+        else await createNote.mutateAsync({ title: payload.title, content: payload.body, tags: payload.tags });
       }
       setSaveState("saved");
+      setDraft(null);
     } catch {
       setSaveState("error");
     }
@@ -1215,6 +1213,7 @@ export default function WorkspacePage() {
   const [wikiAutosaveError, setWikiAutosaveError] = useState("");
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [taskDetail, setTaskDetail] = useState<WorkspaceTask | null>(null);
+  const [mindmapNodes, setMindmapNodes, onMindmapNodesChange] = useNodesState<MindmapFlowNode>([]);
   const todayKey = dateKeyFromDate(new Date());
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date();
@@ -1375,6 +1374,10 @@ export default function WorkspacePage() {
   }, [activeBoardId, overview?.active_board_id]);
 
   useEffect(() => {
+    setMindmapNodes(mindmapData.nodes);
+  }, [mindmapData.nodes, setMindmapNodes]);
+
+  useEffect(() => {
     if (!expandedWikiBooks.length && wikiBooks[0]?.id) setExpandedWikiBooks([wikiBooks[0].id]);
   }, [expandedWikiBooks.length, wikiBooks]);
 
@@ -1483,15 +1486,30 @@ export default function WorkspacePage() {
   };
 
   const quickCreate = async (type: WorkspaceObjectType, columnId?: number) => {
-    if (type === "project") setDraft(makeDraft("project", await createProject.mutateAsync({ title: t("workspace.new_project"), body: "## Goal\n\n## Tasks\n", status: "backlog", priority: "medium" }), boardId));
-    if (type === "task") setDraft(makeDraft("task", await createTask.mutateAsync({ title: t("workspace.new_task"), board_id: boardId, column_id: columnId ?? boardColumns[0]?.id, priority: "medium" }), boardId, columnId));
+    if (type === "project") {
+      setDraft({
+        ...makeDraft("project", undefined, boardId),
+        title: t("workspace.new_project"),
+        body: "## Goal\n\n## Tasks\n",
+        status: "backlog",
+        priority: "medium",
+      });
+    }
+    if (type === "task") {
+      setDraft({
+        ...makeDraft("task", undefined, boardId, columnId ?? boardColumns[0]?.id),
+        title: t("workspace.new_task"),
+        board_id: boardId,
+        column_id: columnId ?? boardColumns[0]?.id ?? null,
+        priority: "medium",
+      });
+    }
     if (type === "wiki") {
       const page = await createWiki.mutateAsync({ title: t("workspace.new_wiki"), body: "## Overview\n", book_id: wikiBooks[0]?.id ?? null });
       startWikiEdit(page);
     }
     if (type === "note") {
-      const note = await createNote.mutateAsync({ title: t("workspace.new_note"), content: "" });
-      setDraft(makeDraft("note", { ...note, type: "note", body: note.content } as WorkspaceObject, boardId));
+      setDraft({ ...makeDraft("note", undefined, boardId), title: t("workspace.new_note") });
     }
   };
 
@@ -2203,9 +2221,11 @@ export default function WorkspacePage() {
         </div>
         <div className="workspace-mindmap-canvas">
           <ReactFlow
-            nodes={mindmapData.nodes}
+            nodes={mindmapNodes}
             edges={mindmapData.edges}
             nodeTypes={mindmapNodeTypes}
+            onNodesChange={onMindmapNodesChange}
+            nodesDraggable
             fitView
             fitViewOptions={{ padding: 0.18 }}
             minZoom={0.25}

@@ -270,9 +270,17 @@ body {
 
 .tile-hover-plane > .tile-status-dot {
   position: absolute;
-  top: 0.55rem;
-  right: 0.55rem;
+  top: 0.45rem;
+  right: 0.45rem;
   z-index: 10;
+  display: grid;
+  width: 0.5rem;
+  height: 0.5rem;
+  place-items: center;
+}
+
+.tile-hover-plane > .tile-status-dot .animate-ping {
+  display: none;
 }
 
 .tile-hover-plane:hover {
@@ -761,11 +769,11 @@ body {
 }
 
 .workspace-calendar-day {
-  min-height: 8.5rem;
+  min-height: 7rem;
   border-right: 1px solid rgb(var(--line) / 0.58);
   border-bottom: 1px solid rgb(var(--line) / 0.58);
   background: rgb(var(--surface) / 0.28);
-  padding: 0.55rem;
+  padding: 0.42rem;
   cursor: pointer;
   transition: background 180ms, box-shadow 180ms;
 }
@@ -790,9 +798,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-height: 1.45rem;
+  min-height: 1.15rem;
   color: rgb(var(--t2));
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
@@ -808,8 +816,8 @@ body {
 
 .workspace-calendar-day-tasks {
   display: grid;
-  gap: 0.35rem;
-  margin-top: 0.45rem;
+  gap: 0.28rem;
+  margin-top: 0.35rem;
 }
 
 .workspace-calendar-task,
@@ -824,8 +832,8 @@ body {
 }
 
 .workspace-calendar-task {
-  gap: 0.22rem;
-  padding: 0.42rem;
+  gap: 0.18rem;
+  padding: 0.34rem;
 }
 
 .workspace-calendar-task:hover,
@@ -838,15 +846,15 @@ body {
 .workspace-calendar-priority {
   width: fit-content;
   border-radius: 999px;
-  padding: 0.08rem 0.38rem;
-  font-size: 0.6rem;
+  padding: 0.06rem 0.34rem;
+  font-size: 0.56rem;
   font-weight: 750;
 }
 
 .workspace-calendar-task-title {
   overflow: hidden;
   color: rgb(var(--t1));
-  font-size: 0.76rem;
+  font-size: 0.7rem;
   font-weight: 750;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -856,7 +864,7 @@ body {
 .workspace-calendar-task-project {
   overflow: hidden;
   color: rgb(var(--t3));
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
